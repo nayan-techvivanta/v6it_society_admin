@@ -38,8 +38,8 @@ import {
 } from "react-icons/fa";
 import { motion } from "framer-motion";
 import { styled } from "@mui/material/styles";
+import { createUser } from "../../api/createUser";
 
-// Styled Components
 const StyledTextField = styled(TextField)(({ theme }) => ({
   "& .MuiOutlinedInput-root": {
     borderRadius: "12px",
@@ -107,157 +107,150 @@ const AddManagerDialog = ({
   isEdit = false,
 }) => {
   const [formData, setFormData] = useState({
-    registerDate: new Date().toISOString().split("T")[0],
-    id: "",
     name: "",
     email: "",
-    address: "",
+    password: "",
     contact: "",
     whatsapp: "",
-    password: "",
-    secretKey: "",
-    country: "",
-    state: "",
-    city: "",
   });
+
   const [errors, setErrors] = useState({});
   const [submitError, setSubmitError] = useState("");
 
-  // useEffect(() => {
-  //   if (!open) {
-  //     setFormData({
-  //       registerDate: new Date().toISOString().split("T")[0],
-  //       id: "",
-  //       name: "",
-  //       email: "",
-  //       address: "",
-  //       contact: "",
-  //       whatsapp: "",
-  //       password: "",
-  //       secretKey: "",
-  //       country: "",
-  //       state: "",
-  //       city: "",
-  //     });
-  //     setErrors({});
-  //     setSubmitError("");
-  //   }
-  // }, [open]);
   useEffect(() => {
     if (!open) {
-      // Dialog band hone par reset
       setFormData({
-        registerDate: new Date().toISOString().split("T")[0],
-        id: "",
         name: "",
         email: "",
-        address: "",
+        password: "",
         contact: "",
         whatsapp: "",
-        password: "",
-        secretKey: "",
-        country: "",
-        state: "",
-        city: "",
       });
       setErrors({});
       setSubmitError("");
-      return;
-    }
-
-    // EDIT MODE - Existing manager data populate karo
-    if (isEdit && manager) {
+    } else if (isEdit && manager) {
       setFormData({
-        id: manager.id?.toString() || "", // ✅ Safe
         name: manager.name || "",
         email: manager.email || "",
-        registerDate:
-          manager.registerDate || new Date().toISOString().split("T")[0],
-        city: manager.address?.city || "",
-        state: manager.address?.state || "",
-        country: manager.address?.country || "",
-        contact: manager.address?.contact || "",
-        whatsapp: manager.address?.whatsapp || "",
-        address: manager.address || "",
         password: "",
-        secretKey: "",
+        contact: manager.contact || "",
+        whatsapp: manager.whatsapp || manager.contact || "",
       });
     }
   }, [open, manager, isEdit]);
 
   const validateForm = () => {
     const newErrors = {};
-    // if (!formData.id) newErrors.id = "ID is required";
-    if (!isEdit && !formData.id) newErrors.id = "ID is required";
 
-    // if (!formData.name.trim()) newErrors.name = "Name is required";
     if (!formData.name.trim()) newErrors.name = "Name is required";
+
     if (!formData.email.trim()) newErrors.email = "Email is required";
     else if (!/\S+@\S+\.\S+/.test(formData.email))
       newErrors.email = "Email is invalid";
+
     if (!formData.contact.trim())
       newErrors.contact = "Contact number is required";
     else if (!/^\+?\d{10,15}$/.test(formData.contact.replace(/\s/g, "")))
       newErrors.contact = "Invalid contact number";
-    // if (!formData.password.trim()) newErrors.password = "Password is required";
-    // else if (formData.password.length < 6)
-    //   newErrors.password = "Password must be at least 6 characters";
+
     if (!isEdit) {
       if (!formData.password.trim())
         newErrors.password = "Password is required";
       else if (formData.password.length < 6)
         newErrors.password = "Password must be at least 6 characters";
     }
-    if (!formData.city.trim()) newErrors.city = "City is required";
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
-
-  // const handleSubmit = (e) => {
-
+  // const handleSubmit = async (e) => {
   //   e.preventDefault();
   //   if (!validateForm()) return;
-  //   const newManager = {
-  //     id: parseInt(formData.id),
-  //     registerDate: formData.registerDate,
-  //     name: formData.name.trim(),
-  //     email: formData.email.trim(),
-  //     assignedBuildings: Math.floor(Math.random() * 10) + 1,
-  //     status: "pending",
-  //     address: {
-  //       city: formData.city.trim(),
-  //       state: formData.state,
-  //       country: formData.country,
+
+  //   setSubmitError("");
+
+  //   try {
+  //     const managerData = {
+  //       name: formData.name.trim(),
+  //       email: formData.email.trim(),
+  //       password: !isEdit ? formData.password.trim() : undefined,
   //       contact: formData.contact.trim(),
   //       whatsapp: formData.whatsapp.trim() || formData.contact.trim(),
-  //     },
-  //     avatar: formData.name.trim().substring(0, 2).toUpperCase(),
-  //   };
-  //   onSubmit(newManager);
+  //     };
+
+  //     if (!isEdit) {
+  //       const newUser = await createUser(managerData);
+  //       console.log("New user created:", newUser);
+  //     }
+
+  //     await onSubmit(managerData);
+  //   } catch (error) {
+  //     console.error("Error creating/updating manager:", error);
+  //     setSubmitError(
+  //       error.message || "Failed to create/update manager. Please try again."
+  //     );
+  //   }
   // };
-  const handleSubmit = (e) => {
+  // const handleSubmit = async (e) => {
+  //   e.preventDefault();
+  //   if (!validateForm()) return;
+
+  //   setSubmitError("");
+
+  //   try {
+  //     // Prepare full payload
+  //     const managerData = {
+  //       name: formData.name.trim(),
+  //       email: formData.email.trim(),
+  //       password: !isEdit ? formData.password.trim() : undefined,
+  //       contact: formData.contact.trim(),
+  //       whatsapp: formData.whatsapp.trim() || formData.contact.trim(),
+  //     };
+
+  //     if (!isEdit) {
+  //       // Call Edge Function to create user
+  //       const newUser = await createUser(managerData);
+  //       console.log("New user created:", newUser);
+  //     }
+
+  //     // Call your onSubmit to save manager in DB
+  //     await onSubmit(managerData);
+  //   } catch (error) {
+  //     console.error("Error creating/updating manager:", error);
+  //     setSubmitError(
+  //       error.message || "Failed to create/update manager. Please try again."
+  //     );
+  //   }
+  // };
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
 
-    const managerData = {
-      id: parseInt(formData.id),
-      registerDate: formData.registerDate,
-      name: formData.name.trim(),
-      email: formData.email.trim(),
-      assignedBuildings: isEdit
-        ? manager.assignedBuildings
-        : Math.floor(Math.random() * 10) + 1,
-      status: isEdit ? manager.status : "pending",
-      address: {
-        city: formData.city.trim(),
-        state: formData.state,
-        country: formData.country,
+    setSubmitError("");
+
+    try {
+      const managerData = {
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        password: formData.password.trim(),
         contact: formData.contact.trim(),
         whatsapp: formData.whatsapp.trim() || formData.contact.trim(),
-      },
-      avatar: formData.name.trim().substring(0, 2).toUpperCase(),
-    };
-    onSubmit(managerData);
+      };
+
+      const userRes = await createUser(managerData);
+      console.log("Supabase user created:", userRes);
+
+      await onSubmit({
+        ...managerData,
+        user_id: userRes.user?.id,
+        role: "Manager",
+      });
+
+      onClose();
+    } catch (error) {
+      console.error(error);
+      setSubmitError(error.message);
+    }
   };
 
   const handleInputChange = (e) => {
@@ -275,7 +268,7 @@ const AddManagerDialog = ({
     <Dialog
       open={open}
       onClose={onClose}
-      maxWidth="md"
+      maxWidth="sm"
       fullWidth
       PaperProps={{
         sx: {
@@ -315,21 +308,6 @@ const AddManagerDialog = ({
               <FaUserTie size={24} />
             </Box>
             <Box>
-              {/* <Typography
-                variant="h5"
-                sx={{ fontWeight: "bold", fontFamily: "'Roboto', sans-serif" }}
-              >
-                Add New Manager
-              </Typography>
-              <Typography
-                sx={{
-                  opacity: 0.9,
-                  fontSize: "0.875rem",
-                  fontFamily: "'Roboto', sans-serif",
-                }}
-              >
-                Complete the form below to register a new property manager
-              </Typography> */}
               <Typography
                 variant="h5"
                 sx={{ fontWeight: "bold", fontFamily: "'Roboto', sans-serif" }}
@@ -377,86 +355,77 @@ const AddManagerDialog = ({
             </Alert>
           )}
 
-          {/* Two Column Layout */}
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: { md: "1fr 1fr" },
-              gap: "24px",
-            }}
-          >
-            {/* Left Column */}
-            <Box sx={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-              <Typography
-                variant="h6"
-                sx={{
-                  fontFamily: "'Roboto', sans-serif",
-                  fontWeight: 600,
-                  color: "#334155",
-                }}
-              >
-                <FaUserTie
-                  style={{
-                    marginRight: "8px",
-                    display: "inline-block",
-                    color: "#8b0000",
-                  }}
-                />
-                Personal Information
-              </Typography>
-
-              <StyledTextField
-                fullWidth
-                placeholder="Manager ID"
-                name="id"
-                value={formData.id}
-                onChange={handleInputChange}
-                error={!!errors.id}
-                helperText={errors.id}
-                type="number"
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Key sx={{ color: "#8b0000" }} />
-                    </InputAdornment>
-                  ),
+          <Box sx={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+            <Typography
+              variant="h6"
+              sx={{
+                fontFamily: "'Roboto', sans-serif",
+                fontWeight: 600,
+                color: "#334155",
+              }}
+            >
+              <FaUserTie
+                style={{
+                  marginRight: "8px",
+                  display: "inline-block",
+                  color: "#8b0000",
                 }}
               />
+              Personal Information
+            </Typography>
 
-              <StyledTextField
-                fullWidth
-                placeholder="Full Name"
-                name="name"
-                value={formData.name}
-                onChange={handleInputChange}
-                error={!!errors.name}
-                helperText={errors.name}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Person sx={{ color: "#8b0000" }} />
-                    </InputAdornment>
-                  ),
-                }}
-              />
+            <StyledTextField
+              fullWidth
+              placeholder="Full Name"
+              name="name"
+              value={formData.name}
+              onChange={handleInputChange}
+              error={!!errors.name}
+              helperText={errors.name}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Person sx={{ color: "#8b0000" }} />
+                  </InputAdornment>
+                ),
+              }}
+            />
 
-              <StyledTextField
-                fullWidth
-                placeholder="Email Address"
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleInputChange}
-                error={!!errors.email}
-                helperText={errors.email}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Email sx={{ color: "#8b0000" }} />
-                    </InputAdornment>
-                  ),
-                }}
-              />
+            <StyledTextField
+              fullWidth
+              placeholder="Email Address"
+              name="email"
+              type="email"
+              value={formData.email}
+              onChange={handleInputChange}
+              error={!!errors.email}
+              helperText={errors.email}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Email sx={{ color: "#8b0000" }} />
+                  </InputAdornment>
+                ),
+              }}
+            />
+            {/* <StyledTextField
+              fullWidth
+              placeholder="Password"
+              name="password"
+              type="password"
+              value={formData.password}
+              onChange={handleInputChange}
+              error={!!errors.password}
+              helperText={errors.password}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Lock sx={{ color: "#8b0000" }} />
+                  </InputAdornment>
+                ),
+              }}
+            /> */}
+            {!isEdit && (
               <StyledTextField
                 fullWidth
                 placeholder="Password"
@@ -474,200 +443,44 @@ const AddManagerDialog = ({
                   ),
                 }}
               />
+            )}
+
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "16px",
+              }}
+            >
               <StyledTextField
-                fullWidth
-                placeholder="Secret Key"
-                name="secretKey"
-                value={formData.secretKey}
+                placeholder="Contact Number"
+                name="contact"
+                value={formData.contact}
                 onChange={handleInputChange}
+                error={!!errors.contact}
+                helperText={errors.contact}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <Key sx={{ color: "#8b0000" }} />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </Box>
-
-            {/* Right Column */}
-            <Box sx={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-              <Typography
-                variant="h6"
-                sx={{
-                  fontFamily: "'Roboto', sans-serif",
-                  fontWeight: 600,
-                  color: "#334155",
-                }}
-              >
-                <FaMapMarkerAlt
-                  style={{
-                    marginRight: "8px",
-                    display: "inline-block",
-                    color: "#8b0000",
-                  }}
-                />
-                Location & Security
-              </Typography>
-
-              <StyledTextField
-                fullWidth
-                placeholder="Registration Date"
-                name="registerDate"
-                type="date"
-                value={formData.registerDate}
-                onChange={handleInputChange}
-                InputLabelProps={{ shrink: true }}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <CalendarToday sx={{ color: "#8b0000" }} />
+                      <Phone sx={{ color: "#8b0000" }} />
                     </InputAdornment>
                   ),
                 }}
               />
 
               <StyledTextField
-                fullWidth
-                placeholder="Address"
-                name="address"
-                value={formData.address}
+                placeholder="WhatsApp"
+                name="whatsapp"
+                value={formData.whatsapp}
                 onChange={handleInputChange}
-                multiline
-                rows={2}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <LocationOn sx={{ color: "#8b0000" }} />
+                      <WhatsApp sx={{ color: "#8b0000" }} />
                     </InputAdornment>
                   ),
                 }}
               />
-
-              <StyledTextField
-                fullWidth
-                placeholder="City"
-                name="city"
-                value={formData.city}
-                onChange={handleInputChange}
-                error={!!errors.city}
-                helperText={errors.city}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <FaCity style={{ color: "#8b0000" }} />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-
-              <Box
-                sx={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: "16px",
-                }}
-              >
-                <FormControl fullWidth>
-                  <StyledSelect
-                    name="country"
-                    value={formData.country || ""}
-                    onChange={handleInputChange}
-                    displayEmpty
-                    startAdornment={
-                      <InputAdornment position="start">
-                        <FaGlobeAmericas
-                          style={{ color: "#8b0000", marginRight: "8px" }}
-                        />
-                      </InputAdornment>
-                    }
-                    renderValue={(selected) =>
-                      selected ? (
-                        selected
-                      ) : (
-                        <span className="text-gray-400">Select Country</span>
-                      )
-                    }
-                  >
-                    <MenuItem value="" disabled>
-                      Select Country
-                    </MenuItem>
-
-                    {countries.map((country) => (
-                      <MenuItem key={country} value={country}>
-                        {country}
-                      </MenuItem>
-                    ))}
-                  </StyledSelect>
-                </FormControl>
-
-                <FormControl fullWidth>
-                  <InputLabel shrink={false}>
-                    {!formData.state && "State"}
-                  </InputLabel>
-
-                  <StyledSelect
-                    name="state"
-                    value={formData.state || ""}
-                    onChange={handleInputChange}
-                    displayEmpty
-                    renderValue={(selected) =>
-                      selected ? (
-                        selected
-                      ) : (
-                        <span className="text-gray-400">State</span>
-                      )
-                    }
-                  >
-                    <MenuItem value="" disabled>
-                      State
-                    </MenuItem>
-
-                    {states.map((state) => (
-                      <MenuItem key={state} value={state}>
-                        {state}
-                      </MenuItem>
-                    ))}
-                  </StyledSelect>
-                </FormControl>
-              </Box>
-              <Box
-                sx={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: "16px",
-                }}
-              >
-                <StyledTextField
-                  placeholder="Contact Number"
-                  name="contact"
-                  value={formData.contact}
-                  onChange={handleInputChange}
-                  error={!!errors.contact}
-                  helperText={errors.contact}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Phone sx={{ color: "#8b0000" }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
-
-                <StyledTextField
-                  placeholder="WhatsApp"
-                  name="whatsapp"
-                  value={formData.whatsapp}
-                  onChange={handleInputChange}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <WhatsApp sx={{ color: "#8b0000" }} />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
-              </Box>
             </Box>
           </Box>
 

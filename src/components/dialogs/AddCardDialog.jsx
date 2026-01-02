@@ -25,46 +25,68 @@ import {
   Apartment,
   Tag,
   AssignmentTurnedIn,
+  Business,
 } from "@mui/icons-material";
+import { supabase } from "../../api/supabaseClient";
+
 import { toast } from "react-toastify";
 
 const AddCardDialog = ({
   open,
   onClose,
-  onSubmit,
-  buildings = [], // This will be passed from parent component
+  // onSubmit,
+  // societies = [],
   isEdit = false,
   cardData,
 }) => {
   const [formData, setFormData] = useState({
-    buildingId: "",
-    serialId: "",
-    assigned: false,
-    notes: "",
+    societyId: "",
+    card_serial_number: "",
   });
+  const [societies, setSocieties] = useState([]);
+  const [loadingSocieties, setLoadingSocieties] = useState(false);
 
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [touched, setTouched] = useState({});
   const [isFormValid, setIsFormValid] = useState(false);
 
-  // Generate serial ID based on selected building
-  const generateSerialId = (building) => {
-    if (!building) return "";
+  // Generate serial ID based on selected society
+  const generateSerialId = (society) => {
+    if (!society) return "";
 
-    // Create serial ID: first 3 letters of building name + random 4 digits
-    const prefix = building.name.substring(0, 3).toUpperCase();
+    // Create serial ID: first 3 letters of society name + random 4 digits
+    const prefix = society.name.substring(0, 3).toUpperCase();
     const randomNum = Math.floor(1000 + Math.random() * 9000);
     return `${prefix}-${randomNum}`;
   };
 
-  // Initialize form data
+  useEffect(() => {
+    const fetchSocieties = async () => {
+      setLoadingSocieties(true);
+
+      const { data, error } = await supabase
+        .from("societies")
+        .select("id, name");
+
+      if (error) {
+        toast.error("Failed to load societies");
+      } else {
+        setSocieties(data || []);
+      }
+
+      setLoadingSocieties(false);
+    };
+
+    if (open) fetchSocieties();
+  }, [open]);
+
   useEffect(() => {
     if (open) {
       if (isEdit && cardData) {
         setFormData({
-          buildingId: cardData.buildingId || "",
-          serialId: cardData.serialId || "",
+          societyId: cardData.society_id || "",
+          card_serial_number: cardData.card_serial_number || "",
           assigned: cardData.assigned || false,
           notes: cardData.notes || "",
         });
@@ -74,8 +96,8 @@ const AddCardDialog = ({
           1000 + Math.random() * 9000
         )}`;
         setFormData({
-          buildingId: "",
-          serialId: initialSerialId,
+          societyId: "",
+          card_serial_number: initialSerialId,
           assigned: false,
           notes: "",
         });
@@ -85,25 +107,20 @@ const AddCardDialog = ({
     }
   }, [open, cardData, isEdit]);
 
-  // Find selected building
-  const selectedBuilding = buildings.find((b) => b.id === formData.buildingId);
+  // Find selected society
+  const selectedSociety = societies.find((s) => s.id === formData.societyId);
 
   // Validation
   const validateForm = () => {
     const newErrors = {};
 
-    if (!formData.buildingId) {
-      newErrors.buildingId = "Please select a building";
+    if (!formData.societyId) {
+      newErrors.societyId = "Please select a society";
     }
 
-    if (!formData.serialId.trim()) {
-      newErrors.serialId = "Serial ID is required";
-    } else if (!/^[A-Z]{3}-\d{4}$|^CARD-\d{4}$/.test(formData.serialId)) {
-      newErrors.serialId = "Serial ID must be in format ABC-1234 or CARD-1234";
+    if (!formData.card_serial_number.trim()) {
+      newErrors.card_serial_number = "Card serial number is required";
     }
-
-    // Check if serial ID is unique among existing cards
-    // You might want to add this check if you have access to existing cards
 
     setErrors(newErrors);
     setIsFormValid(Object.keys(newErrors).length === 0);
@@ -122,23 +139,49 @@ const AddCardDialog = ({
     }
 
     setIsSubmitting(true);
+
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      let query;
 
-      const cardPayload = {
-        ...formData,
-        buildingName: selectedBuilding?.name || "",
-        buildingAvatar:
-          selectedBuilding?.name?.substring(0, 2).toUpperCase() || "",
-      };
+      if (isEdit && cardData?.id) {
+        // 🔹 UPDATE CARD
+        query = supabase
+          .from("cards")
+          .update({
+            society_id: formData.societyId,
+            card_serial_number: formData.card_serial_number,
+          })
+          .eq("id", cardData.id)
+          .select()
+          .single();
+      } else {
+        // 🔹 INSERT NEW CARD
+        query = supabase
+          .from("cards")
+          .insert([
+            {
+              society_id: formData.societyId,
+              card_serial_number: formData.card_serial_number,
+            },
+          ])
+          .select()
+          .single();
+      }
 
-      onSubmit(cardPayload);
+      const { data, error } = await query;
+
+      if (error) {
+        throw error;
+      }
+
       toast.success(
         isEdit ? "Card updated successfully!" : "Card created successfully!"
       );
-      onClose();
+
+      onClose(); // parent will refresh list
     } catch (error) {
-      toast.error("Failed to save card");
+      console.error("Save card error:", error);
+      toast.error(error.message || "Failed to save card");
     } finally {
       setIsSubmitting(false);
     }
@@ -146,21 +189,22 @@ const AddCardDialog = ({
 
   const handleFieldChange = (field) => (e) => {
     const value = e.target.value;
-    setFormData((prev) => ({ ...prev, [field]: value }));
-    setTouched((prev) => ({ ...prev, [field]: true }));
 
-    // Clear error when user types
+    setFormData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+
+    setTouched((prev) => ({
+      ...prev,
+      [field]: true,
+    }));
+
     if (errors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: "" }));
-    }
-
-    // If building changes, update serial ID
-    if (field === "buildingId" && value) {
-      const building = buildings.find((b) => b.id === value);
-      if (building && !isEdit) {
-        const newSerialId = generateSerialId(building);
-        setFormData((prev) => ({ ...prev, serialId: newSerialId }));
-      }
+      setErrors((prev) => ({
+        ...prev,
+        [field]: "",
+      }));
     }
   };
 
@@ -207,7 +251,7 @@ const AddCardDialog = ({
                 justifyContent: "center",
               }}
             >
-              <Apartment sx={{ fontSize: 20 }} />
+              <Business sx={{ fontSize: 20 }} />
             </Box>
             <Box>
               <Typography variant="h5" fontWeight="700">
@@ -261,7 +305,7 @@ const AddCardDialog = ({
               </Alert>
             )}
 
-            {/* Building Selection */}
+            {/* Society Selection */}
             <Box sx={{ mb: 3 }}>
               <Typography
                 component="label"
@@ -278,23 +322,23 @@ const AddCardDialog = ({
                   },
                 }}
               >
-                Select Building
+                Select Society
               </Typography>
 
-              <FormControl fullWidth error={!!errors.buildingId} size="small">
+              <FormControl fullWidth error={!!errors.societyId} size="small">
                 <Select
-                  value={formData.buildingId}
-                  onChange={handleFieldChange("buildingId")}
+                  value={formData.societyId}
+                  onChange={handleFieldChange("societyId")}
                   displayEmpty
                   sx={{
                     borderRadius: 1.5,
                     height: 44,
                     backgroundColor: "white",
                     border: "1px solid",
-                    borderColor: errors.buildingId ? "#B31B1B" : "#E0E0E0",
+                    borderColor: errors.societyId ? "#B31B1B" : "#E0E0E0",
                     transition: "all 0.2s ease",
                     "&:hover": {
-                      borderColor: errors.buildingId ? "#B31B1B" : "#6F0B14",
+                      borderColor: errors.societyId ? "#B31B1B" : "#6F0B14",
                     },
                     "& .MuiSelect-select": {
                       display: "flex",
@@ -326,12 +370,13 @@ const AddCardDialog = ({
                           color="#A29EB6"
                           sx={{ fontStyle: "italic" }}
                         >
-                          Select a building
+                          Select a society
                         </Typography>
                       );
                     }
 
-                    const building = buildings.find((b) => b.id === selected);
+                    const society = societies.find((s) => s.id === selected);
+                    return society?.name;
                     return (
                       <Box display="flex" alignItems="center" gap={2}>
                         <Box
@@ -351,15 +396,15 @@ const AddCardDialog = ({
                             color="#6F0B14"
                             fontSize="0.875rem"
                           >
-                            {building?.name?.substring(0, 2).toUpperCase()}
+                            {society?.name?.substring(0, 2).toUpperCase()}
                           </Typography>
                         </Box>
                         <Box>
                           <Typography fontWeight={600} color="text.primary">
-                            {building?.name}
+                            {society?.name}
                           </Typography>
                           <Typography variant="caption" color="#A29EB6">
-                            ID: {building?.id}
+                            ID: {society?.id}
                           </Typography>
                         </Box>
                       </Box>
@@ -385,19 +430,19 @@ const AddCardDialog = ({
                           height: 36,
                         }}
                       >
-                        <Apartment sx={{ color: "#A29EB6", fontSize: 20 }} />
+                        <Business sx={{ color: "#A29EB6", fontSize: 20 }} />
                       </Box>
                       <Box>
-                        <Typography color="#A29EB6">Select building</Typography>
+                        <Typography color="#A29EB6">Select society</Typography>
                         <Typography variant="caption" color="#A29EB6">
-                          Choose from available buildings
+                          Choose from available societies
                         </Typography>
                       </Box>
                     </Box>
                   </MenuItem>
 
-                  {buildings.map((building) => (
-                    <MenuItem key={building.id} value={building.id}>
+                  {societies.map((society) => (
+                    <MenuItem key={society.id} value={society.id}>
                       <Box
                         display="flex"
                         alignItems="center"
@@ -421,18 +466,17 @@ const AddCardDialog = ({
                             color="#6F0B14"
                             fontSize="0.875rem"
                           >
-                            {building.name.substring(0, 2).toUpperCase()}
+                            {society.name.substring(0, 2).toUpperCase()}
                           </Typography>
                         </Box>
+
                         <Box flex={1}>
                           <Typography fontWeight={500} color="text.primary">
-                            {building.name}
-                          </Typography>
-                          <Typography variant="caption" color="#A29EB6">
-                            {building.type} • {building.city}
+                            {society.name}
                           </Typography>
                         </Box>
-                        {formData.buildingId === building.id && (
+
+                        {formData.societyId === society.id && (
                           <CheckCircle
                             sx={{ color: "#6F0B14", fontSize: 20 }}
                           />
@@ -442,7 +486,7 @@ const AddCardDialog = ({
                   ))}
                 </Select>
 
-                {errors.buildingId && (
+                {errors.societyId && (
                   <Box
                     sx={{
                       display: "flex",
@@ -466,7 +510,7 @@ const AddCardDialog = ({
                       fontWeight={500}
                       fontSize="0.75rem"
                     >
-                      {errors.buildingId}
+                      {errors.societyId}
                     </Typography>
                   </Box>
                 )}
@@ -490,16 +534,19 @@ const AddCardDialog = ({
                   },
                 }}
               >
-                Serial ID
+                Card Serial Number
               </Typography>
 
               <TextField
                 fullWidth
-                value={formData.serialId}
-                onChange={handleFieldChange("serialId")}
-                error={!!errors.serialId && touched.serialId}
+                value={formData.card_serial_number}
+                onChange={handleFieldChange("card_serial_number")}
+                error={
+                  !!errors.card_serial_number && touched.card_serial_number
+                }
                 helperText={
-                  (touched.serialId && errors.serialId) || "Format: ABC-1234"
+                  (touched.card_serial_number && errors.card_serial_number) ||
+                  "Format: ABC-1234"
                 }
                 InputProps={{
                   startAdornment: (
@@ -512,151 +559,13 @@ const AddCardDialog = ({
                     height: 44,
                   },
                 }}
-                placeholder="e.g., SKY-1234"
+                placeholder="e.g., SOC-1234"
                 size="small"
               />
             </Box>
 
-            {/* Assignment Status */}
-            <Box sx={{ mb: 3 }}>
-              <Typography
-                component="label"
-                variant="caption"
-                fontWeight={600}
-                display="block"
-                mb={1}
-                color="#6F0B14"
-              >
-                Assignment Status
-              </Typography>
-
-              <FormControl fullWidth size="small">
-                <Select
-                  value={formData.assigned}
-                  onChange={handleFieldChange("assigned")}
-                  sx={{
-                    borderRadius: 1.5,
-                    height: 44,
-                    backgroundColor: "white",
-                    border: "1px solid #E0E0E0",
-                    "& .MuiSelect-select": {
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1.5,
-                      py: 1.5,
-                    },
-                  }}
-                  renderValue={(selected) => (
-                    <Box display="flex" alignItems="center" gap={2}>
-                      <Box
-                        sx={{
-                          backgroundColor: selected
-                            ? "rgba(0, 128, 0, 0.1)"
-                            : "rgba(179, 27, 27, 0.1)",
-                          borderRadius: 1,
-                          p: 0.75,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <AssignmentTurnedIn
-                          sx={{
-                            color: selected ? "#008000" : "#B31B1B",
-                            fontSize: 20,
-                          }}
-                        />
-                      </Box>
-                      <Typography fontWeight={500}>
-                        {selected ? "Assigned" : "Unassigned"}
-                      </Typography>
-                    </Box>
-                  )}
-                >
-                  <MenuItem value={false}>
-                    <Box display="flex" alignItems="center" gap={2}>
-                      <Box
-                        sx={{
-                          backgroundColor: "rgba(179, 27, 27, 0.1)",
-                          borderRadius: 1,
-                          p: 0.75,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <AssignmentTurnedIn
-                          sx={{ color: "#B31B1B", fontSize: 20 }}
-                        />
-                      </Box>
-                      <Box>
-                        <Typography fontWeight={500}>Unassigned</Typography>
-                        <Typography variant="caption" color="#A29EB6">
-                          Card is not assigned to any user
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </MenuItem>
-                  <MenuItem value={true}>
-                    <Box display="flex" alignItems="center" gap={2}>
-                      <Box
-                        sx={{
-                          backgroundColor: "rgba(0, 128, 0, 0.1)",
-                          borderRadius: 1,
-                          p: 0.75,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <AssignmentTurnedIn
-                          sx={{ color: "#008000", fontSize: 20 }}
-                        />
-                      </Box>
-                      <Box>
-                        <Typography fontWeight={500}>Assigned</Typography>
-                        <Typography variant="caption" color="#A29EB6">
-                          Card is assigned to a user
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </MenuItem>
-                </Select>
-              </FormControl>
-            </Box>
-
-            {/* Notes (Optional) */}
-            <Box sx={{ mb: 3 }}>
-              <Typography
-                component="label"
-                variant="caption"
-                fontWeight={600}
-                display="block"
-                mb={1}
-                color="#6F0B14"
-              >
-                Additional Notes
-              </Typography>
-
-              <TextField
-                fullWidth
-                multiline
-                rows={3}
-                value={formData.notes}
-                onChange={handleFieldChange("notes")}
-                placeholder="Add any additional notes or comments..."
-                sx={{
-                  borderRadius: 1.5,
-                  "& .MuiOutlinedInput-root": {
-                    borderRadius: 1.5,
-                  },
-                }}
-                size="small"
-              />
-            </Box>
-
-            {/* Selected Building Preview */}
-            {selectedBuilding && (
+            {/* Selected Society Preview */}
+            {selectedSociety && (
               <Box
                 sx={{
                   backgroundColor: "rgba(111, 11, 20, 0.05)",
@@ -672,7 +581,7 @@ const AddCardDialog = ({
                   color="#6F0B14"
                   mb={1}
                 >
-                  Selected Building Preview
+                  Selected Society Preview
                 </Typography>
                 <Box display="flex" alignItems="center" gap={2}>
                   <Box
@@ -692,16 +601,18 @@ const AddCardDialog = ({
                       color="#6F0B14"
                       fontSize="1rem"
                     >
-                      {selectedBuilding.name.substring(0, 2).toUpperCase()}
+                      {selectedSociety.name.substring(0, 2).toUpperCase()}
                     </Typography>
                   </Box>
                   <Box>
                     <Typography fontWeight={600} color="text.primary">
-                      {selectedBuilding.name}
+                      {selectedSociety.name}
                     </Typography>
                     <Typography variant="caption" color="#A29EB6">
-                      {selectedBuilding.type} • {selectedBuilding.city},{" "}
-                      {selectedBuilding.country}
+                      {selectedSociety.address &&
+                        `${selectedSociety.address} • `}
+                      {selectedSociety.city && `${selectedSociety.city}, `}
+                      {selectedSociety.state || selectedSociety.region}
                     </Typography>
                   </Box>
                 </Box>

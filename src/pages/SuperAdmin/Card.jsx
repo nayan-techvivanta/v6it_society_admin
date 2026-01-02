@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Table,
   TableBody,
@@ -14,6 +14,7 @@ import {
   useMediaQuery,
   useTheme,
 } from "@mui/material";
+import { supabase } from "../../api/supabaseClient";
 import { Edit, Delete, MoreVert, Add } from "@mui/icons-material";
 import { motion, AnimatePresence } from "framer-motion";
 import AddCardDialog from "../../components/dialogs/AddCardDialog";
@@ -56,39 +57,6 @@ const mockBuildings = [
   },
 ];
 
-const initialCards = [
-  {
-    id: 1,
-    buildingName: "Skyline Tower",
-    status: "assigned",
-    avatar: "ST",
-  },
-  {
-    id: 2,
-    buildingName: "Green Valley Apartments",
-    status: "unassigned",
-    avatar: "GV",
-  },
-  {
-    id: 3,
-    buildingName: "Ocean View Residency",
-    status: "assigned",
-    avatar: "OV",
-  },
-  {
-    id: 4,
-    buildingName: "City Center Plaza",
-    status: "assigned",
-    avatar: "CC",
-  },
-  {
-    id: 5,
-    buildingName: "Royal Gardens",
-    status: "unassigned",
-    avatar: "RG",
-  },
-];
-
 const statusColors = {
   assigned: "#93BD57",
   unassigned: "#F96E5B",
@@ -117,21 +85,25 @@ const CardRow = ({ card, isMobile, onEdit, onDelete }) => {
     >
       <TableCell className="p-4">
         <Typography className="font-roboto text-sm font-semibold text-black">
-          #{card.id.toString().padStart(3, "0")}
+          {card.id}
+        </Typography>
+      </TableCell>
+      <TableCell className="p-4">
+        <Typography className="font-roboto text-sm font-semibold text-black">
+          {card.serialNumber || "-"}
         </Typography>
       </TableCell>
 
       <TableCell className="p-4">
-        <div className="flex items-center gap-3">
-          <Avatar className="bg-primary text-white font-roboto font-semibold">
-            {card.avatar}
-          </Avatar>
-          <div>
-            <Typography className="font-roboto font-semibold text-black">
-              {card.buildingName}
-            </Typography>
-          </div>
-        </div>
+        <Typography className="font-roboto text-sm font-semibold text-black">
+          {card.societyId || "-"}
+        </Typography>
+      </TableCell>
+
+      <TableCell className="p-4">
+        <Typography className="font-roboto text-sm text-black">
+          {new Date(card.createdAt).toLocaleDateString()}
+        </Typography>
       </TableCell>
 
       <TableCell className="p-4">
@@ -209,12 +181,13 @@ const CardCard = ({ cardItem, onEdit, onDelete }) => {
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div className="bg-lightBackground p-3 rounded-lg">
             <Typography className="font-roboto text-xs text-hintText mb-1">
-              Serial ID
+              Serial Number
             </Typography>
-            <Typography className="font-roboto text-sm font-semibold text-black">
-              #{cardItem.id.toString().padStart(3, "0")}
+            <Typography className="font-roboto font-semibold text-black">
+              {cardItem.serialNumber || "-"}
             </Typography>
           </div>
+
           <div className="bg-lightBackground p-3 rounded-lg">
             <Typography className="font-roboto text-xs text-hintText mb-1">
               Status
@@ -252,16 +225,63 @@ const CardCard = ({ cardItem, onEdit, onDelete }) => {
 };
 
 export default function Card() {
-  const [cards, setCards] = useState(initialCards);
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedCard, setSelectedCard] = useState(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [buildings, setBuildings] = useState(mockBuildings);
+  const [cards, setCards] = useState([]);
+  const [loading, setLoading] = useState(false);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+  const fetchCards = async () => {
+    setLoading(true);
 
-  // Table headers
-  const headers = ["Serial ID", "Building Name", "Status", "Actions"];
+    const { data, error } = await supabase
+      .from("cards")
+      .select(
+        `
+      id,
+      card_serial_number,
+      society_id,
+      created_at
+    `
+      )
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Fetch cards error:", error);
+      setLoading(false);
+      return;
+    }
+
+    const mappedCards = data.map((card) => ({
+      id: card.id,
+      buildingName: `Society #${card.society_id}`,
+      status: "assigned",
+      avatar: card.card_serial_number
+        ? card.card_serial_number.slice(0, 2).toUpperCase()
+        : "CR",
+      serialNumber: card.card_serial_number,
+      societyId: card.society_id,
+      createdAt: card.created_at,
+    }));
+
+    setCards(mappedCards);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchCards();
+  }, []);
+
+  const headers = [
+    "Id",
+    "Card Serial Number",
+    "Society ID",
+    "Created At",
+    "Status",
+    "Actions",
+  ];
 
   const handleAddNewCard = () => {
     setIsEditMode(false);
@@ -271,41 +291,34 @@ export default function Card() {
 
   const handleEditCard = (id) => {
     const cardToEdit = cards.find((card) => card.id === id);
-    if (cardToEdit) {
-      setIsEditMode(true);
-      setSelectedCard(cardToEdit);
-      setOpenDialog(true);
-    }
+
+    if (!cardToEdit) return;
+
+    setIsEditMode(true);
+    setSelectedCard({
+      id: cardToEdit.id,
+      society_id: cardToEdit.societyId,
+      card_serial_number: cardToEdit.serialNumber,
+    });
+    setOpenDialog(true);
   };
 
-  const handleDeleteCard = (id) => {
-    console.log("Delete card:", id);
-    if (window.confirm("Are you sure you want to delete this card?")) {
-      setCards(cards.filter((card) => card.id !== id));
+  const handleDeleteCard = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this card?")) return;
+
+    const { error } = await supabase.from("cards").delete().eq("id", id);
+
+    if (error) {
+      console.error(error);
+      alert("Failed to delete card");
+      return;
     }
+
+    fetchCards();
   };
 
-  const handleSubmitCard = (cardData) => {
-    if (isEditMode && selectedCard) {
-      // Update existing card
-      setCards(
-        cards.map((card) =>
-          card.id === selectedCard.id
-            ? { ...card, ...cardData, id: selectedCard.id }
-            : card
-        )
-      );
-    } else {
-      // Add new card
-      const newCard = {
-        id: cards.length + 1,
-        buildingName: cardData.buildingName,
-        avatar: cardData.buildingAvatar,
-        status: cardData.assigned ? "assigned" : "unassigned",
-      };
-      setCards([...cards, newCard]);
-    }
-    setOpenDialog(false);
+  const handleSubmitCard = () => {
+    fetchCards();
   };
 
   return (
@@ -431,18 +444,24 @@ export default function Card() {
             <span>New Card</span>
           </motion.button> */}
         </div>
+        {loading && (
+          <div className="p-6 text-center">
+            <Typography className="font-roboto text-hintText">
+              Loading cards...
+            </Typography>
+          </div>
+        )}
 
         {/* Table/Card View */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3 }}
-          className="bg-white rounded-lg shadow overflow-hidden border border-gray-200"
+          className="bg-white rounded-lg shadow overflow-hidden  border border-gray-200"
         >
           {!isMobile ? (
-            // Desktop Table View
             <TableContainer component={Paper} elevation={0}>
-              <Table aria-label="cards table">
+              <Table aria-label="cards table ">
                 <TableHead className="bg-lightBackground">
                   <TableRow>
                     {headers.map((header, index) => (
@@ -507,9 +526,10 @@ export default function Card() {
         )}
         <AddCardDialog
           open={openDialog}
-          onClose={() => setOpenDialog(false)}
-          onSubmit={handleSubmitCard}
-          buildings={buildings}
+          onClose={() => {
+            setOpenDialog(false);
+            fetchCards();
+          }}
           isEdit={isEditMode}
           cardData={selectedCard}
         />

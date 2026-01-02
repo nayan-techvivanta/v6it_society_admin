@@ -14,6 +14,7 @@ import {
 } from "react-icons/fi";
 import { BsBuildings } from "react-icons/bs";
 import Badge from "../../ui/badge/Badge";
+import { Typography } from "@mui/material";
 
 export default function Dashboard() {
   // Building stats data
@@ -111,23 +112,26 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 font-roboto">
-            Dashboard
-          </h1>
-          <p className="text-gray-600 mt-1 font-roboto">
-            Overview of your portfolio and performance
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button className="px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium font-roboto text-sm">
-            Last 30 Days
-          </button>
+      <div className="mb-8">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+          <div>
+            <Typography
+              variant="h4"
+              className="font-roboto font-bold text-primary mb-2"
+            >
+              Dashboard
+            </Typography>
+            <Typography className="font-roboto text-gray-600">
+              Overview of your portfolio and performance
+            </Typography>
+          </div>
+          <div className="flex items-center gap-3">
+            <button className="px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium font-roboto text-sm">
+              Last 30 Days
+            </button>
+          </div>
         </div>
       </div>
-
       {/* Quick Stats Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {performanceMetrics.map((metric, index) => (

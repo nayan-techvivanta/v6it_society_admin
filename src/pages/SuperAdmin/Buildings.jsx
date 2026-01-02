@@ -47,6 +47,7 @@ import {
   CheckCircle,
   Cancel,
 } from "@mui/icons-material";
+import { supabase } from "../../api/supabaseClient";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "react-toastify";
 import AddBuildingDialog from "../../components/dialogs/AddBuildingDialog";
@@ -716,8 +717,8 @@ const BuildingCard = ({ building, onEdit, onDelete, onStatusToggle }) => {
 };
 
 export default function Buildings() {
-  const [buildings, setBuildings] = useState(initialBuildings);
-  const [filteredBuildings, setFilteredBuildings] = useState(initialBuildings);
+  const [buildings, setBuildings] = useState([]);
+  const [filteredBuildings, setFilteredBuildings] = useState([]);
   const theme = useTheme();
   const [openDialog, setOpenDialog] = useState(false);
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
@@ -729,6 +730,91 @@ export default function Buildings() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterAnchorEl, setFilterAnchorEl] = useState(null);
   const [statusFilter, setStatusFilter] = useState("all");
+
+  const [societies, setSocieties] = useState([]);
+
+  useEffect(() => {
+    const fetchSocieties = async () => {
+      const { data, error } = await supabase
+        .from("societies")
+        .select("id, name, city, state, country")
+        .order("name", { ascending: true });
+
+      if (!error && data) {
+        setSocieties(data);
+      }
+    };
+
+    fetchSocieties();
+  }, []);
+  const fetchBuildings = useCallback(async () => {
+    setLoading(true);
+
+    const { data, error } = await supabase
+      .from("buildings")
+      .select(
+        `
+    id,
+    name,
+    description,
+    society_id,
+    created_at,
+    is_active,
+    is_delete,
+    societies (
+      id,
+      name
+    )
+  `
+      )
+      .eq("is_delete", false)
+      .order("id", { ascending: false });
+
+    if (error) {
+      console.error(error);
+      toast.error("Failed to fetch buildings");
+      setLoading(false);
+      return;
+    }
+
+    const mapped = data.map((b) => ({
+      id: b.id,
+      name: b.name,
+
+      // 🔥 IMPORTANT FIELDS
+      description: b.description || "",
+      society_id: b.society_id || "",
+      society_name: b.societies?.name || "",
+
+      address: b.description || "—",
+      registerDate: b.created_at
+        ? new Date(b.created_at).toISOString().split("T")[0]
+        : "—",
+
+      status: b.is_active ? "active" : "inactive",
+
+      // UI-only fields
+      units: 0,
+      manager: "N/A",
+      occupancy: 0,
+      type: "Building",
+
+      avatar: b.name
+        ?.split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase(),
+
+      loading: false,
+    }));
+
+    setBuildings(mapped);
+    setFilteredBuildings(mapped);
+    setLoading(false);
+  }, []);
+  useEffect(() => {
+    fetchBuildings();
+  }, [fetchBuildings]);
 
   const headers = [
     "",
@@ -767,30 +853,29 @@ export default function Buildings() {
   const handleStatusToggle = useCallback(async (buildingId, currentStatus) => {
     const newStatus = currentStatus === "active" ? "inactive" : "active";
 
+    // Optimistic UI
     setBuildings((prev) =>
-      prev.map((building) =>
-        building.id === buildingId
-          ? { ...building, status: newStatus }
-          : building
-      )
+      prev.map((b) => (b.id === buildingId ? { ...b, status: newStatus } : b))
     );
 
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      toast.success(
-        `Building ${
-          newStatus === "active" ? "activated" : "deactivated"
-        } successfully!`
-      );
-    } catch (error) {
+    const { error } = await supabase
+      .from("buildings")
+      .update({ is_active: newStatus === "active" })
+      .eq("id", buildingId);
+
+    if (error) {
+      toast.error("Failed to update status");
+
+      // rollback
       setBuildings((prev) =>
-        prev.map((building) =>
-          building.id === buildingId
-            ? { ...building, status: currentStatus }
-            : building
+        prev.map((b) =>
+          b.id === buildingId ? { ...b, status: currentStatus } : b
         )
       );
-      toast.error("Failed to update status");
+    } else {
+      toast.success(
+        `Building ${newStatus === "active" ? "activated" : "deactivated"}`
+      );
     }
   }, []);
 
@@ -826,15 +911,34 @@ export default function Buildings() {
   );
 
   const handleEditBuilding = (id) => {
-    const building = buildings.find((b) => b.id === id);
-    setSelectedBuilding(building);
+    const b = buildings.find((item) => item.id === id);
+
+    if (!b) return;
+
+    setSelectedBuilding({
+      id: b.id,
+      name: b.name || "",
+      description: b.description || "",
+      society_id: String(b.society_id || ""),
+    });
+
     setOpenDialog(true);
   };
 
-  const handleDeleteBuilding = (id) => {
-    if (window.confirm("Are you sure you want to delete this building?")) {
-      setBuildings((prev) => prev.filter((building) => building.id !== id));
-      toast.success("Building deleted successfully!");
+  const handleDeleteBuilding = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this building?"))
+      return;
+
+    const { error } = await supabase
+      .from("buildings")
+      .update({ is_delete: true })
+      .eq("id", id);
+
+    if (error) {
+      toast.error("Failed to delete building");
+    } else {
+      setBuildings((prev) => prev.filter((b) => b.id !== id));
+      toast.success("Building deleted successfully");
     }
   };
 
@@ -846,32 +950,7 @@ export default function Buildings() {
   const handleCloseDialog = () => {
     setOpenDialog(false);
     setSelectedBuilding(null);
-  };
-
-  const handleBuildingSubmit = (buildingData) => {
-    if (selectedBuilding) {
-      setBuildings((prev) =>
-        prev.map((b) =>
-          b.id === buildingData.id ? { ...b, ...buildingData } : b
-        )
-      );
-      toast.success("Building updated successfully!");
-    } else {
-      const newBuilding = {
-        ...buildingData,
-        id: Math.max(...buildings.map((b) => b.id)) + 1,
-        registerDate: new Date().toISOString().split("T")[0],
-        status: "active",
-        avatar: buildingData.name
-          .split(" ")
-          .map((n) => n[0])
-          .join(""),
-      };
-      setBuildings((prev) => [newBuilding, ...prev]);
-      toast.success("Building added successfully!");
-    }
-    setOpenDialog(false);
-    setSelectedBuilding(null);
+    fetchBuildings();
   };
 
   const handleChangePage = (event, newPage) => {
@@ -1267,110 +1346,11 @@ export default function Buildings() {
         <AddBuildingDialog
           open={openDialog}
           onClose={handleCloseDialog}
-          onSubmit={handleBuildingSubmit}
           building={selectedBuilding}
           isEdit={!!selectedBuilding}
+          societies={societies}
         />
       </motion.div>
     </div>
   );
 }
-
-const initialBuildings = [
-  {
-    id: 1,
-    registerDate: "2024-01-10",
-    name: "Sunshine Apartments",
-    address: "123 Main St, New York, NY 10001",
-    units: 45,
-    status: "active",
-    manager: "John Smith",
-    occupancy: 92,
-    avatar: "SA",
-    type: "Apartment Complex",
-  },
-  {
-    id: 2,
-    registerDate: "2024-02-05",
-    name: "Ocean View Towers",
-    address: "456 Beach Rd, Los Angeles, CA 90210",
-    units: 28,
-    status: "inactive",
-    manager: "Sarah Johnson",
-    occupancy: 65,
-    avatar: "OV",
-    type: "Condominium",
-  },
-  {
-    id: 3,
-    registerDate: "2024-03-01",
-    name: "Central Plaza",
-    address: "789 Oak Ave, Chicago, IL 60601",
-    units: 62,
-    status: "active",
-    manager: "Michael Chen",
-    occupancy: 88,
-    avatar: "CP",
-    type: "Commercial Building",
-  },
-  {
-    id: 4,
-    registerDate: "2024-01-20",
-    name: "Green Valley Homes",
-    address: "321 Pine St, Miami, FL 33101",
-    units: 18,
-    status: "active",
-    manager: "Emma Wilson",
-    occupancy: 42,
-    avatar: "GV",
-    type: "Townhouse",
-  },
-  {
-    id: 5,
-    registerDate: "2024-02-15",
-    name: "Skyline Residences",
-    address: "654 Cedar Blvd, Seattle, WA 98101",
-    units: 36,
-    status: "active",
-    manager: "David Brown",
-    occupancy: 78,
-    avatar: "SR",
-    type: "Luxury Apartments",
-  },
-  {
-    id: 6,
-    registerDate: "2024-03-15",
-    name: "Maplewood Estates",
-    address: "987 Maple Ave, Boston, MA 02101",
-    units: 24,
-    status: "active",
-    manager: "Lisa Wang",
-    occupancy: 95,
-    avatar: "ME",
-    type: "Gated Community",
-  },
-  {
-    id: 7,
-    registerDate: "2024-03-20",
-    name: "Riverfront Suites",
-    address: "741 River Rd, Austin, TX 73301",
-    units: 32,
-    status: "inactive",
-    manager: "Robert Garcia",
-    occupancy: 35,
-    avatar: "RS",
-    type: "Serviced Apartments",
-  },
-  {
-    id: 8,
-    registerDate: "2024-01-30",
-    name: "Highland Park",
-    address: "852 Highland Dr, Denver, CO 80201",
-    units: 40,
-    status: "active",
-    manager: "Maria Rodriguez",
-    occupancy: 82,
-    avatar: "HP",
-    type: "Mixed-Use Development",
-  },
-];

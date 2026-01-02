@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { FiLock } from "react-icons/fi";
 import { IoKeyOutline } from "react-icons/io5";
@@ -10,135 +10,74 @@ import { useNavigate } from "react-router-dom";
 import { MdOutlineEmail } from "react-icons/md";
 import { supabase } from "../../api/supabaseClient";
 
-const userTypes = [
-  "super admin",
-  "property manager",
-  "building admin",
-  "building security",
-  "building user",
-  "school admin",
-  "school security",
-];
-
 const Login = () => {
-  const [selectedType, setSelectedType] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [secretKey, setSecretKey] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [showSecretKey, setShowSecretKey] = useState(false);
   const navigate = useNavigate();
 
-  // const handleSubmit = async (e) => {
-  //   e.preventDefault();
-  //   setIsLoading(true);
-
-  //   try {
-  //     const { data, error } = await supabase.auth.signInWithPassword({
-  //       email,
-  //       password,
-  //     });
-
-  //     if (error) {
-  //       alert(error.message);
-  //       return;
-  //     }
-
-  //     console.log("User:", data.user);
-  //     console.log("Session:", data.session);
-  //     console.log("User Type:", selectedType);
-  //     console.log("Secret Key:", secretKey);
-
-  //     navigate("/dashboard");
-  //   } catch (err) {
-  //     console.error("Login failed:", err);
-  //   } finally {
-  //     setIsLoading(false);
-  //   }
-  // };
-  // const handleSubmit = async (e) => {
-  //   e.preventDefault();
-  //   setIsLoading(true);
-
-  //   const { data, error } = await supabase.auth.signInWithPassword({
-  //     // email,
-  //     // password,
-  //     email: "test@mail.com",
-  //     password: "password123",
-  //   });
-
-  //   if (error) {
-  //     console.error("Login error:", error.message);
-  //     alert(error.message);
-  //     setIsLoading(false);
-  //     return;
-  //   }
-
-  //   // ✅ PRINT ONLY USER ID
-  //   console.log(data.user.id);
-
-  //   setIsLoading(false);
-  //   navigate("/dashboard");
-  // };
-  // console.log("SUPABASE URL:", import.meta.env.VITE_SUPABASE_URL);
-  // console.log("SUPABASE KEY:", import.meta.env.VITE_SUPABASE_ANON_KEY);
-  useEffect(() => {
-    const autoLogin = async () => {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: "User1@gmail.com",
-        password: "Test@1234",
-      });
-
-      if (error) {
-        console.error("Login error:", error.message);
-        return;
-      }
-
-      console.log(data.user.id);
-    };
-
-    autoLogin();
-  }, []);
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: "User1@gmail.com",
-        password: "Test@1234",
+        email,
+        password,
       });
 
+      console.log("Supabase login:", data, error);
+
       if (error) {
-        console.error("Login error:", error.message);
         alert(error.message);
         return;
       }
 
-      console.log("User ID:", data.user.id);
+      if (!data.session) {
+        alert("Invalid email or password");
+        return;
+      }
 
-      // optional
-      navigate("/dashboard");
+      const userId = data.user.id;
+      const accessToken = data.session.access_token;
+
+      // Fetch user profile
+      const { data: profile, error: roleError } = await supabase
+        .from("users")
+        .select("*")
+        .eq("registed_user_id", userId)
+        .single();
+
+      if (roleError || !profile?.role_type) {
+        alert("User role not found. Contact admin.");
+        return;
+      }
+
+      // Map API role to internal role
+      let role = profile.role_type.toLowerCase();
+      if (role === "super") role = "superadmin"; // 🔹 Map 'Super' → 'superadmin'
+
+      // Store in localStorage
+      localStorage.setItem("token", accessToken);
+      localStorage.setItem("role", role);
+      localStorage.setItem("userId", userId);
+
+      // Role-based redirect
+      const dashboardPathByRole = {
+        superadmin: "/superadmin/dashboard",
+        admin: "/admin/dashboard",
+        propertymanager: "/property/dashboard",
+      };
+
+      navigate(dashboardPathByRole[role], { replace: true });
     } catch (err) {
-      console.error("Unexpected error:", err);
+      console.error(err);
+      alert("Something went wrong. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
-  async function handleLogin() {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: "test@mail.com",
-      password: "password123",
-    });
-
-    if (error) {
-      console.error("Login error:", error.message);
-      return;
-    }
-
-    console.log(data.user.id);
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-white via-gray-50 to-lightBackground font-roboto flex flex-col md:flex-row">
@@ -236,50 +175,6 @@ const Login = () => {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* User Type Select */}
-              {/* <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.4 }}
-                className="space-y-2"
-              >
-                <label className="block text-sm font-semibold ">
-                  Select Type
-                </label>
-                <div className="relative group">
-                  <select
-                    value={selectedType}
-                    onChange={(e) => setSelectedType(e.target.value)}
-                    className="w-full px-4 py-3.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200 appearance-none cursor-pointer bg-white hover:border-gray-300 group-hover:shadow-sm"
-                    required
-                  >
-                    <option value="" disabled>
-                      Select your role
-                    </option>
-                    {userTypes.map((type) => (
-                      <option key={type} value={type}>
-                        {type.charAt(0).toUpperCase() + type.slice(1)}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                    <svg
-                      className="w-5 h-5 text-primary"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 9l-7 7-7-7"
-                      />
-                    </svg>
-                  </div>
-                </div>
-              </motion.div>
-                */}
               <motion.div
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -352,50 +247,6 @@ const Login = () => {
                 </div>
               </motion.div>
 
-              {/* Secret Key Input */}
-              {/*  <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.7 }}
-                className="space-y-2"
-              >
-                <label className="block text-sm font-semibold ">
-                  Secret Key
-                </label>
-                <div className="relative group">
-               
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <IoKeyOutline className="h-5 w-5 text-hintText group-focus-within:text-primary transition-colors" />
-                  </div>
-
-                  
-                  <input
-                    type={showSecretKey ? "text" : "password"}
-                    value={secretKey}
-                    onChange={(e) => setSecretKey(e.target.value)}
-                    className="w-full pl-10 pr-12 py-3.5 border border-gray-200 rounded-xl
-               focus:outline-none focus:ring-2 focus:ring-primary/50
-               focus:border-primary transition-all duration-200
-               placeholder:text-gray-400 hover:border-gray-300"
-                    placeholder="Enter your secret key"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowSecretKey(!showSecretKey)}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center
-               text-hintText hover:text-primary
-               hover:scale-110 transition-all"
-                  >
-                    {showSecretKey ? (
-                      <FaRegEyeSlash size={18} />
-                    ) : (
-                      <FaRegEye Eye size={18} />
-                    )}
-                  </button>
-                </div>
-              </motion.div>
-
               {/* Login Button */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -455,7 +306,6 @@ const Login = () => {
         </motion.div>
       </div>
 
-      {/* Decorative Elements */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 0.1 }}
