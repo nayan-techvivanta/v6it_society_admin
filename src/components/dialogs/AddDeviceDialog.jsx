@@ -17,8 +17,9 @@ import {
   Alert,
   alpha,
   InputAdornment,
-  Autocomplete,
   Grid,
+  Autocomplete,
+  Chip,
 } from "@mui/material";
 import {
   Close,
@@ -26,12 +27,13 @@ import {
   Devices as DeviceIcon,
   Tag,
   Memory,
-  LocationOn,
   CalendarToday,
-  Build,
-  SignalCellularAlt,
+  Business,
+  Apartment,
+  QrCode,
 } from "@mui/icons-material";
 import { toast } from "react-toastify";
+import { supabase } from "../../api/supabaseClient";
 
 const AddDeviceDialog = ({
   open,
@@ -41,12 +43,9 @@ const AddDeviceDialog = ({
   deviceData,
 }) => {
   const [formData, setFormData] = useState({
-    name: "",
-    deviceId: "",
-    type: "",
-    location: "",
-    issueDate: new Date().toISOString().split("T")[0],
-    status: "active",
+    device_serial_number: "",
+    society_id: "",
+    building_id: "",
   });
 
   const [errors, setErrors] = useState({});
@@ -54,66 +53,67 @@ const AddDeviceDialog = ({
   const [touched, setTouched] = useState({});
   const [isFormValid, setIsFormValid] = useState(false);
 
-  // Device types options
-  const deviceTypes = [
-    { value: "thermostat", label: "Thermostat", icon: "🌡️" },
-    { value: "camera", label: "Security Camera", icon: "📹" },
-    { value: "sensor", label: "Motion Sensor", icon: "📡" },
-    { value: "lock", label: "Smart Lock", icon: "🔒" },
-    { value: "detector", label: "Water Leak Detector", icon: "💧" },
-    { value: "outlet", label: "Smart Plug", icon: "🔌" },
-    { value: "light", label: "Smart Light", icon: "💡" },
-    { value: "hub", label: "Smart Hub", icon: "🖥️" },
-  ];
+  // New state for dropdowns
+  const [societies, setSocieties] = useState([]);
+  const [buildings, setBuildings] = useState([]);
+  const [loadingSocieties, setLoadingSocieties] = useState(false);
+  const [loadingBuildings, setLoadingBuildings] = useState(false);
+  const [filteredBuildings, setFilteredBuildings] = useState([]);
 
   // Status options
   const statusOptions = [
     { value: "active", label: "Active", color: "#008000" },
     { value: "inactive", label: "Inactive", color: "#A29EB6" },
+    { value: "warning", label: "Warning", color: "#DBA400" },
+    { value: "offline", label: "Offline", color: "#ff0000" },
   ];
 
-  // Location options
-  const locationOptions = [
-    "Living Room",
-    "Bedroom",
-    "Kitchen",
-    "Bathroom",
-    "Front Door",
-    "Back Door",
-    "Basement",
-    "Garage",
-    "Office",
-    "Hallway",
-  ];
+  // Fetch societies on mount
+  useEffect(() => {
+    if (open) {
+      fetchSocieties();
+    }
+  }, [open]);
+
+  // Fetch buildings when society is selected
+  useEffect(() => {
+    if (formData.society_id) {
+      fetchBuildings(formData.society_id);
+    } else {
+      setBuildings([]);
+      setFilteredBuildings([]);
+    }
+  }, [formData.society_id]);
 
   // Initialize form data
   useEffect(() => {
     if (open) {
       if (isEdit && deviceData) {
         setFormData({
-          name: deviceData.name || "",
-          deviceId: deviceData.id || "",
-          type: deviceData.type?.toLowerCase() || "",
-          location: deviceData.location || "",
-          issueDate:
-            deviceData.issueDate || new Date().toISOString().split("T")[0],
+          device_serial_number: deviceData.device_serial_number || "",
+          society_id: deviceData.society_id || "",
+          building_id: deviceData.building_id || "",
+          issue_date:
+            deviceData.issue_date || new Date().toISOString().split("T")[0],
           status: deviceData.status || "active",
-          description: "",
         });
+
+        // If device has society_id, fetch its buildings
+        if (deviceData.society_id) {
+          fetchBuildings(deviceData.society_id);
+        }
       } else {
-        // Generate initial device ID
+        // Generate initial device serial number
         const prefix = "DEV";
-        const randomNum = Math.floor(1000 + Math.random() * 9000);
-        const initialDeviceId = `${prefix}${randomNum}`;
+        const randomNum = Math.floor(10000 + Math.random() * 90000);
+        const initialSerial = `${prefix}${randomNum}`;
 
         setFormData({
-          name: "",
-          deviceId: initialDeviceId,
-          type: "",
-          location: "",
-          issueDate: new Date().toISOString().split("T")[0],
+          device_serial_number: initialSerial,
+          society_id: "",
+          building_id: "",
+          issue_date: new Date().toISOString().split("T")[0],
           status: "active",
-          description: "",
         });
       }
       setErrors({});
@@ -121,24 +121,78 @@ const AddDeviceDialog = ({
     }
   }, [open, deviceData, isEdit]);
 
-  // Generate device ID from name
-  const generateDeviceId = (name) => {
-    if (!name.trim()) return "";
+  // Fetch societies from Supabase
+  const fetchSocieties = async () => {
+    try {
+      setLoadingSocieties(true);
+      const { data, error } = await supabase
+        .from("societies")
+        .select("id, name, address")
+        .order("name");
 
-    // Create device ID: first 2 letters of each word + random 3 digits
-    const words = name.split(" ");
-    let prefix = "";
+      if (error) throw error;
+      setSocieties(data || []);
+    } catch (error) {
+      console.error("Error fetching societies:", error);
+      toast.error("Failed to load societies");
+      setSocieties([]);
+    } finally {
+      setLoadingSocieties(false);
+    }
+  };
 
-    if (words.length === 1) {
-      prefix = words[0].substring(0, 2).toUpperCase();
-    } else {
-      prefix = words
-        .map((word) => word.substring(0, 1))
-        .join("")
-        .toUpperCase();
+  // Fetch buildings for selected society
+  const fetchBuildings = async (societyId) => {
+    try {
+      setLoadingBuildings(true);
+      const { data, error } = await supabase
+        .from("buildings")
+        .select("id, name, floors, address")
+        .eq("society_id", societyId)
+        .order("name");
+
+      if (error) throw error;
+      setBuildings(data || []);
+      setFilteredBuildings(data || []);
+
+      // If in edit mode and building exists in the list, keep it selected
+      if (isEdit && deviceData?.building_id) {
+        const buildingExists = data?.some(
+          (b) => b.id === deviceData.building_id
+        );
+        if (!buildingExists) {
+          setFormData((prev) => ({ ...prev, building_id: "" }));
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching buildings:", error);
+      toast.error("Failed to load buildings");
+      setBuildings([]);
+      setFilteredBuildings([]);
+    } finally {
+      setLoadingBuildings(false);
+    }
+  };
+
+  // Search buildings
+  const handleBuildingSearch = (searchValue) => {
+    if (!searchValue.trim()) {
+      setFilteredBuildings(buildings);
+      return;
     }
 
-    const randomNum = Math.floor(100 + Math.random() * 900);
+    const filtered = buildings.filter(
+      (building) =>
+        building.name.toLowerCase().includes(searchValue.toLowerCase()) ||
+        building.address?.toLowerCase().includes(searchValue.toLowerCase())
+    );
+    setFilteredBuildings(filtered);
+  };
+
+  // Generate device serial number
+  const generateSerialNumber = () => {
+    const prefix = "DEV";
+    const randomNum = Math.floor(10000 + Math.random() * 90000);
     return `${prefix}${randomNum}`;
   };
 
@@ -146,24 +200,23 @@ const AddDeviceDialog = ({
   const validateForm = () => {
     const newErrors = {};
 
-    if (!formData.name.trim()) {
-      newErrors.name = "Device name is required";
-    } else if (formData.name.trim().length < 2) {
-      newErrors.name = "Device name must be at least 2 characters";
+    if (!formData.device_serial_number.trim()) {
+      newErrors.device_serial_number = "Device serial number is required";
+    } else if (formData.device_serial_number.trim().length < 3) {
+      newErrors.device_serial_number =
+        "Serial number must be at least 3 characters";
     }
 
-    if (!formData.deviceId.trim()) {
-      newErrors.deviceId = "Device ID is required";
-    } else if (!/^[A-Z]{2,4}\d{3,4}$/.test(formData.deviceId)) {
-      newErrors.deviceId = "Device ID must be in format ABC123";
+    if (!formData.society_id) {
+      newErrors.society_id = "Please select a society";
     }
 
-    if (!formData.type) {
-      newErrors.type = "Device type is required";
+    if (!formData.building_id) {
+      newErrors.building_id = "Please select a building";
     }
 
-    if (!formData.location) {
-      newErrors.location = "Location is required";
+    if (!formData.issue_date) {
+      newErrors.issue_date = "Issue date is required";
     }
 
     setErrors(newErrors);
@@ -184,22 +237,19 @@ const AddDeviceDialog = ({
 
     setIsSubmitting(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
+      // Prepare data for parent component
       const devicePayload = {
-        ...formData,
-        id: formData.deviceId,
-        avatar: formData.name.substring(0, 2).toUpperCase(),
-        lastSeen: "Just now",
+        device_serial_number: formData.device_serial_number,
+        society_id: formData.society_id,
+        building_id: formData.building_id,
+        issue_date: formData.issue_date,
+        status: formData.status,
       };
 
       onSubmit(devicePayload);
-      toast.success(
-        isEdit ? "Device updated successfully!" : "Device added successfully!"
-      );
-      onClose();
     } catch (error) {
-      toast.error("Failed to save device");
+      console.error("Error in device submission:", error);
+      toast.error(`Failed to ${isEdit ? "update" : "add"} device`);
     } finally {
       setIsSubmitting(false);
     }
@@ -214,18 +264,55 @@ const AddDeviceDialog = ({
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: "" }));
     }
+  };
 
-    // Generate device ID when name changes
-    if (field === "name" && value.trim().length >= 2 && !isEdit) {
-      const generatedId = generateDeviceId(value);
-      setFormData((prev) => ({ ...prev, deviceId: generatedId }));
+  const handleSocietyChange = (e) => {
+    const societyId = e.target.value;
+    setFormData((prev) => ({
+      ...prev,
+      society_id: societyId,
+      building_id: "", // Reset building when society changes
+    }));
+    setTouched((prev) => ({ ...prev, society_id: true }));
+
+    if (errors.society_id) {
+      setErrors((prev) => ({ ...prev, society_id: "" }));
     }
+  };
+
+  const handleBuildingChange = (e) => {
+    const buildingId = e.target.value;
+    setFormData((prev) => ({ ...prev, building_id: buildingId }));
+    setTouched((prev) => ({ ...prev, building_id: true }));
+
+    if (errors.building_id) {
+      setErrors((prev) => ({ ...prev, building_id: "" }));
+    }
+  };
+
+  const handleGenerateSerial = () => {
+    const newSerial = generateSerialNumber();
+    setFormData((prev) => ({ ...prev, device_serial_number: newSerial }));
   };
 
   const handleClose = () => {
     if (!isSubmitting) {
       onClose();
     }
+  };
+
+  // Get selected society name
+  const getSelectedSocietyName = () => {
+    if (!formData.society_id) return "";
+    const society = societies.find((s) => s.id === formData.society_id);
+    return society ? society.name : "";
+  };
+
+  // Get selected building name
+  const getSelectedBuildingName = () => {
+    if (!formData.building_id) return "";
+    const building = buildings.find((b) => b.id === formData.building_id);
+    return building ? building.name : "";
   };
 
   return (
@@ -277,7 +364,7 @@ const AddDeviceDialog = ({
               >
                 {isEdit
                   ? "Update device details"
-                  : "Configure your new smart device"}
+                  : "Add a new device to your building"}
               </Typography>
             </Box>
           </Box>
@@ -322,7 +409,7 @@ const AddDeviceDialog = ({
             )}
 
             <Grid container spacing={3}>
-              {/* Device Name */}
+              {/* Device Serial Number */}
               <Grid item xs={12} md={6}>
                 <Box>
                   <Typography
@@ -340,64 +427,21 @@ const AddDeviceDialog = ({
                       },
                     }}
                   >
-                    Device Name
+                    Device Serial Number
                   </Typography>
 
                   <TextField
                     fullWidth
-                    value={formData.name}
-                    onChange={handleFieldChange("name")}
-                    error={!!errors.name && touched.name}
-                    helperText={
-                      (touched.name && errors.name) ||
-                      "Enter a descriptive name for the device"
+                    value={formData.device_serial_number}
+                    onChange={handleFieldChange("device_serial_number")}
+                    error={
+                      !!errors.device_serial_number &&
+                      touched.device_serial_number
                     }
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Memory sx={{ color: "#A29EB6", fontSize: 20 }} />
-                        </InputAdornment>
-                      ),
-                      sx: {
-                        borderRadius: 1.5,
-                        height: 44,
-                      },
-                    }}
-                    placeholder="e.g., Living Room Thermostat"
-                    size="small"
-                  />
-                </Box>
-              </Grid>
-
-              {/* Device ID */}
-              <Grid item xs={12} md={6}>
-                <Box>
-                  <Typography
-                    component="label"
-                    variant="caption"
-                    fontWeight={600}
-                    display="block"
-                    mb={1}
-                    color="#6F0B14"
-                    sx={{
-                      "&::after": {
-                        content: '"*"',
-                        color: "#B31B1B",
-                        marginLeft: 0.5,
-                      },
-                    }}
-                  >
-                    Device ID
-                  </Typography>
-
-                  <TextField
-                    fullWidth
-                    value={formData.deviceId}
-                    onChange={handleFieldChange("deviceId")}
-                    error={!!errors.deviceId && touched.deviceId}
                     helperText={
-                      (touched.deviceId && errors.deviceId) ||
-                      "Auto-generated from device name"
+                      (touched.device_serial_number &&
+                        errors.device_serial_number) ||
+                      "Unique identifier for the device"
                     }
                     InputProps={{
                       startAdornment: (
@@ -405,18 +449,36 @@ const AddDeviceDialog = ({
                           <Tag sx={{ color: "#A29EB6", fontSize: 20 }} />
                         </InputAdornment>
                       ),
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton
+                            size="small"
+                            onClick={handleGenerateSerial}
+                            sx={{ mr: -1 }}
+                          >
+                            <QrCode fontSize="small" />
+                          </IconButton>
+                        </InputAdornment>
+                      ),
                       sx: {
                         borderRadius: 1.5,
                         height: 44,
                       },
                     }}
-                    placeholder="e.g., LR123"
+                    placeholder="e.g., DEV12345"
                     size="small"
                   />
+                  <Button
+                    size="small"
+                    onClick={handleGenerateSerial}
+                    sx={{ mt: 1, textTransform: "none" }}
+                  >
+                    Generate New Serial
+                  </Button>
                 </Box>
               </Grid>
 
-              {/* Device Type */}
+              {/* Society Selection */}
               <Grid item xs={12} md={6}>
                 <Box>
                   <Typography
@@ -434,20 +496,30 @@ const AddDeviceDialog = ({
                       },
                     }}
                   >
-                    Device Type
+                    Society
                   </Typography>
 
-                  <FormControl fullWidth error={!!errors.type} size="small">
+                  <FormControl
+                    fullWidth
+                    error={!!errors.society_id && touched.society_id}
+                    size="small"
+                  >
                     <Select
-                      value={formData.type}
-                      onChange={handleFieldChange("type")}
+                      value={formData.society_id}
+                      onChange={handleSocietyChange}
                       displayEmpty
+                      disabled={loadingSocieties}
+                      startAdornment={
+                        <InputAdornment position="start" sx={{ ml: 1 }}>
+                          <Business sx={{ color: "#A29EB6", fontSize: 20 }} />
+                        </InputAdornment>
+                      }
                       sx={{
                         borderRadius: 1.5,
                         height: 44,
                         backgroundColor: "white",
                         border: "1px solid",
-                        borderColor: errors.type ? "#B31B1B" : "#E0E0E0",
+                        borderColor: errors.society_id ? "#B31B1B" : "#E0E0E0",
                         "& .MuiSelect-select": {
                           display: "flex",
                           alignItems: "center",
@@ -462,62 +534,70 @@ const AddDeviceDialog = ({
                               color="#A29EB6"
                               sx={{ fontStyle: "italic" }}
                             >
-                              Select device type
+                              {loadingSocieties
+                                ? "Loading societies..."
+                                : "Select a society"}
                             </Typography>
                           );
                         }
 
-                        const selectedType = deviceTypes.find(
-                          (t) => t.value === selected
+                        const selectedSociety = societies.find(
+                          (s) => s.id === selected
                         );
                         return (
-                          <Box display="flex" alignItems="center" gap={2}>
-                            <Typography fontSize="1.25rem">
-                              {selectedType?.icon}
-                            </Typography>
+                          <Box>
                             <Typography fontWeight={500}>
-                              {selectedType?.label}
+                              {selectedSociety?.name}
                             </Typography>
+                            {selectedSociety?.address && (
+                              <Typography variant="caption" color="#A29EB6">
+                                {selectedSociety.address}
+                              </Typography>
+                            )}
                           </Box>
                         );
                       }}
                     >
                       <MenuItem value="" disabled>
                         <Typography color="#A29EB6">
-                          Select device type
+                          {loadingSocieties ? "Loading..." : "Select a society"}
                         </Typography>
                       </MenuItem>
 
-                      {deviceTypes.map((type) => (
-                        <MenuItem key={type.value} value={type.value}>
-                          <Box display="flex" alignItems="center" gap={2}>
-                            <Typography fontSize="1.25rem">
-                              {type.icon}
+                      {societies.map((society) => (
+                        <MenuItem key={society.id} value={society.id}>
+                          <Box sx={{ width: "100%" }}>
+                            <Typography fontWeight={500}>
+                              {society.name}
                             </Typography>
-                            <Box>
-                              <Typography fontWeight={500}>
-                                {type.label}
+                            {society.address && (
+                              <Typography
+                                variant="caption"
+                                color="#A29EB6"
+                                display="block"
+                              >
+                                {society.address}
                               </Typography>
-                            </Box>
+                            )}
                           </Box>
                         </MenuItem>
                       ))}
                     </Select>
 
-                    {errors.type && (
+                    {errors.society_id && (
                       <Typography
                         variant="caption"
                         color="#B31B1B"
                         sx={{ mt: 0.5, ml: 1, display: "block" }}
                       >
-                        {errors.type}
+                        {errors.society_id}
                       </Typography>
                     )}
                   </FormControl>
                 </Box>
               </Grid>
 
-              {/* Issue Date */}
+              {/* Building Selection */}
               <Grid item xs={12} md={6}>
                 <Box>
                   <Typography
@@ -527,56 +607,38 @@ const AddDeviceDialog = ({
                     display="block"
                     mb={1}
                     color="#6F0B14"
-                  >
-                    Installation Date
-                  </Typography>
-
-                  <TextField
-                    fullWidth
-                    type="date"
-                    value={formData.issueDate}
-                    onChange={handleFieldChange("issueDate")}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <CalendarToday
-                            sx={{ color: "#A29EB6", fontSize: 20 }}
-                          />
-                        </InputAdornment>
-                      ),
-                      sx: {
-                        borderRadius: 1.5,
-                        height: 44,
+                    sx={{
+                      "&::after": {
+                        content: '"*"',
+                        color: "#B31B1B",
+                        marginLeft: 0.5,
                       },
                     }}
-                    size="small"
-                  />
-                </Box>
-              </Grid>
-
-              {/* Status */}
-              <Grid item xs={12} md={6}>
-                <Box>
-                  <Typography
-                    component="label"
-                    variant="caption"
-                    fontWeight={600}
-                    display="block"
-                    mb={1}
-                    color="#6F0B14"
                   >
-                    Status
+                    Building
                   </Typography>
 
-                  <FormControl fullWidth size="small">
+                  <FormControl
+                    fullWidth
+                    error={!!errors.building_id && touched.building_id}
+                    size="small"
+                  >
                     <Select
-                      value={formData.status}
-                      onChange={handleFieldChange("status")}
+                      value={formData.building_id}
+                      onChange={handleBuildingChange}
+                      displayEmpty
+                      disabled={!formData.society_id || loadingBuildings}
+                      startAdornment={
+                        <InputAdornment position="start" sx={{ ml: 1 }}>
+                          <Apartment sx={{ color: "#A29EB6", fontSize: 20 }} />
+                        </InputAdornment>
+                      }
                       sx={{
                         borderRadius: 1.5,
                         height: 44,
                         backgroundColor: "white",
-                        border: "1px solid #E0E0E0",
+                        border: "1px solid",
+                        borderColor: errors.building_id ? "#B31B1B" : "#E0E0E0",
                         "& .MuiSelect-select": {
                           display: "flex",
                           alignItems: "center",
@@ -585,48 +647,147 @@ const AddDeviceDialog = ({
                         },
                       }}
                       renderValue={(selected) => {
-                        const selectedStatus = statusOptions.find(
-                          (s) => s.value === selected
+                        if (!selected) {
+                          return (
+                            <Typography
+                              color="#A29EB6"
+                              sx={{ fontStyle: "italic" }}
+                            >
+                              {!formData.society_id
+                                ? "Select a society first"
+                                : loadingBuildings
+                                ? "Loading buildings..."
+                                : "Select a building"}
+                            </Typography>
+                          );
+                        }
+
+                        const selectedBuilding = buildings.find(
+                          (b) => b.id === selected
                         );
                         return (
-                          <Box display="flex" alignItems="center" gap={2}>
-                            <Box
-                              sx={{
-                                width: 10,
-                                height: 10,
-                                borderRadius: "50%",
-                                backgroundColor: selectedStatus?.color,
-                              }}
-                            />
+                          <Box>
                             <Typography fontWeight={500}>
-                              {selectedStatus?.label}
+                              {selectedBuilding?.name}
                             </Typography>
+                            {selectedBuilding?.floors && (
+                              <Typography variant="caption" color="#A29EB6">
+                                {selectedBuilding.floors} floors
+                              </Typography>
+                            )}
                           </Box>
                         );
                       }}
                     >
-                      {statusOptions.map((status) => (
-                        <MenuItem key={status.value} value={status.value}>
-                          <Box display="flex" alignItems="center" gap={2}>
-                            <Box
-                              sx={{
-                                width: 10,
-                                height: 10,
-                                borderRadius: "50%",
-                                backgroundColor: status.color,
-                              }}
-                            />
-                            <Typography>{status.label}</Typography>
+                      <MenuItem value="" disabled>
+                        <Typography color="#A29EB6">
+                          {!formData.society_id
+                            ? "Select a society first"
+                            : loadingBuildings
+                            ? "Loading..."
+                            : "Select a building"}
+                        </Typography>
+                      </MenuItem>
+
+                      {filteredBuildings.map((building) => (
+                        <MenuItem key={building.id} value={building.id}>
+                          <Box sx={{ width: "100%" }}>
+                            <Typography fontWeight={500}>
+                              {building.name}
+                            </Typography>
+                            <Box display="flex" gap={2} mt={0.5}>
+                              {building.floors && (
+                                <Chip
+                                  size="small"
+                                  label={`${building.floors} floors`}
+                                  sx={{ height: 20, fontSize: "0.7rem" }}
+                                />
+                              )}
+                              {building.address && (
+                                <Typography variant="caption" color="#A29EB6">
+                                  {building.address}
+                                </Typography>
+                              )}
+                            </Box>
                           </Box>
                         </MenuItem>
                       ))}
                     </Select>
+
+                    {errors.building_id && (
+                      <Typography
+                        variant="caption"
+                        color="#B31B1B"
+                        sx={{ mt: 0.5, ml: 1, display: "block" }}
+                      >
+                        {errors.building_id}
+                      </Typography>
+                    )}
+
+                    {formData.society_id && buildings.length > 10 && (
+                      <TextField
+                        fullWidth
+                        size="small"
+                        placeholder="Search buildings..."
+                        onChange={(e) => handleBuildingSearch(e.target.value)}
+                        sx={{ mt: 1 }}
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <Typography color="#A29EB6">🔍</Typography>
+                            </InputAdornment>
+                          ),
+                        }}
+                      />
+                    )}
                   </FormControl>
                 </Box>
               </Grid>
-
-              {/* Preview Card */}
             </Grid>
+
+            {/* Selected Info Preview */}
+            {(formData.society_id || formData.building_id) && (
+              <Box
+                sx={{
+                  mt: 3,
+                  p: 2,
+                  backgroundColor: alpha("#6F0B14", 0.05),
+                  borderRadius: 2,
+                  border: `1px solid ${alpha("#6F0B14", 0.1)}`,
+                }}
+              >
+                <Typography
+                  variant="body2"
+                  fontWeight={600}
+                  color="#6F0B14"
+                  mb={1}
+                >
+                  Selected Information:
+                </Typography>
+                <Grid container spacing={1}>
+                  {formData.society_id && (
+                    <Grid item xs={12} md={6}>
+                      <Box display="flex" alignItems="center" gap={1}>
+                        <Business fontSize="small" sx={{ color: "#6F0B14" }} />
+                        <Typography variant="body2">
+                          <strong>Society:</strong> {getSelectedSocietyName()}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  )}
+                  {formData.building_id && (
+                    <Grid item xs={12} md={6}>
+                      <Box display="flex" alignItems="center" gap={1}>
+                        <Apartment fontSize="small" sx={{ color: "#6F0B14" }} />
+                        <Typography variant="body2">
+                          <strong>Building:</strong> {getSelectedBuildingName()}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  )}
+                </Grid>
+              </Box>
+            )}
 
             <DialogActions
               sx={{

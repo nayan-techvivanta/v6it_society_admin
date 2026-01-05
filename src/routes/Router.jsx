@@ -14,6 +14,7 @@ import SACards from "../pages/SuperAdmin/Card";
 import SADevices from "../pages/SuperAdmin/Devices";
 import Unauthorized from "../pages/Errors/Unauthorized";
 import NotFound from "../pages/Errors/NotFounda";
+import Society from "../pages/SuperAdmin/Society";
 
 // import PMDashboard from "../pages/PropertyManager/Dashboard";
 // import PMBuildings from "../pages/PropertyManager/Buildings";
@@ -52,6 +53,7 @@ export default function Router() {
             element={<SAPropertyManager />}
           />
           <Route path="/superadmin/buildings" element={<SABuildings />} />
+          <Route path="/superadmin/society" element={<Society />} />
           <Route path="/superadmin/cards" element={<SACards />} />
           <Route path="/superadmin/devices" element={<SADevices />} />
         </Route>

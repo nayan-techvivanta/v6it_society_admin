@@ -29,8 +29,6 @@ import {
   Menu,
   MenuItem,
 } from "@mui/material";
-// import AssignManagerDialog from "../../components/dialogs/AssignManagerDialog";
-
 import {
   KeyboardArrowDown,
   KeyboardArrowUp,
@@ -38,23 +36,26 @@ import {
   Delete,
   Search,
   FilterList,
-  Add as AddIcon,
   Refresh,
   LocationOn,
-  Bed,
   Business,
-  Group,
+  PinDrop,
+  Public,
+  Map,
+  Person,
+  Phone,
+  Email,
+  CalendarToday,
   Apartment,
   Home,
-  CheckCircle,
-  Cancel,
 } from "@mui/icons-material";
 import { supabase } from "../../api/supabaseClient";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "react-toastify";
-import AddBuildingDialog from "../../components/dialogs/AddBuildingDialog";
+import AddSocietyDialog from "../../components/dialogs/AddSocietyDialog";
+import AssignManagerDialog from "../../components/dialogs/AssignManagerDialog";
+import { FaUserEdit, FaUserPlus } from "react-icons/fa";
 
-// Custom styled switch for buildings
 const PrimarySwitch = styled(Switch)(({ theme }) => ({
   "& .MuiSwitch-switchBase.Mui-checked": {
     color: "#6F0B14",
@@ -68,8 +69,8 @@ const PrimarySwitch = styled(Switch)(({ theme }) => ({
 }));
 
 const statusColors = {
-  active: "#93BD57",
-  inactive: "#F96E5B",
+  active: "#008000",
+  inactive: "#B31B1B",
 };
 
 const statusLabels = {
@@ -77,17 +78,17 @@ const statusLabels = {
   inactive: "Inactive",
 };
 
-const BuildingRow = ({
-  building,
+const SocietyRow = ({
+  society,
   onEdit,
-  onAssign,
   onDelete,
   onStatusToggle,
   isExpanded,
   onToggleRow,
+  onAssign,
 }) => {
-  const currentStatus = building.status || "inactive";
-  const isRowDisabled = currentStatus === "inactive";
+  const currentStatus = society.is_active ? "active" : "inactive";
+  const isRowDisabled = !society.is_active;
 
   return (
     <React.Fragment>
@@ -108,7 +109,7 @@ const BuildingRow = ({
           <IconButton
             aria-label="expand row"
             size="small"
-            onClick={() => onToggleRow(building.id)}
+            onClick={() => onToggleRow(society.id)}
             disabled={isRowDisabled}
             className="text-primary hover:bg-lightBackground"
             sx={{
@@ -121,7 +122,7 @@ const BuildingRow = ({
 
         <TableCell className="p-4">
           <Typography className="font-roboto font-semibold text-sm text-gray-800">
-            #{building.id.toString().padStart(3, "0")}
+            {society.id}
           </Typography>
         </TableCell>
 
@@ -137,17 +138,17 @@ const BuildingRow = ({
                 fontSize: "0.875rem",
               }}
             >
-              {building.avatar}
+              {society.name?.substring(0, 2).toUpperCase() || "SO"}
             </Avatar>
             <div>
               <Typography
                 className="font-roboto font-semibold text-sm"
                 sx={{ color: isRowDisabled ? "#6b7280" : "#1E293B" }}
               >
-                {building.name}
+                {society.name}
               </Typography>
               <Typography className="font-roboto text-xs text-hintText">
-                {building.type}
+                {society.city}, {society.state}
               </Typography>
             </div>
           </div>
@@ -158,13 +159,31 @@ const BuildingRow = ({
             className="font-roboto text-sm break-all max-w-[200px]"
             sx={{ color: isRowDisabled ? "#6b7280" : "#1E293B" }}
           >
-            {building.address}
+            {society.address}
           </Typography>
         </TableCell>
 
-        <TableCell className="p-4" align="center">
+        <TableCell className="p-4">
+          <Typography className="font-roboto text-sm">
+            {society.city}
+          </Typography>
+        </TableCell>
+
+        <TableCell className="p-4">
+          <Typography className="font-roboto text-sm">
+            {society.state}
+          </Typography>
+        </TableCell>
+
+        <TableCell className="p-4">
+          <Typography className="font-roboto text-sm">
+            {society.country}
+          </Typography>
+        </TableCell>
+
+        <TableCell className="p-4">
           <Chip
-            label={`${building.units} units`}
+            label={society.pincode}
             className="font-roboto font-medium"
             sx={{
               backgroundColor: isRowDisabled
@@ -211,27 +230,53 @@ const BuildingRow = ({
 
         <TableCell className="p-4" align="center">
           <div className="flex items-center justify-center gap-1">
+            {/* <IconButton
+              size="small"
+              onClick={() => onAssign(society)}
+              disabled={!society.is_active}
+              sx={{
+                color: "#2563EB",
+                "&:hover": { backgroundColor: "rgba(37,99,235,0.08)" },
+              }}
+            >
+              <Person fontSize="small" />
+            </IconButton> */}
+            {/* Assign / Change Manager */}
+            <IconButton
+              size="small"
+              onClick={() => onAssign(society)}
+              disabled={!society.is_active}
+              sx={{
+                color: society.user_id ? "#9CA3AF" : "#2563EB",
+                "&:hover": {
+                  backgroundColor: society.user_id
+                    ? "rgba(156,163,175,0.15)"
+                    : "rgba(37,99,235,0.08)",
+                },
+              }}
+            >
+              {society.user_id ? (
+                <FaUserEdit size={20} fontSize="small" />
+              ) : (
+                <FaUserPlus size={20} fontSize="small" />
+              )}
+            </IconButton>
+
             <FormControlLabel
               control={
                 <PrimarySwitch
-                  checked={currentStatus === "active"}
-                  onChange={(e) => onStatusToggle(building.id, currentStatus)}
+                  checked={society.is_active}
+                  onChange={(e) =>
+                    onStatusToggle(society.id, society.is_active)
+                  }
                   size="small"
                 />
               }
               sx={{ m: 0 }}
             />
-            {/* <IconButton
-              size="small"
-              onClick={() => onAssign(building)}
-              className="text-primary hover:bg-lightBackground"
-            >
-              <Group fontSize="small" />
-            </IconButton> */}
-
             <IconButton
               size="small"
-              onClick={() => onEdit(building.id)}
+              onClick={() => onEdit(society)}
               disabled={isRowDisabled}
               className="text-primary hover:bg-lightBackground"
               sx={{ opacity: isRowDisabled ? 0.5 : 1 }}
@@ -240,7 +285,7 @@ const BuildingRow = ({
             </IconButton>
             <IconButton
               size="small"
-              onClick={() => onDelete(building.id)}
+              onClick={() => onDelete(society.id)}
               disabled={isRowDisabled}
               className="text-reject hover:bg-[rgba(179,27,27,0.09)]"
               sx={{ opacity: isRowDisabled ? 0.5 : 1 }}
@@ -253,10 +298,10 @@ const BuildingRow = ({
 
       {/* Collapsible Details Row */}
       <TableRow>
-        <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={8}>
+        <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={10}>
           <Collapse in={isExpanded} timeout="auto" unmountOnExit>
             <Box sx={{ margin: 1, py: 3 }}>
-              {building.loading ? (
+              {society.loading ? (
                 <Box display="flex" justifyContent="center" p={2}>
                   <CircularProgress size={24} />
                 </Box>
@@ -267,7 +312,7 @@ const BuildingRow = ({
                       variant="h6"
                       className="font-roboto font-semibold text-primary"
                     >
-                      Building Details
+                      Society Details
                     </Typography>
                     <Box
                       sx={{
@@ -293,7 +338,7 @@ const BuildingRow = ({
                           className="font-roboto font-semibold text-primary mb-4"
                           variant="subtitle1"
                         >
-                          Property Information
+                          Society Information
                         </Typography>
                         <div className="space-y-3">
                           <div className="flex items-center gap-3">
@@ -306,15 +351,15 @@ const BuildingRow = ({
                                 height: 48,
                               }}
                             >
-                              {building.avatar}
+                              {society.name?.substring(0, 2).toUpperCase() ||
+                                "SO"}
                             </Avatar>
                             <div>
                               <Typography className="font-roboto font-semibold">
-                                {building.name}
+                                {society.name}
                               </Typography>
                               <Typography className="font-roboto text-sm text-hintText">
-                                {building.type} • Register:{" "}
-                                {building.registerDate}
+                                ID: #{society.id.toString().padStart(3, "0")}
                               </Typography>
                             </div>
                           </div>
@@ -326,24 +371,25 @@ const BuildingRow = ({
                               />
                               <div>
                                 <Typography className="font-roboto text-xs text-hintText">
-                                  Address
+                                  Full Address
                                 </Typography>
                                 <Typography className="font-roboto text-sm">
-                                  {building.address}
+                                  {society.address}
                                 </Typography>
                               </div>
                             </div>
                             <div className="flex items-start gap-2">
-                              <Business
+                              <Map
                                 className="text-primary mt-0.5"
                                 fontSize="small"
                               />
                               <div>
                                 <Typography className="font-roboto text-xs text-hintText">
-                                  Property Manager
+                                  Location
                                 </Typography>
                                 <Typography className="font-roboto text-sm">
-                                  {building.manager}
+                                  {society.city}, {society.state},{" "}
+                                  {society.country} - {society.pincode}
                                 </Typography>
                               </div>
                             </div>
@@ -352,67 +398,59 @@ const BuildingRow = ({
                       </CardContent>
                     </Card>
 
-                    {/* Unit & Occupancy Stats */}
+                    {/* Contact Information */}
                     <Card className="rounded-xl border border-gray-200 shadow-sm">
                       <CardContent className="p-4">
                         <Typography
                           className="font-roboto font-semibold text-primary mb-4"
                           variant="subtitle1"
                         >
-                          Unit Statistics
+                          Contact Information
                         </Typography>
-                        <div className="space-y-4">
-                          <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-3">
+                          {society.contact_person && (
                             <div className="p-3 bg-lightBackground rounded-lg">
                               <Typography className="font-roboto text-xs text-hintText mb-1">
-                                Total Units
+                                Contact Person
                               </Typography>
-                              <Typography className="font-roboto font-semibold text-xl text-primary">
-                                {building.units}
+                              <Typography className="font-roboto font-semibold flex items-center gap-2">
+                                <Person fontSize="small" />
+                                {society.contact_person}
                               </Typography>
                             </div>
+                          )}
+
+                          {society.contact_phone && (
                             <div className="p-3 bg-lightBackground rounded-lg">
                               <Typography className="font-roboto text-xs text-hintText mb-1">
-                                Occupancy Rate
+                                Phone Number
                               </Typography>
-                              <Typography
-                                className="font-roboto font-semibold text-xl"
-                                style={{
-                                  color:
-                                    building.occupancy > 70
-                                      ? "#93BD57"
-                                      : building.occupancy > 40
-                                      ? "#DBA400"
-                                      : "#F96E5B",
-                                }}
-                              >
-                                {building.occupancy}%
+                              <Typography className="font-roboto font-semibold flex items-center gap-2">
+                                <Phone fontSize="small" />
+                                {society.contact_phone}
                               </Typography>
                             </div>
-                          </div>
-                          <div className="relative pt-1">
-                            <div className="flex items-center justify-between mb-1">
-                              <Typography className="font-roboto text-xs text-hintText">
-                                Occupancy Progress
+                          )}
+
+                          {society.contact_email && (
+                            <div className="p-3 bg-lightBackground rounded-lg">
+                              <Typography className="font-roboto text-xs text-hintText mb-1">
+                                Email Address
                               </Typography>
-                              <Typography className="font-roboto text-xs font-medium">
-                                {building.occupancy}%
+                              <Typography className="font-roboto font-semibold flex items-center gap-2">
+                                <Email fontSize="small" />
+                                {society.contact_email}
                               </Typography>
                             </div>
-                            <div className="overflow-hidden h-2 text-xs flex rounded bg-gray-200">
-                              <div
-                                style={{ width: `${building.occupancy}%` }}
-                                // className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center rounded-full"
-                                className={`rounded-full ${
-                                  building.occupancy > 70
-                                    ? "bg-[#93BD57]"
-                                    : building.occupancy > 40
-                                    ? "bg-[#DBA400]"
-                                    : "bg-[#F96E5B]"
-                                }`}
-                              />
-                            </div>
-                          </div>
+                          )}
+
+                          {!society.contact_person &&
+                            !society.contact_phone &&
+                            !society.contact_email && (
+                              <Typography className="font-roboto text-sm text-hintText italic">
+                                No contact information available
+                              </Typography>
+                            )}
                         </div>
                       </CardContent>
                     </Card>
@@ -424,63 +462,56 @@ const BuildingRow = ({
                           className="font-roboto font-semibold text-primary mb-4"
                           variant="subtitle1"
                         >
-                          Additional Details
+                          Additional Information
                         </Typography>
                         <div className="space-y-3">
                           <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                             <div className="flex items-center gap-2">
-                              <Bed className="text-primary" fontSize="small" />
-                              <div>
-                                <Typography className="font-roboto text-xs text-hintText">
-                                  Available Units
-                                </Typography>
-                                <Typography className="font-roboto font-semibold">
-                                  {Math.floor(
-                                    (building.units *
-                                      (100 - building.occupancy)) /
-                                      100
-                                  )}
-                                </Typography>
-                              </div>
-                            </div>
-                            <CheckCircle className="text-[#93BD57]" />
-                          </div>
-                          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                            <div className="flex items-center gap-2">
-                              <Group
+                              <Business
                                 className="text-primary"
                                 fontSize="small"
                               />
                               <div>
                                 <Typography className="font-roboto text-xs text-hintText">
-                                  Residents
+                                  Total Buildings
                                 </Typography>
                                 <Typography className="font-roboto font-semibold">
-                                  {Math.floor(
-                                    (building.units * building.occupancy) / 100
-                                  )}
+                                  {society.building_count || 0}
                                 </Typography>
                               </div>
                             </div>
-                            <Group className="text-primary" />
+                            <Apartment className="text-primary" />
                           </div>
+
                           <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                             <div className="flex items-center gap-2">
-                              <Apartment
-                                className="text-primary"
-                                fontSize="small"
-                              />
+                              <Home className="text-primary" fontSize="small" />
                               <div>
                                 <Typography className="font-roboto text-xs text-hintText">
-                                  Building Type
+                                  Created Date
                                 </Typography>
                                 <Typography className="font-roboto font-semibold">
-                                  {building.type}
+                                  {society.created_at
+                                    ? new Date(
+                                        society.created_at
+                                      ).toLocaleDateString()
+                                    : "N/A"}
                                 </Typography>
                               </div>
                             </div>
-                            <Home className="text-primary" />
+                            <CalendarToday className="text-primary" />
                           </div>
+
+                          {society.description && (
+                            <div className="p-3 bg-gray-50 rounded-lg">
+                              <Typography className="font-roboto text-xs text-hintText mb-2">
+                                Description
+                              </Typography>
+                              <Typography className="font-roboto text-sm">
+                                {society.description}
+                              </Typography>
+                            </div>
+                          )}
                         </div>
                       </CardContent>
                     </Card>
@@ -495,16 +526,17 @@ const BuildingRow = ({
   );
 };
 
-const BuildingCard = ({
-  building,
+// Society Card Component for Mobile
+const SocietyCard = ({
+  society,
   onEdit,
-  onAssign,
   onDelete,
   onStatusToggle,
+  onAssign,
 }) => {
   const [expanded, setExpanded] = useState(false);
-  const currentStatus = building.status || "inactive";
-  const isRowDisabled = currentStatus === "inactive";
+  const currentStatus = society.is_active ? "active" : "inactive";
+  const isRowDisabled = !society.is_active;
 
   return (
     <motion.div
@@ -526,17 +558,17 @@ const BuildingCard = ({
                 height: 48,
               }}
             >
-              {building.avatar}
+              {society.name?.substring(0, 2).toUpperCase() || "SO"}
             </Avatar>
             <div>
               <Typography
                 className="font-roboto font-semibold"
                 sx={{ color: isRowDisabled ? "#6b7280" : "#1E293B" }}
               >
-                {building.name}
+                {society.name}
               </Typography>
               <Typography className="font-roboto text-xs text-hintText">
-                #{building.id.toString().padStart(3, "0")} • {building.type}
+                #{society.id.toString().padStart(3, "0")} • {society.city}
               </Typography>
             </div>
           </div>
@@ -544,8 +576,10 @@ const BuildingCard = ({
             <FormControlLabel
               control={
                 <PrimarySwitch
-                  checked={currentStatus === "active"}
-                  onChange={(e) => onStatusToggle(building.id, currentStatus)}
+                  checked={society.is_active}
+                  onChange={(e) =>
+                    onStatusToggle(society.id, society.is_active)
+                  }
                   size="small"
                 />
               }
@@ -557,42 +591,26 @@ const BuildingCard = ({
         <div className="grid grid-cols-2 gap-3 mb-4">
           <div className="p-3 bg-gray-50 rounded-lg">
             <Typography className="font-roboto text-xs text-hintText mb-1">
-              Manager
+              Pincode
             </Typography>
             <Typography className="font-roboto text-sm font-medium">
-              {building.manager}
+              {society.pincode}
             </Typography>
           </div>
           <div className="p-3 bg-gray-50 rounded-lg">
             <Typography className="font-roboto text-xs text-hintText mb-1">
-              Units
+              State
             </Typography>
-            <Chip
-              label={building.units}
-              className="font-roboto font-medium"
-              sx={{
-                backgroundColor: "rgba(111, 11, 20, 0.09)",
-                color: "#6F0B14",
-              }}
-              size="small"
-            />
+            <Typography className="font-roboto text-sm font-medium">
+              {society.state}
+            </Typography>
           </div>
           <div className="p-3 bg-gray-50 rounded-lg">
             <Typography className="font-roboto text-xs text-hintText mb-1">
-              Occupancy
+              Country
             </Typography>
-            <Typography
-              className="font-roboto text-sm font-medium"
-              style={{
-                color:
-                  building.occupancy > 70
-                    ? "#93BD57"
-                    : building.occupancy > 40
-                    ? "#DBA400"
-                    : "#F96E5B",
-              }}
-            >
-              {building.occupancy}%
+            <Typography className="font-roboto text-sm font-medium">
+              {society.country}
             </Typography>
           </div>
           <div className="p-3 bg-gray-50 rounded-lg">
@@ -633,22 +651,23 @@ const BuildingCard = ({
           Address
         </Typography>
         <Typography className="font-roboto text-sm mb-4">
-          {building.address}
+          {society.address}
         </Typography>
 
         <div className="flex items-center justify-between">
           <div className="flex gap-1">
-            {/* <IconButton
+            <IconButton
               size="small"
-              onClick={() => onAssign(building)}
-              className="text-primary"
+              onClick={() => onAssign(society)}
+              disabled={!society.is_active}
+              sx={{ color: "#2563EB" }}
             >
-              <Group fontSize="small" />
-            </IconButton> */}
+              <Person fontSize="small" />
+            </IconButton>
 
             <IconButton
               size="small"
-              onClick={() => onEdit(building.id)}
+              onClick={() => onEdit(society)}
               disabled={isRowDisabled}
               className="text-primary hover:bg-lightBackground"
               sx={{ opacity: isRowDisabled ? 0.5 : 1 }}
@@ -657,7 +676,7 @@ const BuildingCard = ({
             </IconButton>
             <IconButton
               size="small"
-              onClick={() => onDelete(building.id)}
+              onClick={() => onDelete(society.id)}
               disabled={isRowDisabled}
               className="text-reject hover:bg-[rgba(179,27,27,0.09)]"
               sx={{ opacity: isRowDisabled ? 0.5 : 1 }}
@@ -689,50 +708,46 @@ const BuildingCard = ({
           </Typography>
 
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
+            {society.contact_person && (
               <div className="p-3 bg-white rounded-lg border border-gray-200">
                 <Typography className="font-roboto text-xs text-hintText mb-1">
-                  Register Date
+                  Contact Person
                 </Typography>
                 <Typography className="font-roboto text-sm font-medium">
-                  {building.registerDate}
+                  {society.contact_person}
                 </Typography>
               </div>
+            )}
+
+            {society.contact_phone && (
               <div className="p-3 bg-white rounded-lg border border-gray-200">
                 <Typography className="font-roboto text-xs text-hintText mb-1">
-                  Available Units
+                  Contact Phone
                 </Typography>
                 <Typography className="font-roboto text-sm font-medium">
-                  {Math.floor(
-                    (building.units * (100 - building.occupancy)) / 100
-                  )}
+                  {society.contact_phone}
                 </Typography>
               </div>
-            </div>
+            )}
+
+            {society.contact_email && (
+              <div className="p-3 bg-white rounded-lg border border-gray-200">
+                <Typography className="font-roboto text-xs text-hintText mb-1">
+                  Contact Email
+                </Typography>
+                <Typography className="font-roboto text-sm font-medium">
+                  {society.contact_email}
+                </Typography>
+              </div>
+            )}
 
             <div className="p-3 bg-white rounded-lg border border-gray-200">
               <Typography className="font-roboto text-xs text-hintText mb-1">
-                Occupancy Progress
+                Buildings Count
               </Typography>
-              <div className="relative pt-1">
-                <div className="flex items-center justify-between mb-1">
-                  <Typography className="font-roboto text-xs font-medium">
-                    {building.occupancy}% occupied
-                  </Typography>
-                </div>
-                <div className="overflow-hidden h-2 text-xs flex rounded bg-gray-200">
-                  <div
-                    style={{ width: `${building.occupancy}%` }}
-                    className={`rounded-full ${
-                      building.occupancy > 70
-                        ? "bg-[#93BD57]"
-                        : building.occupancy > 40
-                        ? "bg-[#DBA400]"
-                        : "bg-[#F96E5B]"
-                    }`}
-                  />
-                </div>
-              </div>
+              <Typography className="font-roboto text-sm font-medium">
+                {society.building_count || 0} buildings
+              </Typography>
             </div>
           </div>
         </motion.div>
@@ -741,13 +756,14 @@ const BuildingCard = ({
   );
 };
 
-export default function Buildings() {
-  const [buildings, setBuildings] = useState([]);
-  const [filteredBuildings, setFilteredBuildings] = useState([]);
+// Main Society Component
+export default function Society() {
+  const [societies, setSocieties] = useState([]);
+  const [filteredSocieties, setFilteredSocieties] = useState([]);
   const theme = useTheme();
   const [openDialog, setOpenDialog] = useState(false);
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
-  const [selectedBuilding, setSelectedBuilding] = useState(null);
+  const [selectedSociety, setSelectedSociety] = useState(null);
   const [openRows, setOpenRows] = useState({});
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(0);
@@ -755,183 +771,119 @@ export default function Buildings() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterAnchorEl, setFilterAnchorEl] = useState(null);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [assignSociety, setAssignSociety] = useState(null);
 
-  const [societies, setSocieties] = useState([]);
-  // const [openAssignDialog, setOpenAssignDialog] = useState(false);
-  // const [assignBuilding, setAssignBuilding] = useState(null);
-
-  useEffect(() => {
-    const fetchSocieties = async () => {
-      const { data, error } = await supabase
-        .from("societies")
-        .select("id, name, city, state, country")
-        .order("name", { ascending: true });
-
-      if (!error && data) {
-        setSocieties(data);
-      }
-    };
-
-    fetchSocieties();
-  }, []);
-  const fetchBuildings = useCallback(async () => {
+  const fetchSocieties = useCallback(async () => {
     setLoading(true);
 
-    const { data, error } = await supabase
-      .from("buildings")
-      .select(
-        `
-    id,
-    name,
-    description,
-    society_id,
-    created_at,
-    is_active,
-    is_delete,
-    societies (
-      id,
-      name
-    )
-  `
-      )
-      .eq("is_delete", false)
-      .order("id", { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from("societies")
+        .select(
+          `
+            *,
+            buildings (id)
+            user:users ( id, name )
+            `
+        )
+        .eq("is_delete", false)
+        .order("id", { ascending: false });
 
-    if (error) {
-      console.error(error);
-      toast.error("Failed to fetch buildings");
+      if (error) throw error;
+
+      const mapped = data.map((society) => ({
+        ...society,
+        building_count: society.buildings?.length || 0,
+        manager_name: society.user?.name || null,
+        loading: false,
+      }));
+
+      setSocieties(mapped);
+      setFilteredSocieties(mapped);
+    } catch (error) {
+      console.error("Error fetching societies:", error);
+      toast.error("Failed to fetch societies");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const mapped = data.map((b) => ({
-      id: b.id,
-      name: b.name,
-
-      description: b.description || "",
-      society_id: b.society_id || "",
-      society_name: b.societies?.name || "",
-
-      address: b.description || "—",
-      registerDate: b.created_at
-        ? new Date(b.created_at).toISOString().split("T")[0]
-        : "—",
-
-      status: b.is_active ? "active" : "inactive",
-
-      // UI-only fields
-      units: 0,
-      manager: "N/A",
-      occupancy: 0,
-      type: "Building",
-
-      avatar: b.name
-        ?.split(" ")
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase(),
-
-      loading: false,
-    }));
-
-    setBuildings(mapped);
-    setFilteredBuildings(mapped);
-    setLoading(false);
   }, []);
-  useEffect(() => {
-    fetchBuildings();
-  }, [fetchBuildings]);
 
-  const headers = [
-    "",
-    "ID",
-    "Building Name",
-    "Address",
-    "Units",
-    "Status",
-    "Actions",
-  ];
-  const handleAssignManager = (building) => {
-    setAssignBuilding(building);
-    setOpenAssignDialog(true);
-  };
-
-  // Filter buildings based on search and status
   useEffect(() => {
-    let filtered = buildings;
+    fetchSocieties();
+  }, [fetchSocieties]);
+
+  useEffect(() => {
+    let filtered = societies;
 
     if (searchTerm) {
       filtered = filtered.filter(
-        (building) =>
-          building.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          building.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          building.manager.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          building.id.toString().includes(searchTerm)
+        (society) =>
+          society.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          society.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          society.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          society.state.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          society.pincode.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
     if (statusFilter !== "all") {
       filtered = filtered.filter(
-        (building) => building.status === statusFilter
+        (society) =>
+          (society.is_active ? "active" : "inactive") === statusFilter
       );
     }
 
-    setFilteredBuildings(filtered);
+    setFilteredSocieties(filtered);
     setPage(0);
-  }, [buildings, searchTerm, statusFilter]);
+  }, [societies, searchTerm, statusFilter]);
 
-  const handleStatusToggle = useCallback(async (buildingId, currentStatus) => {
-    const newStatus = currentStatus === "active" ? "inactive" : "active";
+  const handleStatusToggle = useCallback(async (societyId, currentStatus) => {
+    const newStatus = !currentStatus;
 
-    // Optimistic UI
-    setBuildings((prev) =>
-      prev.map((b) => (b.id === buildingId ? { ...b, status: newStatus } : b))
+    setSocieties((prev) =>
+      prev.map((s) => (s.id === societyId ? { ...s, is_active: newStatus } : s))
     );
 
     const { error } = await supabase
-      .from("buildings")
-      .update({ is_active: newStatus === "active" })
-      .eq("id", buildingId);
+      .from("societies")
+      .update({ is_active: newStatus })
+      .eq("id", societyId);
 
     if (error) {
       toast.error("Failed to update status");
 
-      // rollback
-      setBuildings((prev) =>
-        prev.map((b) =>
-          b.id === buildingId ? { ...b, status: currentStatus } : b
+      setSocieties((prev) =>
+        prev.map((s) =>
+          s.id === societyId ? { ...s, is_active: currentStatus } : s
         )
       );
     } else {
-      toast.success(
-        `Building ${newStatus === "active" ? "activated" : "deactivated"}`
-      );
+      toast.success(`Society ${newStatus ? "activated" : "deactivated"}`);
     }
   }, []);
 
   const handleToggleRow = useCallback(
-    (buildingId) => {
-      const isCurrentlyOpen = openRows[buildingId];
+    (societyId) => {
+      const isCurrentlyOpen = openRows[societyId];
 
       if (isCurrentlyOpen) {
-        setOpenRows((prev) => ({ ...prev, [buildingId]: false }));
+        setOpenRows((prev) => ({ ...prev, [societyId]: false }));
       } else {
-        setOpenRows((prev) => ({ ...prev, [buildingId]: true }));
+        setOpenRows((prev) => ({ ...prev, [societyId]: true }));
 
-        setBuildings((prev) =>
-          prev.map((building) =>
-            building.id === buildingId
-              ? { ...building, loading: true }
-              : building
+        setSocieties((prev) =>
+          prev.map((society) =>
+            society.id === societyId ? { ...society, loading: true } : society
           )
         );
 
         setTimeout(() => {
-          setBuildings((prev) =>
-            prev.map((building) =>
-              building.id === buildingId
-                ? { ...building, loading: false }
-                : building
+          setSocieties((prev) =>
+            prev.map((society) =>
+              society.id === societyId
+                ? { ...society, loading: false }
+                : society
             )
           );
         }, 500);
@@ -939,48 +891,51 @@ export default function Buildings() {
     },
     [openRows]
   );
+  const handleAssignSociety = (society) => {
+    setAssignSociety(society);
+    setAssignDialogOpen(true);
+  };
 
-  const handleEditBuilding = (id) => {
-    const b = buildings.find((item) => item.id === id);
-
-    if (!b) return;
-
-    setSelectedBuilding({
-      id: b.id,
-      name: b.name || "",
-      description: b.description || "",
-      society_id: String(b.society_id || ""),
-    });
-
+  const handleEditSociety = (society) => {
+    setSelectedSociety(society);
     setOpenDialog(true);
   };
 
-  const handleDeleteBuilding = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this building?"))
+  const handleDeleteSociety = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this society?"))
       return;
 
-    const { error } = await supabase
-      .from("buildings")
-      .update({ is_delete: true })
-      .eq("id", id);
+    try {
+      const { error } = await supabase
+        .from("societies")
+        .update({ is_delete: true })
+        .eq("id", id);
 
-    if (error) {
-      toast.error("Failed to delete building");
-    } else {
-      setBuildings((prev) => prev.filter((b) => b.id !== id));
-      toast.success("Building deleted successfully");
+      if (error) throw error;
+
+      // UI se remove
+      setSocieties((prev) => prev.filter((s) => s.id !== id));
+
+      toast.success("Society deleted successfully");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to delete society");
     }
   };
 
-  const handleAddNewBuilding = () => {
-    setSelectedBuilding(null);
+  const handleAddNewSociety = () => {
+    setSelectedSociety(null);
     setOpenDialog(true);
   };
 
   const handleCloseDialog = () => {
     setOpenDialog(false);
-    setSelectedBuilding(null);
-    fetchBuildings();
+    setSelectedSociety(null);
+    fetchSocieties();
+  };
+
+  const handleSubmitSociety = () => {
+    fetchSocieties();
   };
 
   const handleChangePage = (event, newPage) => {
@@ -1014,21 +969,23 @@ export default function Buildings() {
     setStatusFilter("all");
   };
 
-  const paginatedBuildings = filteredBuildings.slice(
+  const paginatedSocieties = filteredSocieties.slice(
     page * rowsPerPage,
     page * rowsPerPage + rowsPerPage
   );
 
-  // Calculate statistics
-  const totalBuildings = buildings.length;
-  const activeBuildings = buildings.filter((b) => b.status === "active").length;
-  const totalUnits = buildings.reduce(
-    (sum, building) => sum + building.units,
-    0
-  );
-  const totalOccupancy =
-    buildings.reduce((sum, building) => sum + building.occupancy, 0) /
-    buildings.length;
+  const headers = [
+    "",
+    "ID",
+    "Name",
+    "Address",
+    "City",
+    "State",
+    "Country",
+    "Pincode",
+    "Status",
+    "Actions",
+  ];
 
   return (
     <div className="min-h-screen p-4 md:p-6 font-roboto bg-gray-50">
@@ -1046,24 +1003,13 @@ export default function Buildings() {
                 variant="h4"
                 className="font-roboto font-bold text-primary mb-2"
               >
-                Buildings Management
+                Societies Management
               </Typography>
               <Typography className="font-roboto text-gray-600">
-                Manage and monitor all building properties
+                Manage and monitor all housing societies
               </Typography>
             </div>
 
-            {/* <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-              <Button
-                variant="contained"
-                onClick={handleAddNewBuilding}
-                startIcon={<AddIcon />}
-                className="font-roboto font-semibold bg-primary hover:bg-[#5a090f] px-6 py-2.5 rounded-lg shadow-sm"
-                sx={{ textTransform: "none" }}
-              >
-                Add New Building
-              </Button>
-            </motion.div> */}
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -1072,31 +1018,31 @@ export default function Buildings() {
               className="inline-block"
             >
               <button
-                onClick={handleAddNewBuilding}
+                onClick={handleAddNewSociety}
                 className="
-                            group
-                            bg-white
-                            font-roboto
-                            font-medium
-                            px-8
-                            py-3.5
-                            text-primary
-                            text-sm
-                            rounded-xl
-                            border-2
-                            border-primary
-                            hover:bg-primary
-                            hover:text-white
-                            transition-all
-                            duration-300
-                            relative
-                            overflow-hidden
-                            flex
-                            items-center
-                            gap-3
-                            shadow-sm
-                            hover:shadow-md
-                          "
+                    group
+                    bg-white
+                    font-roboto
+                    font-medium
+                    px-8
+                    py-3.5
+                    text-primary
+                    text-sm
+                    rounded-xl
+                    border-2
+                    border-primary
+                    hover:bg-primary
+                    hover:text-white
+                    transition-all
+                    duration-300
+                    relative
+                    overflow-hidden
+                    flex
+                    items-center
+                    gap-3
+                    shadow-sm
+                    hover:shadow-md
+                    "
               >
                 {/* Underline animation */}
                 <motion.div
@@ -1119,21 +1065,21 @@ export default function Buildings() {
                     d="M12 4v16m8-8H4"
                   />
                 </svg>
-                <span className="tracking-wide">New Building</span>
+                <span className="tracking-wide">New Society</span>
 
                 {/* Hover fill effect */}
                 <div
                   className="
-                              absolute
-                              inset-0
-                              bg-primary
-                              transform
-                              -translate-x-full
-                              group-hover:translate-x-0
-                              transition-transform
-                              duration-300
-                              -z-10
-                            "
+                        absolute
+                        inset-0
+                        bg-primary
+                        transform
+                        -translate-x-full
+                        group-hover:translate-x-0
+                        transition-transform
+                        duration-300
+                        -z-10
+                    "
                 />
               </button>
             </motion.div>
@@ -1145,12 +1091,12 @@ export default function Buildings() {
           <CardContent className="p-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <Typography variant="h6" className="font-roboto font-semibold">
-                All Buildings ({filteredBuildings.length})
+                All Societies ({filteredSocieties.length})
               </Typography>
 
               <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
                 <TextField
-                  placeholder="Search buildings..."
+                  placeholder="Search societies..."
                   variant="outlined"
                   size="small"
                   value={searchTerm}
@@ -1219,15 +1165,15 @@ export default function Buildings() {
           </CardContent>
         </Card>
 
-        {/* Buildings Table/Cards */}
+        {/* Societies Table/Cards */}
         <Card className="rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           {loading ? (
             <Box display="flex" justifyContent="center" p={4}>
               <CircularProgress />
             </Box>
-          ) : filteredBuildings.length === 0 ? (
+          ) : filteredSocieties.length === 0 ? (
             <Alert severity="info" sx={{ m: 3 }}>
-              No buildings found. Add your first building!
+              No societies found. Add your first society!
             </Alert>
           ) : (
             <>
@@ -1250,9 +1196,9 @@ export default function Buildings() {
                               py: 2,
                             }}
                             align={
-                              header === "Units" ||
                               header === "Status" ||
-                              header === "Actions"
+                              header === "Actions" ||
+                              header === "Pincode"
                                 ? "center"
                                 : "left"
                             }
@@ -1263,16 +1209,16 @@ export default function Buildings() {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {paginatedBuildings.map((building) => (
-                        <BuildingRow
-                          key={building.id}
-                          building={building}
-                          onEdit={handleEditBuilding}
-                          onDelete={handleDeleteBuilding}
+                      {paginatedSocieties.map((society) => (
+                        <SocietyRow
+                          key={society.id}
+                          society={society}
+                          onEdit={handleEditSociety}
+                          onDelete={handleDeleteSociety}
                           onStatusToggle={handleStatusToggle}
                           onToggleRow={handleToggleRow}
-                          isExpanded={!!openRows[building.id]}
-                          // onAssign={handleAssignManager}
+                          isExpanded={!!openRows[society.id]}
+                          onAssign={handleAssignSociety}
                         />
                       ))}
                     </TableBody>
@@ -1281,14 +1227,14 @@ export default function Buildings() {
               ) : (
                 <div className="p-4">
                   <AnimatePresence>
-                    {paginatedBuildings.map((building) => (
-                      <BuildingCard
-                        key={building.id}
-                        building={building}
-                        onEdit={handleEditBuilding}
-                        onDelete={handleDeleteBuilding}
-                        onAssign={handleAssignManager}
+                    {paginatedSocieties.map((society) => (
+                      <SocietyCard
+                        key={society.id}
+                        society={society}
+                        onEdit={handleEditSociety}
+                        onDelete={handleDeleteSociety}
                         onStatusToggle={handleStatusToggle}
+                        onAssign={handleAssignSociety}
                       />
                     ))}
                   </AnimatePresence>
@@ -1307,15 +1253,15 @@ export default function Buildings() {
               >
                 <Typography className="font-roboto text-sm text-hintText">
                   Showing{" "}
-                  {Math.min(page * rowsPerPage + 1, filteredBuildings.length)}{" "}
+                  {Math.min(page * rowsPerPage + 1, filteredSocieties.length)}{" "}
                   to{" "}
-                  {Math.min((page + 1) * rowsPerPage, filteredBuildings.length)}{" "}
-                  of {filteredBuildings.length} buildings
+                  {Math.min((page + 1) * rowsPerPage, filteredSocieties.length)}{" "}
+                  of {filteredSocieties.length} societies
                 </Typography>
                 <TablePagination
                   rowsPerPageOptions={[5, 10, 25]}
                   component="div"
-                  count={filteredBuildings.length}
+                  count={filteredSocieties.length}
                   rowsPerPage={rowsPerPage}
                   page={page}
                   onPageChange={handleChangePage}
@@ -1371,20 +1317,23 @@ export default function Buildings() {
             Inactive Only
           </MenuItem>
         </Menu>
-        {/* <AssignManagerDialog
-          open={openAssignDialog}
-          onClose={() => setOpenAssignDialog(false)}
-          building={assignBuilding}
-          onSuccess={fetchBuildings}
-        /> */}
 
-        {/* Add/Edit Building Dialog */}
-        <AddBuildingDialog
+        {/* Add/Edit Society Dialog */}
+        <AddSocietyDialog
           open={openDialog}
           onClose={handleCloseDialog}
-          building={selectedBuilding}
-          isEdit={!!selectedBuilding}
-          societies={societies}
+          onSubmit={handleSubmitSociety}
+          society={selectedSociety}
+          isEdit={!!selectedSociety}
+        />
+        <AssignManagerDialog
+          open={assignDialogOpen}
+          onClose={() => {
+            setAssignDialogOpen(false);
+            setAssignSociety(null);
+          }}
+          society={assignSociety}
+          onSuccess={fetchSocieties}
         />
       </motion.div>
     </div>

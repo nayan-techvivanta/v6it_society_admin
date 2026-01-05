@@ -56,8 +56,8 @@ const Login = () => {
 
       // Map API role to internal role
       let role = profile.role_type.toLowerCase();
-      if (role === "super") role = "superadmin"; // 🔹 Map 'Super' → 'superadmin'
-
+      if (role === "super") role = "superadmin";
+      if (role === "Manager") role = "propertymanager";
       // Store in localStorage
       localStorage.setItem("token", accessToken);
       localStorage.setItem("role", role);

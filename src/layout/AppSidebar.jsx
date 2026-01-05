@@ -324,9 +324,8 @@
 // export default AppSidebar;
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-/* 🔴 FIX: use react-router-dom instead of react-router */
 import { Link, useLocation, useNavigate } from "react-router-dom";
-
+import { PiBuildingApartment } from "react-icons/pi";
 import { FaRegIdCard } from "react-icons/fa";
 import { BsThreeDots, BsBuildings } from "react-icons/bs";
 import { FiLogOut, FiChevronDown } from "react-icons/fi";
@@ -350,6 +349,12 @@ const navItems = [
     name: "Property Manager",
     path: "/superadmin/property-managers",
     roles: ["superadmin", "admin"],
+  },
+  {
+    icon: <PiBuildingApartment size={22} />,
+    name: "Society",
+    path: "/superadmin/society",
+    roles: ["superadmin", "admin", "propertymanager"],
   },
   {
     icon: <BsBuildings size={20} />,
@@ -380,10 +385,8 @@ const AppSidebar = () => {
   const [subMenuHeight, setSubMenuHeight] = useState({});
   const subMenuRefs = useRef({});
 
-  /* 🔴 FIX: normalize role to lowercase */
   const userRole = localStorage.getItem("role")?.toLowerCase();
 
-  /* 🔴 FIX: use filteredNavItems everywhere */
   const filteredNavItems = useMemo(() => {
     return navItems.filter((item) => item.roles.includes(userRole));
   }, [userRole]);
@@ -492,7 +495,6 @@ const AppSidebar = () => {
     >
       {/* ================= LOGO ================= */}
       <div className="py-8 flex justify-center">
-        {/* 🔴 FIX: correct dashboard path */}
         <Link to="/superadmin/dashboard" className="flex items-center gap-2">
           <img src={Logo} alt="Logo" className="w-10 h-10" />
           {(isExpanded || isHovered || isMobileOpen) && (
@@ -512,7 +514,7 @@ const AppSidebar = () => {
       </nav>
 
       {/* ================= LOGOUT ================= */}
-      <div className="mt-auto px-4 pb-6">
+      <div className="mt-10 px-4 pb-6 ">
         <button
           onClick={handleLogout}
           className="flex items-center gap-3 w-full px-3 py-3 rounded-lg
