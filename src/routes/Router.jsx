@@ -13,10 +13,11 @@ import SABuildings from "../pages/SuperAdmin/Buildings";
 import SACards from "../pages/SuperAdmin/Card";
 import SADevices from "../pages/SuperAdmin/Devices";
 import Unauthorized from "../pages/Errors/Unauthorized";
-import NotFound from "../pages/Errors/NotFounda";
+import NotFound from "../pages/Errors/NotFound";
 import Society from "../pages/SuperAdmin/Society";
 
-// import PMDashboard from "../pages/PropertyManager/Dashboard";
+import PMDashboard from "../pages/PropertyManager/DashboardCom";
+import AdminPage from "../pages/PropertyManager/Adminpage";
 // import PMBuildings from "../pages/PropertyManager/Buildings";
 
 // import AdminDashboard from "../pages/Admin/Dashboard";
@@ -59,7 +60,7 @@ export default function Router() {
         </Route>
 
         {/* ================= PROPERTY MANAGER ================= */}
-        {/*
+
         <Route
           element={
             <ProtectedRoute allowedRoles={["propertymanager"]}>
@@ -68,9 +69,9 @@ export default function Router() {
           }
         >
           <Route path="/property/dashboard" element={<PMDashboard />} />
-          <Route path="/property/buildings" element={<PMBuildings />} />
+          <Route path="/property/admin" element={<AdminPage />} />
+          {/* <Route path="/property/buildings" element={<PMBuildings />} /> */}
         </Route>
-        */}
 
         {/* ================= ADMIN ================= */}
         {/*

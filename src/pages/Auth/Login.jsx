@@ -8,6 +8,7 @@ import Logo from "../../assets/Images/Logo/logo.png";
 import { FaRegEye, FaRegEyeSlash, FaRegUser } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { MdOutlineEmail } from "react-icons/md";
+import { toast } from "react-toastify";
 import { supabase } from "../../api/supabaseClient";
 
 const Login = () => {
@@ -17,6 +18,67 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
+  // const handleSubmit = async (e) => {
+  //   e.preventDefault();
+  //   setIsLoading(true);
+
+  //   try {
+  //     const { data, error } = await supabase.auth.signInWithPassword({
+  //       email,
+  //       password,
+  //     });
+
+  //     console.log("Supabase login:", data, error);
+
+  //     if (error) {
+  //       alert(error.message);
+  //       return;
+  //     }
+
+  //     if (!data.session) {
+  //       alert("Invalid email or password");
+  //       return;
+  //     }
+
+  //     const userId = data.user.id;
+  //     const accessToken = data.session.access_token;
+
+  //     // Fetch user profile
+  //     const { data: profile, error: roleError } = await supabase
+  //       .from("users")
+  //       .select("*")
+  //       .eq("registed_user_id", userId)
+  //       .single();
+
+  //     if (roleError || !profile?.role_type) {
+  //       alert("User role not found. Contact admin.");
+  //       return;
+  //     }
+
+  //     // Map API role to internal role
+  //     let role = profile.role_type.toLowerCase();
+  //     if (role === "super") role = "superadmin";
+  //     if (role === "Manager") role = "propertymanager";
+  //     // Store in localStorage
+  //     localStorage.setItem("token", accessToken);
+  //     localStorage.setItem("role", role);
+  //     localStorage.setItem("userId", userId);
+
+  //     // Role-based redirect
+  //     const dashboardPathByRole = {
+  //       superadmin: "/superadmin/dashboard",
+  //       admin: "/admin/dashboard",
+  //       propertymanager: "/property/dashboard",
+  //     };
+
+  //     navigate(dashboardPathByRole[role], { replace: true });
+  //   } catch (err) {
+  //     console.error(err);
+  //     alert("Something went wrong. Please try again.");
+  //   } finally {
+  //     setIsLoading(false);
+  //   }
+  // };
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -27,15 +89,13 @@ const Login = () => {
         password,
       });
 
-      console.log("Supabase login:", data, error);
-
       if (error) {
-        alert(error.message);
+        toast.error(error.message || "Invalid email or password");
         return;
       }
 
-      if (!data.session) {
-        alert("Invalid email or password");
+      if (!data?.session) {
+        toast.error("Invalid email or password");
         return;
       }
 
@@ -43,44 +103,53 @@ const Login = () => {
       const accessToken = data.session.access_token;
 
       // Fetch user profile
-      const { data: profile, error: roleError } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from("users")
         .select("*")
         .eq("registed_user_id", userId)
         .single();
 
-      if (roleError || !profile?.role_type) {
-        alert("User role not found. Contact admin.");
+      if (profileError) {
+        console.error(profileError);
+        toast.error("Failed to fetch user profile");
         return;
       }
 
-      // Map API role to internal role
+      if (!profile?.role_type) {
+        toast.error("User role not found. Contact admin.");
+        return;
+      }
+
+      // Normalize role
       let role = profile.role_type.toLowerCase();
       if (role === "super") role = "superadmin";
-      if (role === "Manager") role = "propertymanager";
-      // Store in localStorage
+      if (role === "manager") role = "propertymanager";
+
       localStorage.setItem("token", accessToken);
       localStorage.setItem("role", role);
       localStorage.setItem("userId", userId);
 
-      // Role-based redirect
       const dashboardPathByRole = {
         superadmin: "/superadmin/dashboard",
         admin: "/admin/dashboard",
         propertymanager: "/property/dashboard",
       };
 
-      navigate(dashboardPathByRole[role], { replace: true });
+      // navigate(dashboardPathByRole[role] || "/", { replace: true });
+      navigate(dashboardPathByRole[role] || "/", {
+        replace: true,
+        state: { fromLogin: true },
+      });
     } catch (err) {
       console.error(err);
-      alert("Something went wrong. Please try again.");
+      toast.error("Something went wrong. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white via-gray-50 to-lightBackground font-roboto flex flex-col md:flex-row">
+    <div className="min-h-screen  bg-gradient-to-br from-white via-gray-50 to-lightBackground font-roboto flex flex-col md:flex-row">
       <motion.div
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}

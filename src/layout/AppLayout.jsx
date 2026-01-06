@@ -1,14 +1,27 @@
 import { SidebarProvider, useSidebar } from "../context/SidebarContext";
-import { Outlet } from "react-router";
+import { Outlet, useLocation } from "react-router";
 import AppHeader from "./AppHeader";
 import Backdrop from "./Backdrop";
 import AppSidebar from "./AppSidebar";
+import { useEffect, useState } from "react";
+import WelcomeOverlay from "../components/overlay/WelcomeOverlay";
 
 const LayoutContent = () => {
   const { isExpanded, isHovered, isMobileOpen } = useSidebar();
+  const location = useLocation();
 
+  const [showWelcome, setShowWelcome] = useState(false);
+
+  useEffect(() => {
+    if (location.state?.fromLogin) {
+      setShowWelcome(true);
+      // clear state so it doesn't repeat on refresh
+      window.history.replaceState({}, document.title);
+    }
+  }, [location]);
   return (
     <div className="min-h-screen xl:flex">
+      {showWelcome && <WelcomeOverlay onFinish={() => setShowWelcome(false)} />}
       <div>
         <AppSidebar />
         <Backdrop />
