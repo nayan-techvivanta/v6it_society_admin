@@ -18,9 +18,10 @@ import Society from "../pages/SuperAdmin/Society";
 
 import PMDashboard from "../pages/PropertyManager/DashboardCom";
 import AdminPage from "../pages/PropertyManager/Adminpage";
-// import PMBuildings from "../pages/PropertyManager/Buildings";
 
-// import AdminDashboard from "../pages/Admin/Dashboard";
+import AdminDashboard from "../pages/Admin/AdminDashboard";
+import AdminBuildings from "../pages/Admin/AdminBuildings";
+import Flats from "../pages/Admin/Flats";
 // import AdminComplaints from "../pages/Admin/Complaints";
 
 export default function Router() {
@@ -70,11 +71,10 @@ export default function Router() {
         >
           <Route path="/property/dashboard" element={<PMDashboard />} />
           <Route path="/property/admin" element={<AdminPage />} />
-          {/* <Route path="/property/buildings" element={<PMBuildings />} /> */}
         </Route>
 
         {/* ================= ADMIN ================= */}
-        {/*
+
         <Route
           element={
             <ProtectedRoute allowedRoles={["admin"]}>
@@ -83,13 +83,12 @@ export default function Router() {
           }
         >
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
-          <Route path="/admin/complaints" element={<AdminComplaints />} />
+          <Route path="/admin/buildings" element={<AdminBuildings />} />
+          <Route path="/admin/flats" element={<Flats />} />
         </Route>
-        */}
 
         {/* Unauthorized */}
         <Route path="/unauthorized" element={<Unauthorized />} />
-        {/* 404 */}
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

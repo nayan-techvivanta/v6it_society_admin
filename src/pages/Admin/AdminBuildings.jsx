@@ -29,8 +29,6 @@ import {
   Menu,
   MenuItem,
 } from "@mui/material";
-// import AssignManagerDialog from "../../components/dialogs/AssignManagerDialog";
-
 import {
   KeyboardArrowDown,
   KeyboardArrowUp,
@@ -38,7 +36,6 @@ import {
   Delete,
   Search,
   FilterList,
-  Add as AddIcon,
   Refresh,
   LocationOn,
   Bed,
@@ -47,14 +44,15 @@ import {
   Apartment,
   Home,
   CheckCircle,
-  Cancel,
   Domain,
   MeetingRoom,
 } from "@mui/icons-material";
 import { supabase } from "../../api/supabaseClient";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "react-toastify";
+import { BsFillHouseAddFill } from "react-icons/bs";
 import AddBuildingDialog from "../../components/dialogs/AddBuildingDialog";
+import AddFlatDialog from "../../components/dialogs/AdminDialogs/AddFlat";
 
 // Custom styled switch for buildings
 const PrimarySwitch = styled(Switch)(({ theme }) => ({
@@ -78,6 +76,7 @@ const statusLabels = {
   active: "Active",
   inactive: "Inactive",
 };
+
 const getBuildingTypeLabel = (type) => {
   const buildingTypes = {
     residential: "Residential",
@@ -87,11 +86,30 @@ const getBuildingTypeLabel = (type) => {
   };
   return buildingTypes[type] || type;
 };
+
+// Helper function to get logged-in user
+const getLoggedInUser = async () => {
+  try {
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
+    if (error) {
+      console.error("Error getting user:", error);
+      return null;
+    }
+    return user;
+  } catch (error) {
+    console.error("Error in getLoggedInUser:", error);
+    return null;
+  }
+};
+
 const BuildingRow = ({
   building,
   onEdit,
-  onAssign,
   onDelete,
+  onAddFlat,
   onStatusToggle,
   isExpanded,
   onToggleRow,
@@ -131,7 +149,7 @@ const BuildingRow = ({
 
         <TableCell className="p-4">
           <Typography className="font-roboto font-semibold text-sm text-gray-800">
-            #{building.id.toString().padStart(3, "0")}
+            #{building.id}
           </Typography>
         </TableCell>
 
@@ -228,6 +246,15 @@ const BuildingRow = ({
 
         <TableCell className="p-4" align="center">
           <div className="flex items-center justify-center gap-1">
+            <IconButton
+              size="small"
+              onClick={() => onAddFlat(building.id)}
+              disabled={isRowDisabled}
+              className="text-primary hover:bg-lightBackground"
+              sx={{ opacity: isRowDisabled ? 0.5 : 1 }}
+            >
+              <BsFillHouseAddFill size={20} />
+            </IconButton>
             <FormControlLabel
               control={
                 <PrimarySwitch
@@ -238,14 +265,6 @@ const BuildingRow = ({
               }
               sx={{ m: 0 }}
             />
-            {/* <IconButton
-              size="small"
-              onClick={() => onAssign(building)}
-              className="text-primary hover:bg-lightBackground"
-            >
-              <Group fontSize="small" />
-            </IconButton> */}
-
             <IconButton
               size="small"
               onClick={() => onEdit(building.id)}
@@ -329,10 +348,6 @@ const BuildingRow = ({
                               <Typography className="font-roboto font-semibold">
                                 {building.name}
                               </Typography>
-                              {/* <Typography className="font-roboto text-sm text-hintText">
-                                {building.type} • Register:{" "}
-                                {building.registerDate}
-                              </Typography> */}
                               <Typography className="font-roboto text-sm text-hintText">
                                 {getBuildingTypeLabel(building.building_type)} •
                                 Register: {building.registerDate}
@@ -441,7 +456,6 @@ const BuildingRow = ({
                             <div className="overflow-hidden h-2 text-xs flex rounded bg-gray-200">
                               <div
                                 style={{ width: `${building.occupancy}%` }}
-                                // className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center rounded-full"
                                 className={`rounded-full ${
                                   building.occupancy > 70
                                     ? "bg-[#93BD57]"
@@ -534,13 +548,7 @@ const BuildingRow = ({
   );
 };
 
-const BuildingCard = ({
-  building,
-  onEdit,
-  onAssign,
-  onDelete,
-  onStatusToggle,
-}) => {
+const BuildingCard = ({ building, onEdit, onDelete, onStatusToggle }) => {
   const [expanded, setExpanded] = useState(false);
   const currentStatus = building.status || "inactive";
   const isRowDisabled = currentStatus === "inactive";
@@ -693,14 +701,6 @@ const BuildingCard = ({
 
         <div className="flex items-center justify-between">
           <div className="flex gap-1">
-            {/* <IconButton
-              size="small"
-              onClick={() => onAssign(building)}
-              className="text-primary"
-            >
-              <Group fontSize="small" />
-            </IconButton> */}
-
             <IconButton
               size="small"
               onClick={() => onEdit(building.id)}
@@ -796,7 +796,7 @@ const BuildingCard = ({
   );
 };
 
-export default function Buildings() {
+export default function AdminBuildings() {
   const [buildings, setBuildings] = useState([]);
   const [filteredBuildings, setFilteredBuildings] = useState([]);
   const theme = useTheme();
@@ -812,158 +812,217 @@ export default function Buildings() {
   const [statusFilter, setStatusFilter] = useState("all");
 
   const [societies, setSocieties] = useState([]);
-  // const [openAssignDialog, setOpenAssignDialog] = useState(false);
-  // const [assignBuilding, setAssignBuilding] = useState(null);
+  const [adminSocietyId, setAdminSocietyId] = useState(null);
+  const [adminSocietyName, setAdminSocietyName] = useState("");
+  const [openAddFlatDialog, setOpenAddFlatDialog] = useState(false);
+  const [selectedBuildingForFlat, setSelectedBuildingForFlat] = useState(null);
 
-  useEffect(() => {
-    const fetchSocieties = async () => {
-      const { data, error } = await supabase
+  // Get admin's society ID
+  const getAdminSocietyId = useCallback(async () => {
+    try {
+      // 1. First try to get societyId from localStorage
+      const storedSocietyId = localStorage.getItem("societyId");
+
+      if (storedSocietyId) {
+        return storedSocietyId;
+      }
+
+      // 2. If not in localStorage, get user_id from localStorage profile
+      const storedProfile = localStorage.getItem("profile");
+      if (!storedProfile) {
+        console.error("No profile found in localStorage");
+        return null;
+      }
+
+      const profile = JSON.parse(storedProfile);
+      const userId = profile.id;
+
+      // 3. Fetch society from Supabase using user_id
+      const { data: societyData, error } = await supabase
         .from("societies")
-        .select("id, name, city, state, country")
-        .order("name", { ascending: true });
+        .select("id, name")
+        .eq("user_id", userId)
+        .single();
 
-      if (!error && data) {
-        setSocieties(data);
+      if (error) {
+        console.error("Error fetching society:", error);
+        toast.error("Unable to fetch society information");
+        return null;
+      }
+
+      if (societyData) {
+        // Store in localStorage for future use
+        localStorage.setItem("societyId", societyData.id);
+        localStorage.setItem("societyName", societyData.name);
+        return societyData.id;
+      }
+
+      return null;
+    } catch (error) {
+      console.error("Error in getAdminSocietyId:", error);
+      return null;
+    }
+  }, []);
+
+  // Initialize admin data
+  useEffect(() => {
+    const initializeAdminData = async () => {
+      const societyId = await getAdminSocietyId();
+
+      if (societyId) {
+        setAdminSocietyId(societyId);
+
+        // Fetch society name
+        const storedSocietyName = localStorage.getItem("societyName");
+        if (storedSocietyName) {
+          setAdminSocietyName(storedSocietyName);
+        } else {
+          // Fetch society details from Supabase
+          const { data: societyData, error } = await supabase
+            .from("societies")
+            .select("name")
+            .eq("id", societyId)
+            .single();
+
+          if (!error && societyData) {
+            setAdminSocietyName(societyData.name);
+            localStorage.setItem("societyName", societyData.name);
+          }
+        }
+
+        // Fetch society list (only admin's society)
+        const { data: societyList, error: societyError } = await supabase
+          .from("societies")
+          .select("id, name, city, state, country")
+          .eq("id", societyId)
+          .single();
+
+        if (!societyError && societyList) {
+          setSocieties([societyList]);
+        }
+      } else {
+        toast.error(
+          "No society assigned to your account. Please contact administrator."
+        );
       }
     };
 
-    fetchSocieties();
-  }, []);
-  // const fetchBuildings = useCallback(async () => {
-  //   setLoading(true);
+    initializeAdminData();
+  }, [getAdminSocietyId]);
 
-  //   const { data, error } = await supabase
-  //     .from("buildings")
-  //     .select(
-  //       `
-  //   id,
-  //   name,
-  //   description,
-  //   society_id,
-  //   created_at,
-  //   is_active,
-  //   is_delete,
-  //   societies (
-  //     id,
-  //     name
-  //   )
-  // `
-  //     )
-  //     .eq("is_delete", false)
-  //     .order("id", { ascending: false });
-
-  //   if (error) {
-  //     console.error(error);
-  //     toast.error("Failed to fetch buildings");
-  //     setLoading(false);
-  //     return;
-  //   }
-
-  //   const mapped = data.map((b) => ({
-  //     id: b.id,
-  //     name: b.name,
-
-  //     description: b.description || "",
-  //     society_id: b.society_id || "",
-  //     society_name: b.societies?.name || "",
-
-  //     address: b.description || "—",
-  //     registerDate: b.created_at
-  //       ? new Date(b.created_at).toISOString().split("T")[0]
-  //       : "—",
-
-  //     status: b.is_active ? "active" : "inactive",
-
-  //     // UI-only fields
-  //     units: 0,
-  //     manager: "N/A",
-  //     occupancy: 0,
-  //     type: "Building",
-
-  //     avatar: b.name
-  //       ?.split(" ")
-  //       .map((n) => n[0])
-  //       .join("")
-  //       .toUpperCase(),
-
-  //     loading: false,
-  //   }));
-
-  //   setBuildings(mapped);
-  //   setFilteredBuildings(mapped);
-  //   setLoading(false);
-  // }, []);
+  // CORRECT SUPABASE QUERY: Fetch only admin's society buildings
   const fetchBuildings = useCallback(async () => {
     setLoading(true);
 
-    const { data, error } = await supabase
-      .from("buildings")
-      .select(
+    try {
+      const societyId = await getAdminSocietyId();
+
+      if (!societyId) {
+        toast.error("No society assigned. Cannot fetch buildings.");
+        setLoading(false);
+        return;
+      }
+
+      // Fetch buildings ONLY from admin's society
+      const { data, error } = await supabase
+        .from("buildings")
+        .select(
+          `
+          id,
+          name,
+          description,
+          society_id,
+          building_type,
+          flat_limit,
+          created_at,
+          is_active,
+          is_delete,
+          societies (
+            id,
+            name
+          )
         `
-    id,
-    name,
-    description,
-    society_id,
-    building_type,
-    flat_limit,
-    created_at,
-    is_active,
-    is_delete,
-    societies (
-      id,
-      name
-    )
-  `
-      )
-      .eq("is_delete", false)
-      .order("id", { ascending: false });
+        )
+        .eq("is_delete", false)
+        .eq("society_id", societyId) // 🔥 CRITICAL: Filter by society_id
+        .order("created_at", { ascending: false });
 
-    if (error) {
-      console.error(error);
-      toast.error("Failed to fetch buildings");
+      if (error) {
+        console.error("Error fetching buildings:", error);
+        toast.error("Failed to fetch buildings");
+        setLoading(false);
+        return;
+      }
+
+      const mapped = data.map((b) => ({
+        id: b.id,
+        name: b.name,
+        description: b.description || "",
+        society_id: b.society_id || "",
+        society_name: b.societies?.name || "",
+        building_type: b.building_type || "residential",
+        flat_limit: b.flat_limit || 0,
+        address: b.description || "—",
+        registerDate: b.created_at
+          ? new Date(b.created_at).toISOString().split("T")[0]
+          : "—",
+        status: b.is_active ? "active" : "inactive",
+        units: b.flat_limit || 0,
+        manager: "N/A",
+        occupancy: 0,
+        type: getBuildingTypeLabel(b.building_type),
+        avatar:
+          b.name
+            ?.split(" ")
+            .map((n) => n[0])
+            .join("")
+            .toUpperCase() || "B",
+        loading: false,
+      }));
+
+      setBuildings(mapped);
+      setFilteredBuildings(mapped);
+    } catch (error) {
+      console.error("Error in fetchBuildings:", error);
+      toast.error("Error fetching buildings");
+    } finally {
       setLoading(false);
-      return;
     }
+  }, [getAdminSocietyId]);
 
-    const mapped = data.map((b) => ({
-      id: b.id,
-      name: b.name,
-      description: b.description || "",
-      society_id: b.society_id || "",
-      society_name: b.societies?.name || "",
-      building_type: b.building_type || "residential",
-      flat_limit: b.flat_limit || 0,
-
-      address: b.description || "—",
-      registerDate: b.created_at
-        ? new Date(b.created_at).toISOString().split("T")[0]
-        : "—",
-
-      status: b.is_active ? "active" : "inactive",
-
-      // UI-only fields (real data से replace)
-      units: b.flat_limit || 0, // flat_limit को units में show करें
-      manager: "N/A",
-      occupancy: 0,
-      type: getBuildingTypeLabel(b.building_type), // building_type से type set करें
-
-      avatar: b.name
-        ?.split(" ")
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase(),
-
-      loading: false,
-    }));
-
-    setBuildings(mapped);
-    setFilteredBuildings(mapped);
-    setLoading(false);
-  }, []);
   useEffect(() => {
-    fetchBuildings();
-  }, [fetchBuildings]);
+    if (adminSocietyId) {
+      fetchBuildings();
+    }
+  }, [fetchBuildings, adminSocietyId]);
+  const handleAddFlat = useCallback(
+    (buildingId) => {
+      console.log("🔥 ADD FLAT CLICKED:", buildingId); // Debug
+      const building = buildings.find((b) => b.id === buildingId);
+      console.log("Building found:", building); // Debug
 
+      if (!building) {
+        console.error("Building not found for ID:", buildingId);
+        toast.error("Building not found!");
+        return;
+      }
+
+      setSelectedBuildingForFlat({
+        id: building.id,
+        name: building.name,
+        societyid: building.societyid,
+      });
+      setOpenAddFlatDialog(true);
+      console.log("✅ Dialog state set - should open now"); // Debug
+    },
+    [buildings]
+  );
+
+  const handleCloseAddFlatDialog = useCallback(() => {
+    setOpenAddFlatDialog(false);
+    setSelectedBuildingForFlat(null);
+    fetchBuildings();
+  }, []);
   const headers = [
     "",
     "ID",
@@ -974,10 +1033,6 @@ export default function Buildings() {
     "Status",
     "Actions",
   ];
-  const handleAssignManager = (building) => {
-    setAssignBuilding(building);
-    setOpenAssignDialog(true);
-  };
 
   // Filter buildings based on search and status
   useEffect(() => {
@@ -988,7 +1043,6 @@ export default function Buildings() {
         (building) =>
           building.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           building.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          building.manager.toLowerCase().includes(searchTerm.toLowerCase()) ||
           building.id.toString().includes(searchTerm)
       );
     }
@@ -1018,8 +1072,7 @@ export default function Buildings() {
 
     if (error) {
       toast.error("Failed to update status");
-
-      // rollback
+      // Rollback
       setBuildings((prev) =>
         prev.map((b) =>
           b.id === buildingId ? { ...b, status: currentStatus } : b
@@ -1032,36 +1085,12 @@ export default function Buildings() {
     }
   }, []);
 
-  const handleToggleRow = useCallback(
-    (buildingId) => {
-      const isCurrentlyOpen = openRows[buildingId];
-
-      if (isCurrentlyOpen) {
-        setOpenRows((prev) => ({ ...prev, [buildingId]: false }));
-      } else {
-        setOpenRows((prev) => ({ ...prev, [buildingId]: true }));
-
-        setBuildings((prev) =>
-          prev.map((building) =>
-            building.id === buildingId
-              ? { ...building, loading: true }
-              : building
-          )
-        );
-
-        setTimeout(() => {
-          setBuildings((prev) =>
-            prev.map((building) =>
-              building.id === buildingId
-                ? { ...building, loading: false }
-                : building
-            )
-          );
-        }, 500);
-      }
-    },
-    [openRows]
-  );
+  const handleToggleRow = useCallback((buildingId) => {
+    setOpenRows((prev) => ({
+      ...prev,
+      [buildingId]: !prev[buildingId],
+    }));
+  }, []);
 
   const handleEditBuilding = (id) => {
     const b = buildings.find((item) => item.id === id);
@@ -1073,6 +1102,8 @@ export default function Buildings() {
       name: b.name || "",
       description: b.description || "",
       society_id: String(b.society_id || ""),
+      building_type: b.building_type || "residential",
+      flat_limit: b.flat_limit || 0,
     });
 
     setOpenDialog(true);
@@ -1092,11 +1123,19 @@ export default function Buildings() {
     } else {
       setBuildings((prev) => prev.filter((b) => b.id !== id));
       toast.success("Building deleted successfully");
+      fetchBuildings(); // Refresh the list
     }
   };
 
   const handleAddNewBuilding = () => {
-    setSelectedBuilding(null);
+    if (!adminSocietyId) {
+      toast.error("No society assigned. Cannot add building.");
+      return;
+    }
+
+    setSelectedBuilding({
+      society_id: String(adminSocietyId),
+    });
     setOpenDialog(true);
   };
 
@@ -1142,17 +1181,6 @@ export default function Buildings() {
     page * rowsPerPage + rowsPerPage
   );
 
-  // Calculate statistics
-  const totalBuildings = buildings.length;
-  const activeBuildings = buildings.filter((b) => b.status === "active").length;
-  const totalUnits = buildings.reduce(
-    (sum, building) => sum + building.units,
-    0
-  );
-  const totalOccupancy =
-    buildings.reduce((sum, building) => sum + building.occupancy, 0) /
-    buildings.length;
-
   return (
     <div className="min-h-screen p-4 md:p-6 font-roboto bg-gray-50">
       <motion.div
@@ -1172,31 +1200,30 @@ export default function Buildings() {
                 Buildings Management
               </Typography>
               <Typography className="font-roboto text-gray-600">
-                Manage and monitor all building properties
+                Manage and monitor building properties for your society
               </Typography>
+              {adminSocietyName ? (
+                <Typography className="font-roboto text-sm text-primary mt-1">
+                  Society: {adminSocietyName}
+                </Typography>
+              ) : (
+                <Typography className="font-roboto text-sm text-gray-500 mt-1">
+                  Loading society information...
+                </Typography>
+              )}
             </div>
 
-            {/* <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-              <Button
-                variant="contained"
-                onClick={handleAddNewBuilding}
-                startIcon={<AddIcon />}
-                className="font-roboto font-semibold bg-primary hover:bg-[#5a090f] px-6 py-2.5 rounded-lg shadow-sm"
-                sx={{ textTransform: "none" }}
+            {adminSocietyId && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.2 }}
+                whileHover={{ scale: 1.02 }}
+                className="inline-block"
               >
-                Add New Building
-              </Button>
-            </motion.div> */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.2 }}
-              whileHover={{ scale: 1.02 }}
-              className="inline-block"
-            >
-              <button
-                onClick={handleAddNewBuilding}
-                className="
+                <button
+                  onClick={handleAddNewBuilding}
+                  className="
                             group
                             bg-white
                             font-roboto
@@ -1220,33 +1247,31 @@ export default function Buildings() {
                             shadow-sm
                             hover:shadow-md
                           "
-              >
-                {/* Underline animation */}
-                <motion.div
-                  className="absolute bottom-0 left-0 h-0.5 bg-primary group-hover:bg-white"
-                  initial={{ width: "0%" }}
-                  whileHover={{ width: "100%" }}
-                  transition={{ duration: 0.3 }}
-                />
-
-                <svg
-                  className="w-5 h-5 group-hover:scale-110 transition-transform duration-200"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  strokeWidth={2}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M12 4v16m8-8H4"
+                  <motion.div
+                    className="absolute bottom-0 left-0 h-0.5 bg-primary group-hover:bg-white"
+                    initial={{ width: "0%" }}
+                    whileHover={{ width: "100%" }}
+                    transition={{ duration: 0.3 }}
                   />
-                </svg>
-                <span className="tracking-wide">New Building</span>
 
-                {/* Hover fill effect */}
-                <div
-                  className="
+                  <svg
+                    className="w-5 h-5 group-hover:scale-110 transition-transform duration-200"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 4v16m8-8H4"
+                    />
+                  </svg>
+                  <span className="tracking-wide">New Building</span>
+
+                  <div
+                    className="
                               absolute
                               inset-0
                               bg-primary
@@ -1257,9 +1282,10 @@ export default function Buildings() {
                               duration-300
                               -z-10
                             "
-                />
-              </button>
-            </motion.div>
+                  />
+                </button>
+              </motion.div>
+            )}
           </div>
         </div>
 
@@ -1268,7 +1294,9 @@ export default function Buildings() {
           <CardContent className="p-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <Typography variant="h6" className="font-roboto font-semibold">
-                All Buildings ({filteredBuildings.length})
+                {adminSocietyName
+                  ? `${adminSocietyName}'s Buildings (${filteredBuildings.length})`
+                  : `Buildings (${filteredBuildings.length})`}
               </Typography>
 
               <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
@@ -1348,14 +1376,19 @@ export default function Buildings() {
             <Box display="flex" justifyContent="center" p={4}>
               <CircularProgress />
             </Box>
+          ) : !adminSocietyId ? (
+            <Alert severity="warning" sx={{ m: 3 }}>
+              No society assigned to your account. Please contact administrator.
+            </Alert>
           ) : filteredBuildings.length === 0 ? (
             <Alert severity="info" sx={{ m: 3 }}>
-              No buildings found. Add your first building!
+              {searchTerm || statusFilter !== "all"
+                ? "No buildings match your filters."
+                : "No buildings found in your society. Add your first building!"}
             </Alert>
           ) : (
             <>
               {!isMobile ? (
-                // Desktop Table View
                 <TableContainer>
                   <Table>
                     <TableHead sx={{ backgroundColor: "#F8FAFC" }}>
@@ -1394,8 +1427,8 @@ export default function Buildings() {
                           onDelete={handleDeleteBuilding}
                           onStatusToggle={handleStatusToggle}
                           onToggleRow={handleToggleRow}
+                          onAddFlat={handleAddFlat}
                           isExpanded={!!openRows[building.id]}
-                          // onAssign={handleAssignManager}
                         />
                       ))}
                     </TableBody>
@@ -1410,7 +1443,6 @@ export default function Buildings() {
                         building={building}
                         onEdit={handleEditBuilding}
                         onDelete={handleDeleteBuilding}
-                        onAssign={handleAssignManager}
                         onStatusToggle={handleStatusToggle}
                       />
                     ))}
@@ -1418,7 +1450,6 @@ export default function Buildings() {
                 </div>
               )}
 
-              {/* Pagination */}
               <Box
                 sx={{
                   display: "flex",
@@ -1451,7 +1482,6 @@ export default function Buildings() {
           )}
         </Card>
 
-        {/* Filter Menu */}
         <Menu
           anchorEl={filterAnchorEl}
           open={Boolean(filterAnchorEl)}
@@ -1494,21 +1524,25 @@ export default function Buildings() {
             Inactive Only
           </MenuItem>
         </Menu>
-        {/* <AssignManagerDialog
-          open={openAssignDialog}
-          onClose={() => setOpenAssignDialog(false)}
-          building={assignBuilding}
-          onSuccess={fetchBuildings}
-        /> */}
 
-        {/* Add/Edit Building Dialog */}
-        <AddBuildingDialog
-          open={openDialog}
-          onClose={handleCloseDialog}
-          building={selectedBuilding}
-          isEdit={!!selectedBuilding}
-          societies={societies}
-        />
+        {adminSocietyId && (
+          <AddBuildingDialog
+            open={openDialog}
+            onClose={handleCloseDialog}
+            building={selectedBuilding}
+            isEdit={!!selectedBuilding?.id}
+            societies={societies}
+            adminSocietyId={adminSocietyId}
+          />
+        )}
+        {adminSocietyId && (
+          <AddFlatDialog
+            open={openAddFlatDialog}
+            onClose={handleCloseAddFlatDialog}
+            building={selectedBuildingForFlat}
+            societyId={adminSocietyId}
+          />
+        )}
       </motion.div>
     </div>
   );

@@ -129,6 +129,10 @@ const Login = () => {
       localStorage.setItem("role", role);
       localStorage.setItem("userId", userId);
 
+      localStorage.setItem("profileId", profile.id);
+      localStorage.setItem("societyId", profile.society_id);
+      localStorage.setItem("name", profile.name);
+      localStorage.setItem("email", profile.email);
       const dashboardPathByRole = {
         superadmin: "/superadmin/dashboard",
         admin: "/admin/dashboard",

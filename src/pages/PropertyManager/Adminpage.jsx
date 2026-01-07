@@ -434,7 +434,7 @@ const AssignSocietyDialog = ({ open, onClose, onSubmit, societies, user }) => {
   const handleRemoveSociety = async () => {
     setIsSubmitting(true);
     try {
-      await onSubmit(user.id, null); // Remove society by setting to null
+      await onSubmit(user.id, null);
       onClose();
     } catch (error) {
       console.error("Error removing society:", error);
@@ -631,7 +631,6 @@ export default function AdminPage() {
     const society = societies.find((s) => s.id === societyId);
     return society ? society.name : null;
   };
-
   // Filter Admins based on search and filters
   const filteredUsers = users.filter((user) => {
     const term = searchTerm.toLowerCase();
@@ -696,9 +695,53 @@ export default function AdminPage() {
     }
   };
 
+  // const handleAssignToSociety = async (userId, societyId) => {
+  //   try {
+  //     const { error } = await supabase
+  //       .from("users")
+  //       .update({
+  //         society_id: societyId,
+  //         updated_at: new Date().toISOString(),
+  //       })
+  //       .eq("id", userId);
+
+  //     if (error) throw error;
+
+  //     setUsers(
+  //       users.map((user) =>
+  //         user.id === userId ? { ...user, society_id: societyId } : user
+  //       )
+  //     );
+
+  //     toast.success(
+  //       societyId
+  //         ? "Society assignment updated successfully!"
+  //         : "Society removed successfully!"
+  //     );
+  //   } catch (error) {
+  //     console.error("Error assigning society:", error);
+  //     toast.error("Failed to update society assignment");
+  //     throw error;
+  //   }
+  // };
   const handleAssignToSociety = async (userId, societyId) => {
     try {
-      const { error } = await supabase
+      // 1️⃣ Get current user's existing society (if any)
+      const currentUser = users.find((u) => u.id === userId);
+      const previousSocietyId = currentUser?.society_id || null;
+
+      // 2️⃣ If user was already assigned → remove from old society
+      if (previousSocietyId) {
+        const { error: removeError } = await supabase
+          .from("societies")
+          .update({ user_id: null })
+          .eq("id", previousSocietyId);
+
+        if (removeError) throw removeError;
+      }
+
+      // 3️⃣ Update users table
+      const { error: userUpdateError } = await supabase
         .from("users")
         .update({
           society_id: societyId,
@@ -706,11 +749,22 @@ export default function AdminPage() {
         })
         .eq("id", userId);
 
-      if (error) throw error;
+      if (userUpdateError) throw userUpdateError;
 
-      // Update local state
-      setUsers(
-        users.map((user) =>
+      // 4️⃣ If assigning new society → update societies table
+      if (societyId) {
+        const { error: societyUpdateError } = await supabase
+          .from("societies")
+          .update({
+            user_id: userId,
+          })
+          .eq("id", societyId);
+
+        if (societyUpdateError) throw societyUpdateError;
+      }
+
+      setUsers((prev) =>
+        prev.map((user) =>
           user.id === userId ? { ...user, society_id: societyId } : user
         )
       );
@@ -727,11 +781,72 @@ export default function AdminPage() {
     }
   };
 
+  // const handleSubmitUser = async (userData) => {
+  //   try {
+  //     if (isEditMode && selectedUser) {
+  //       // Update existing Admin
+  //       const { error } = await supabase
+  //         .from("users")
+  //         .update({
+  //           name: userData.name,
+  //           email: userData.email,
+  //           phone: userData.contact,
+  //           number: userData.contact,
+  //           whatsapp_number: userData.whatsapp,
+  //           role_type: "Admin",
+  //           status: userData.status,
+  //           society_id: userData.society_id,
+  //           updated_at: new Date().toISOString(),
+  //         })
+  //         .eq("id", selectedUser.id);
+
+  //       if (error) throw error;
+  //       toast.success("Admin updated successfully!");
+  //     } else {
+  //       const { error } = await supabase.from("users").insert({
+  //         name: userData.name,
+  //         email: userData.email,
+  //         phone: userData.contact,
+  //         number: userData.contact,
+  //         whatsapp_number: userData.whatsapp,
+  //         role_type: "Admin",
+  //         status: userData.status,
+  //         society_id: userData.society_id,
+  //         created_at: new Date().toISOString(),
+  //         updated_at: new Date().toISOString(),
+  //       });
+
+  //       if (error) throw error;
+  //       toast.success("Admin added successfully!");
+  //     }
+
+  //     // Refresh data
+  //     fetchData();
+  //     setOpenDialog(false);
+  //   } catch (error) {
+  //     console.error("Error saving Admin:", error);
+  //     toast.error(`Failed to ${isEditMode ? "update" : "add"} Admin`);
+  //     throw error;
+  //   }
+  // };
   const handleSubmitUser = async (userData) => {
     try {
       if (isEditMode && selectedUser) {
-        // Update existing Admin
-        const { error } = await supabase
+        const previousSocietyId = selectedUser.society_id || null;
+        const newSocietyId = userData.society_id || null;
+
+        // 1️⃣ Agar society change hui → old society se remove
+        if (previousSocietyId && previousSocietyId !== newSocietyId) {
+          const { error } = await supabase
+            .from("societies")
+            .update({ user_id: null })
+            .eq("id", previousSocietyId);
+
+          if (error) throw error;
+        }
+
+        // 2️⃣ Users table update
+        const { error: userError } = await supabase
           .from("users")
           .update({
             name: userData.name,
@@ -741,32 +856,57 @@ export default function AdminPage() {
             whatsapp_number: userData.whatsapp,
             role_type: "Admin",
             status: userData.status,
-            society_id: userData.society_id,
+            society_id: newSocietyId,
             updated_at: new Date().toISOString(),
           })
           .eq("id", selectedUser.id);
 
-        if (error) throw error;
+        if (userError) throw userError;
+
+        // 3️⃣ New society me assign
+        if (newSocietyId && previousSocietyId !== newSocietyId) {
+          const { error } = await supabase
+            .from("societies")
+            .update({ user_id: selectedUser.id })
+            .eq("id", newSocietyId);
+
+          if (error) throw error;
+        }
+
         toast.success("Admin updated successfully!");
       } else {
-        const { error } = await supabase.from("users").insert({
-          name: userData.name,
-          email: userData.email,
-          phone: userData.contact,
-          number: userData.contact,
-          whatsapp_number: userData.whatsapp,
-          role_type: "Admin",
-          status: userData.status,
-          society_id: userData.society_id,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
+        const { data, error } = await supabase
+          .from("users")
+          .insert({
+            name: userData.name,
+            email: userData.email,
+            phone: userData.contact,
+            number: userData.contact,
+            whatsapp_number: userData.whatsapp,
+            role_type: "Admin",
+            status: userData.status,
+            society_id: userData.society_id,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
 
         if (error) throw error;
+
+        // 4️⃣ New admin ko society me assign
+        if (userData.society_id) {
+          const { error } = await supabase
+            .from("societies")
+            .update({ user_id: data.id })
+            .eq("id", userData.society_id);
+
+          if (error) throw error;
+        }
+
         toast.success("Admin added successfully!");
       }
 
-      // Refresh data
       fetchData();
       setOpenDialog(false);
     } catch (error) {

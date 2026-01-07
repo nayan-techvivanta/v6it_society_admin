@@ -16,6 +16,8 @@ import {
   FormControl,
   Select,
   MenuItem,
+  Chip,
+  InputAdornment,
 } from "@mui/material";
 import { supabase } from "../../api/supabaseClient";
 import {
@@ -26,8 +28,44 @@ import {
   Edit,
   Add,
   Domain,
+  Home,
+  BusinessCenter,
+  FamilyRestroom,
+  MeetingRoom,
 } from "@mui/icons-material";
 import { toast } from "react-toastify";
+
+// Building Type Options
+const BUILDING_TYPES = [
+  {
+    value: "residential",
+    label: "Residential",
+    icon: <Home fontSize="small" />,
+    color: "#1976d2",
+    description: "Only residential apartments",
+  },
+  {
+    value: "commercial",
+    label: "Commercial",
+    icon: <BusinessCenter fontSize="small" />,
+    color: "#ed6c02",
+    description: "Office spaces and commercial units",
+  },
+  {
+    value: "mixed",
+    label: "Mixed Use",
+    icon: <FamilyRestroom fontSize="small" />,
+    color: "#2e7d32",
+    description: "Both residential and commercial units",
+  },
+  {
+    value: "other",
+    label: "Other",
+    icon: <Business fontSize="small" />,
+    color: "#9c27b0",
+    description: "Other types of buildings",
+  },
+];
 
 const AddBuildingDialog = ({
   open,
@@ -40,36 +78,43 @@ const AddBuildingDialog = ({
     name: "",
     description: "",
     society_id: "",
+    building_type: "residential",
+    flat_limit: "",
   });
 
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [touched, setTouched] = useState({});
   const [isFormValid, setIsFormValid] = useState(false);
+  const [submitAttempted, setSubmitAttempted] = useState(false); // Add this state
 
   useEffect(() => {
     if (isEdit && building) {
       setFormData({
         name: building.name || "",
-        // description: building.description || "",
-        description:
-          building.description || building.building_description || "",
-
+        description: building.description || "",
         society_id: String(building.society_id || ""),
+        building_type: building.building_type || "residential",
+        flat_limit: building.flat_limit || "",
       });
     } else {
       setFormData({
         name: "",
         description: "",
         society_id: "",
+        building_type: "residential",
+        flat_limit: "",
       });
     }
-  }, [isEdit, building]);
+    setSubmitAttempted(false);
+    setTouched({});
+  }, [isEdit, building, open]);
 
-  // Get selected society
-  // const selectedSociety = societies.find((s) => s.id === formData.society_id);
   const selectedSociety = societies.find(
     (s) => String(s.id) === String(formData.society_id)
+  );
+  const selectedBuildingType = BUILDING_TYPES.find(
+    (type) => type.value === formData.building_type
   );
 
   // Validation function
@@ -79,11 +124,20 @@ const AddBuildingDialog = ({
     if (!formData.name.trim()) {
       newErrors.name = "Building name is required";
     } else if (formData.name.trim().length < 3) {
-      newErrors.name = "Building name must be at least 3 characters";
+      newErrors.name = "name must be at least 3 characters";
     }
 
     if (!formData.society_id) {
       newErrors.society_id = "Please select a society";
+    }
+
+    // Flat limit validation
+    if (!formData.flat_limit) {
+      newErrors.flat_limit = "Flat limit is required";
+    } else if (parseInt(formData.flat_limit) <= 0) {
+      newErrors.flat_limit = "Flat limit must be greater than 0";
+    } else if (parseInt(formData.flat_limit) > 1000) {
+      newErrors.flat_limit = "Flat limit cannot exceed 1000";
     }
 
     setErrors(newErrors);
@@ -97,8 +151,31 @@ const AddBuildingDialog = ({
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!isFormValid) {
+    setSubmitAttempted(true); // Mark that submit was attempted
+
+    // Check if any field has been touched (for edit mode)
+    const hasInteracted = Object.keys(touched).length > 0;
+    const shouldShowErrors = submitAttempted || hasInteracted;
+
+    if (!isFormValid && shouldShowErrors) {
       toast.error("Please fix all errors before submitting");
+      return;
+    }
+
+    // If no interaction yet and form is invalid, mark all required fields as touched
+    if (!isFormValid && !shouldShowErrors) {
+      const requiredFields = ["name", "society_id", "flat_limit"];
+      const newTouched = {};
+      requiredFields.forEach((field) => {
+        newTouched[field] = true;
+      });
+      setTouched(newTouched);
+      setSubmitAttempted(true);
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
+    if (!isFormValid) {
       return;
     }
 
@@ -109,6 +186,8 @@ const AddBuildingDialog = ({
         name: formData.name.trim(),
         description: formData.description?.trim() || null,
         society_id: formData.society_id,
+        building_type: formData.building_type,
+        flat_limit: parseInt(formData.flat_limit),
       };
 
       if (isEdit && building?.id) {
@@ -126,7 +205,7 @@ const AddBuildingDialog = ({
         toast.success("Building added successfully!");
       }
 
-      onClose(); // 🔥 parent list refresh karega
+      onClose();
     } catch (error) {
       console.error(error);
       toast.error(error.message || "Failed to save building");
@@ -141,7 +220,6 @@ const AddBuildingDialog = ({
       setFormData((prev) => ({ ...prev, [field]: value }));
       setTouched((prev) => ({ ...prev, [field]: true }));
 
-      // Clear error when user types
       if (errors[field]) {
         setErrors((prev) => ({ ...prev, [field]: "" }));
       }
@@ -149,17 +227,33 @@ const AddBuildingDialog = ({
     [errors]
   );
 
+  const handleNumberInput = (field) => (e) => {
+    const value = e.target.value;
+    if (value === "" || /^\d+$/.test(value)) {
+      setFormData((prev) => ({ ...prev, [field]: value }));
+      setTouched((prev) => ({ ...prev, [field]: true }));
+
+      if (errors[field]) {
+        setErrors((prev) => ({ ...prev, [field]: "" }));
+      }
+    }
+  };
+
   const handleClose = () => {
     if (!isSubmitting) {
+      setSubmitAttempted(false); // Reset submit attempt on close
       onClose();
     }
   };
+
+  // Check if we should show the error alert
+  const showErrorAlert = submitAttempted && Object.values(errors).some(Boolean);
 
   return (
     <Dialog
       open={open}
       onClose={handleClose}
-      maxWidth="sm"
+      maxWidth="md"
       fullWidth
       PaperProps={{
         sx: {
@@ -241,8 +335,8 @@ const AddBuildingDialog = ({
 
       <DialogContent sx={{ p: 0 }}>
         <Box sx={{ p: 3 }}>
-          {/* Error Alert */}
-          {Object.values(errors).some(Boolean) && (
+          {/* Error Alert - Only show when submit was attempted AND there are errors */}
+          {showErrorAlert && (
             <Alert
               severity="error"
               sx={{
@@ -282,7 +376,13 @@ const AddBuildingDialog = ({
                 >
                   Select Society
                 </Typography>
-                <FormControl fullWidth error={!!errors.society_id}>
+                <FormControl
+                  fullWidth
+                  error={
+                    !!errors.society_id &&
+                    (touched.society_id || submitAttempted)
+                  }
+                >
                   <Select
                     value={formData.society_id}
                     onChange={handleFieldChange("society_id")}
@@ -292,10 +392,18 @@ const AddBuildingDialog = ({
                       height: 44,
                       backgroundColor: "white",
                       "& .MuiOutlinedInput-notchedOutline": {
-                        borderColor: errors.society_id ? "#B31B1B" : "#E0E0E0",
+                        borderColor:
+                          (touched.society_id || submitAttempted) &&
+                          errors.society_id
+                            ? "#B31B1B"
+                            : "#E0E0E0",
                       },
                       "&:hover .MuiOutlinedInput-notchedOutline": {
-                        borderColor: errors.society_id ? "#B31B1B" : "#6F0B14",
+                        borderColor:
+                          (touched.society_id || submitAttempted) &&
+                          errors.society_id
+                            ? "#B31B1B"
+                            : "#6F0B14",
                       },
                       "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
                         borderColor: "#6F0B14",
@@ -355,15 +463,16 @@ const AddBuildingDialog = ({
                       </MenuItem>
                     ))}
                   </Select>
-                  {errors.society_id && (
-                    <Typography
-                      variant="caption"
-                      color="#B31B1B"
-                      sx={{ mt: 0.5, display: "block" }}
-                    >
-                      {errors.society_id}
-                    </Typography>
-                  )}
+                  {(touched.society_id || submitAttempted) &&
+                    errors.society_id && (
+                      <Typography
+                        variant="caption"
+                        color="#B31B1B"
+                        sx={{ mt: 0.5, display: "block" }}
+                      >
+                        {errors.society_id}
+                      </Typography>
+                    )}
                 </FormControl>
               </Grid>
 
@@ -389,8 +498,8 @@ const AddBuildingDialog = ({
                   fullWidth
                   value={formData.name}
                   onChange={handleFieldChange("name")}
-                  error={!!errors.name && touched.name}
-                  helperText={touched.name && errors.name}
+                  error={!!errors.name && (touched.name || submitAttempted)}
+                  helperText={(touched.name || submitAttempted) && errors.name}
                   placeholder="Enter building name"
                   variant="outlined"
                   size="small"
@@ -405,10 +514,16 @@ const AddBuildingDialog = ({
                       height: 44,
                       backgroundColor: "white",
                       "& .MuiOutlinedInput-notchedOutline": {
-                        borderColor: errors.name ? "#B31B1B" : "#E0E0E0",
+                        borderColor:
+                          (touched.name || submitAttempted) && errors.name
+                            ? "#B31B1B"
+                            : "#E0E0E0",
                       },
                       "&:hover .MuiOutlinedInput-notchedOutline": {
-                        borderColor: errors.name ? "#B31B1B" : "#6F0B14",
+                        borderColor:
+                          (touched.name || submitAttempted) && errors.name
+                            ? "#B31B1B"
+                            : "#6F0B14",
                       },
                       "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
                         borderColor: "#6F0B14",
@@ -417,7 +532,7 @@ const AddBuildingDialog = ({
                     },
                   }}
                 />
-                {!errors.name && (
+                {/* {!errors.name && (
                   <Typography
                     variant="caption"
                     color="text.secondary"
@@ -425,10 +540,10 @@ const AddBuildingDialog = ({
                   >
                     Enter a unique name for the building
                   </Typography>
-                )}
+                )} */}
               </Grid>
 
-              {/* Description */}
+              {/* Building Type */}
               <Grid item xs={12}>
                 <Typography
                   variant="caption"
@@ -436,33 +551,23 @@ const AddBuildingDialog = ({
                   display="block"
                   mb={1}
                   color="text.primary"
+                  sx={{
+                    "&::after": {
+                      content: '"*"',
+                      color: "#B31B1B",
+                      marginLeft: 0.5,
+                    },
+                  }}
                 >
-                  Description (Optional)
+                  Building Type
                 </Typography>
-                <TextField
-                  fullWidth
-                  value={formData.description}
-                  onChange={handleFieldChange("description")}
-                  placeholder="Enter building description"
-                  multiline
-                  rows={3}
-                  variant="outlined"
-                  size="small"
-                  InputProps={{
-                    startAdornment: (
-                      <Box
-                        sx={{
-                          color: "#A29EB6",
-                          mr: 1,
-                          mt: 1,
-                          alignSelf: "flex-start",
-                        }}
-                      >
-                        <Description sx={{ fontSize: 20 }} />
-                      </Box>
-                    ),
-                    sx: {
+                <FormControl fullWidth>
+                  <Select
+                    value={formData.building_type}
+                    onChange={handleFieldChange("building_type")}
+                    sx={{
                       borderRadius: 2,
+                      height: 44,
                       backgroundColor: "white",
                       "& .MuiOutlinedInput-notchedOutline": {
                         borderColor: "#E0E0E0",
@@ -474,73 +579,335 @@ const AddBuildingDialog = ({
                         borderColor: "#6F0B14",
                         borderWidth: 2,
                       },
-                    },
-                  }}
-                />
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ mt: 0.5, display: "block" }}
-                >
-                  Add any additional notes or details about the building
-                </Typography>
+                      "& .MuiSelect-select": {
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        py: 1.5,
+                      },
+                    }}
+                    renderValue={(selected) => {
+                      const type = BUILDING_TYPES.find(
+                        (t) => t.value === selected
+                      );
+                      return (
+                        <Box display="flex" alignItems="center" gap={1}>
+                          <Box sx={{ color: type?.color }}>{type?.icon}</Box>
+                          <Typography>{type?.label}</Typography>
+                          <Chip
+                            label={type?.description}
+                            size="small"
+                            sx={{
+                              ml: "auto",
+                              fontSize: "0.7rem",
+                              height: 20,
+                              backgroundColor: alpha(
+                                type?.color || "#000",
+                                0.1
+                              ),
+                              color: type?.color,
+                            }}
+                          />
+                        </Box>
+                      );
+                    }}
+                  >
+                    {BUILDING_TYPES.map((type) => (
+                      <MenuItem key={type.value} value={type.value}>
+                        <Box
+                          display="flex"
+                          alignItems="center"
+                          gap={2}
+                          width="100%"
+                        >
+                          <Box sx={{ color: type.color }}>{type.icon}</Box>
+                          <Box flex={1}>
+                            <Typography fontWeight={600}>
+                              {type.label}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              {type.description}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
               </Grid>
 
-              {/* Selected Society Preview */}
-              {selectedSociety && (
-                <Grid item xs={12}>
+              {/* Flat Limit */}
+              <Grid item xs={12}>
+                <Box display="flex" flexDirection="column" alignItems="center">
                   <Box
                     sx={{
                       backgroundColor: alpha("#6F0B14", 0.05),
                       borderRadius: 2,
-                      p: 2,
+                      p: 3,
                       border: `1px solid ${alpha("#6F0B14", 0.1)}`,
+                      width: "100%",
+                      maxWidth: 600,
                     }}
                   >
                     <Typography
-                      variant="caption"
+                      variant="subtitle2"
                       fontWeight="600"
                       color="#6F0B14"
-                      mb={1}
+                      mb={2}
                       display="block"
+                      textAlign="center"
                     >
-                      Selected Society
+                      Flat/Unit Configuration
                     </Typography>
-                    <Box display="flex" alignItems="center" gap={2}>
-                      <Box
+
+                    <Grid container spacing={2}>
+                      <Grid item xs={12}>
+                        <Box
+                          display="flex"
+                          flexDirection="column"
+                          alignItems="center"
+                        >
+                          <Typography
+                            variant="caption"
+                            fontWeight="600"
+                            display="block"
+                            mb={1}
+                            color="text.primary"
+                            sx={{
+                              "&::after": {
+                                content: '"*"',
+                                color: "#B31B1B",
+                                marginLeft: 0.5,
+                              },
+                              textAlign: "center",
+                              width: "100%",
+                            }}
+                          >
+                            Total Flat/Unit Limit
+                          </Typography>
+                          <TextField
+                            value={formData.flat_limit}
+                            onChange={handleNumberInput("flat_limit")}
+                            error={
+                              !!errors.flat_limit &&
+                              (touched.flat_limit || submitAttempted)
+                            }
+                            helperText={
+                              (touched.flat_limit || submitAttempted) &&
+                              errors.flat_limit
+                            }
+                            placeholder="e.g., 100"
+                            variant="outlined"
+                            size="small"
+                            sx={{
+                              width: "100%",
+                              maxWidth: 400,
+                            }}
+                            InputProps={{
+                              startAdornment: (
+                                <InputAdornment position="start">
+                                  <MeetingRoom
+                                    sx={{
+                                      color:
+                                        (touched.flat_limit ||
+                                          submitAttempted) &&
+                                        errors.flat_limit
+                                          ? "#B31B1B"
+                                          : "#6F0B14",
+                                      fontSize: 20,
+                                    }}
+                                  />
+                                </InputAdornment>
+                              ),
+                              endAdornment: (
+                                <InputAdornment position="end">
+                                  <Typography
+                                    variant="caption"
+                                    color={
+                                      (touched.flat_limit || submitAttempted) &&
+                                      errors.flat_limit
+                                        ? "#B31B1B"
+                                        : "text.secondary"
+                                    }
+                                  >
+                                    flats/units
+                                  </Typography>
+                                </InputAdornment>
+                              ),
+                              inputProps: {
+                                inputMode: "numeric",
+                                pattern: "[0-9]*",
+                                min: 1,
+                                max: 1000,
+                              },
+                              sx: {
+                                borderRadius: 2,
+                                height: 44,
+                                backgroundColor: "white",
+                                "& .MuiOutlinedInput-notchedOutline": {
+                                  borderColor:
+                                    (touched.flat_limit || submitAttempted) &&
+                                    errors.flat_limit
+                                      ? "#B31B1B"
+                                      : "#E0E0E0",
+                                  borderWidth: 1,
+                                },
+                                "&:hover .MuiOutlinedInput-notchedOutline": {
+                                  borderColor:
+                                    (touched.flat_limit || submitAttempted) &&
+                                    errors.flat_limit
+                                      ? "#B31B1B"
+                                      : "#6F0B14",
+                                },
+                                "&.Mui-focused .MuiOutlinedInput-notchedOutline":
+                                  {
+                                    borderColor: "#6F0B14",
+                                    borderWidth: 2,
+                                  },
+                              },
+                            }}
+                          />
+                          {!errors.flat_limit && (
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{
+                                mt: 0.5,
+                                display: "block",
+                                textAlign: "center",
+                                maxWidth: 400,
+                                width: "100%",
+                              }}
+                            >
+                              Maximum number of flats/units allowed in this
+                              building
+                            </Typography>
+                          )}
+                        </Box>
+                      </Grid>
+                    </Grid>
+
+                    {/* Building Type Summary */}
+                    <Box
+                      sx={{
+                        mt: 2,
+                        pt: 2,
+                        borderTop: `1px dashed ${alpha("#6F0B14", 0.1)}`,
+                        textAlign: "center",
+                      }}
+                    >
+                      <Typography variant="caption" color="text.secondary">
+                        <strong>Building Type:</strong>{" "}
+                        {selectedBuildingType?.label}
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
                         sx={{
-                          backgroundColor: alpha("#6F0B14", 0.1),
-                          borderRadius: 1,
-                          p: 1.5,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          width: 48,
-                          height: 48,
+                          display: "block",
+                          mt: 0.5,
+                          maxWidth: 500,
+                          margin: "0 auto",
                         }}
                       >
-                        <Typography
-                          fontWeight={700}
-                          color="#6F0B14"
-                          fontSize="1rem"
-                        >
-                          {selectedSociety.name?.substring(0, 2).toUpperCase()}
-                        </Typography>
-                      </Box>
-                      <Box flex={1}>
-                        <Typography fontWeight={600} color="text.primary">
-                          {selectedSociety.name}
-                        </Typography>
-                        {selectedSociety.city && selectedSociety.state && (
-                          <Typography variant="caption" color="text.secondary">
-                            {selectedSociety.city}, {selectedSociety.state}
-                          </Typography>
-                        )}
-                      </Box>
+                        {selectedBuildingType?.description}
+                      </Typography>
                     </Box>
                   </Box>
-                </Grid>
-              )}
+                </Box>
+              </Grid>
+
+              {/* Description */}
+              <Grid item xs={12}>
+                <Box
+                  display="flex"
+                  flexDirection="column"
+                  alignItems="center"
+                  sx={{
+                    backgroundColor: alpha("#6F0B14", 0.05),
+                    borderRadius: 2,
+                    p: 3,
+                    border: `1px solid ${alpha("#6F0B14", 0.1)}`,
+                    width: "100%",
+                    maxWidth: 600,
+                  }}
+                >
+                  <Typography
+                    variant="subtitle2"
+                    fontWeight="600"
+                    color="#6F0B14"
+                    mb={2}
+                    display="block"
+                    sx={{
+                      textAlign: "center",
+                      width: "100%",
+                    }}
+                  >
+                    Description (Optional)
+                  </Typography>
+                  <TextField
+                    value={formData.description}
+                    onChange={handleFieldChange("description")}
+                    placeholder="Enter building description"
+                    multiline
+                    rows={3}
+                    variant="outlined"
+                    size="small"
+                    sx={{
+                      width: "100%",
+                      maxWidth: 600,
+                    }}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Description
+                            sx={{
+                              color: "#6F0B14",
+                              fontSize: 20,
+                              mt: 0.5,
+                            }}
+                          />
+                        </InputAdornment>
+                      ),
+                      sx: {
+                        borderRadius: 2,
+                        backgroundColor: "white",
+                        "& .MuiOutlinedInput-notchedOutline": {
+                          borderColor: "#E0E0E0",
+                          borderWidth: 1,
+                        },
+                        "&:hover .MuiOutlinedInput-notchedOutline": {
+                          borderColor: "#6F0B14",
+                        },
+                        "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                          borderColor: "#6F0B14",
+                          borderWidth: 2,
+                        },
+                        "& .MuiInputBase-inputMultiline": {
+                          paddingTop: 1.5,
+                          paddingBottom: 1.5,
+                        },
+                      },
+                    }}
+                  />
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{
+                      mt: 0.5,
+                      display: "block",
+                      textAlign: "center",
+                      maxWidth: 600,
+                      width: "100%",
+                    }}
+                  >
+                    Add any additional notes or details about the building
+                  </Typography>
+                </Box>
+              </Grid>
             </Grid>
 
             {/* Action Buttons */}
@@ -589,7 +956,7 @@ const AddBuildingDialog = ({
 
                   <Button
                     type="submit"
-                    disabled={isSubmitting || !isFormValid}
+                    disabled={isSubmitting}
                     variant="contained"
                     sx={{
                       textTransform: "none",

@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Player } from "@lottiefiles/react-lottie-player";
 import { motion } from "framer-motion";
 
-import animation from "../../assets/lottie/Loading_Progress_Bar.json";
+import animation from "../../assets/lottie/loading_gray.json";
 
 const welcomeAnimation = animation.default || animation;
 
@@ -28,16 +28,8 @@ const WelcomeOverlay = ({ onFinish }) => {
           autoplay
           loop
           src={welcomeAnimation}
-          style={{ width: 220, height: 220 }}
+          style={{ width: 180, height: 180 }}
         />
-
-        <h2 className="mt-4 text-xl font-semibold text-gray-800">
-          Welcome Back 👋
-        </h2>
-
-        <p className="text-gray-500 text-sm mt-1">
-          Preparing your dashboard...
-        </p>
       </motion.div>
     </motion.div>
   );

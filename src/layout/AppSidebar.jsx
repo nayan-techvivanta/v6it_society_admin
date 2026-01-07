@@ -7,7 +7,7 @@ import { MdDevices } from "react-icons/md";
 import { PiBuildingApartment } from "react-icons/pi";
 
 import { FiChevronDown } from "react-icons/fi";
-import { FaBuildingUser } from "react-icons/fa6";
+import { FaBuildingUser, FaHouse } from "react-icons/fa6";
 import { RxDashboard } from "react-icons/rx";
 
 import Logo from "../assets/Images/Logo/logo.png";
@@ -55,7 +55,7 @@ const AppSidebar = () => {
       icon: <FaBuildingUser size={20} />,
       name: "Property Manager",
       path: `${basePath}/property-managers`,
-      roles: ["superadmin", "admin"],
+      roles: ["superadmin"],
     },
     {
       icon: <FaBuildingUser size={20} />,
@@ -67,7 +67,7 @@ const AppSidebar = () => {
       icon: <PiBuildingApartment size={22} />,
       name: "Society",
       path: `${basePath}/society`,
-      roles: ["superadmin", "admin"],
+      roles: ["superadmin"],
     },
     {
       icon: <BsBuildings size={20} />,
@@ -76,10 +76,16 @@ const AppSidebar = () => {
       roles: ["superadmin", "admin"],
     },
     {
+      icon: <FaHouse size={20} />,
+      name: "Flats",
+      path: `${basePath}/flats`,
+      roles: ["admin"],
+    },
+    {
       icon: <FaRegIdCard size={20} />,
       name: "Cards",
       path: `${basePath}/cards`,
-      roles: ["superadmin", "admin"],
+      roles: ["superadmin"],
     },
     {
       icon: <MdDevices size={20} />,
