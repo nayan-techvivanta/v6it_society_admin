@@ -21,6 +21,7 @@ import AdminPage from "../pages/PropertyManager/Adminpage";
 
 import AdminDashboard from "../pages/Admin/AdminDashboard";
 import AdminBuildings from "../pages/Admin/AdminBuildings";
+import Security from "../pages/Admin/Security";
 import Flats from "../pages/Admin/Flats";
 // import AdminComplaints from "../pages/Admin/Complaints";
 
@@ -84,7 +85,8 @@ export default function Router() {
         >
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
           <Route path="/admin/buildings" element={<AdminBuildings />} />
-          <Route path="/admin/flats" element={<Flats />} />
+          <Route path="/admin/flats/:buildingId" element={<Flats />} />
+          <Route path="/admin/security" element={<Security />} />
         </Route>
 
         {/* Unauthorized */}

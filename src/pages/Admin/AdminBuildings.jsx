@@ -29,6 +29,7 @@ import {
   Menu,
   MenuItem,
 } from "@mui/material";
+import { MdPreview } from "react-icons/md";
 import {
   KeyboardArrowDown,
   KeyboardArrowUp,
@@ -51,6 +52,8 @@ import { supabase } from "../../api/supabaseClient";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "react-toastify";
 import { BsFillHouseAddFill } from "react-icons/bs";
+import { Tooltip } from "@mui/material";
+
 import AddBuildingDialog from "../../components/dialogs/AddBuildingDialog";
 import AddFlatDialog from "../../components/dialogs/AdminDialogs/AddFlat";
 
@@ -110,6 +113,7 @@ const BuildingRow = ({
   onEdit,
   onDelete,
   onAddFlat,
+  onViewFlats,
   onStatusToggle,
   isExpanded,
   onToggleRow,
@@ -246,43 +250,78 @@ const BuildingRow = ({
 
         <TableCell className="p-4" align="center">
           <div className="flex items-center justify-center gap-1">
-            <IconButton
-              size="small"
-              onClick={() => onAddFlat(building.id)}
-              disabled={isRowDisabled}
-              className="text-primary hover:bg-lightBackground"
-              sx={{ opacity: isRowDisabled ? 0.5 : 1 }}
-            >
-              <BsFillHouseAddFill size={20} />
-            </IconButton>
-            <FormControlLabel
-              control={
-                <PrimarySwitch
-                  checked={currentStatus === "active"}
-                  onChange={(e) => onStatusToggle(building.id, currentStatus)}
+            <Tooltip title="Add Flat" arrow>
+              <span>
+                <IconButton
                   size="small"
-                />
+                  onClick={() => onAddFlat(building.id)}
+                  disabled={isRowDisabled}
+                  className="text-primary hover:bg-lightBackground"
+                  sx={{ opacity: isRowDisabled ? 0.5 : 1 }}
+                >
+                  <BsFillHouseAddFill size={20} />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Tooltip title="View Flats" arrow>
+              <span>
+                <IconButton
+                  size="small"
+                  onClick={() => onViewFlats(building.id)}
+                  disabled={isRowDisabled}
+                >
+                  <MdPreview size={22} />
+                </IconButton>
+              </span>
+            </Tooltip>
+
+            <Tooltip
+              title={
+                currentStatus === "active"
+                  ? "Deactivate Building"
+                  : "Activate Building"
               }
-              sx={{ m: 0 }}
-            />
-            <IconButton
-              size="small"
-              onClick={() => onEdit(building.id)}
-              disabled={isRowDisabled}
-              className="text-primary hover:bg-lightBackground"
-              sx={{ opacity: isRowDisabled ? 0.5 : 1 }}
+              arrow
             >
-              <Edit fontSize="small" />
-            </IconButton>
-            <IconButton
-              size="small"
-              onClick={() => onDelete(building.id)}
-              disabled={isRowDisabled}
-              className="text-reject hover:bg-[rgba(179,27,27,0.09)]"
-              sx={{ opacity: isRowDisabled ? 0.5 : 1 }}
-            >
-              <Delete fontSize="small" />
-            </IconButton>
+              <span>
+                <FormControlLabel
+                  control={
+                    <PrimarySwitch
+                      checked={currentStatus === "active"}
+                      onChange={() =>
+                        onStatusToggle(building.id, currentStatus)
+                      }
+                      size="small"
+                    />
+                  }
+                  sx={{ m: 0 }}
+                />
+              </span>
+            </Tooltip>
+
+            <Tooltip title="Edit Building" arrow>
+              <span>
+                <IconButton
+                  size="small"
+                  onClick={() => onEdit(building.id)}
+                  disabled={isRowDisabled}
+                >
+                  <Edit fontSize="small" />
+                </IconButton>
+              </span>
+            </Tooltip>
+
+            <Tooltip title="Delete Building" arrow>
+              <span>
+                <IconButton
+                  size="small"
+                  onClick={() => onDelete(building.id)}
+                  disabled={isRowDisabled}
+                >
+                  <Delete fontSize="small" />
+                </IconButton>
+              </span>
+            </Tooltip>
           </div>
         </TableCell>
       </TableRow>
@@ -548,7 +587,13 @@ const BuildingRow = ({
   );
 };
 
-const BuildingCard = ({ building, onEdit, onDelete, onStatusToggle }) => {
+const BuildingCard = ({
+  building,
+  onEdit,
+  onDelete,
+  onStatusToggle,
+  onViewFlats,
+}) => {
   const [expanded, setExpanded] = useState(false);
   const currentStatus = building.status || "inactive";
   const isRowDisabled = currentStatus === "inactive";
@@ -701,6 +746,16 @@ const BuildingCard = ({ building, onEdit, onDelete, onStatusToggle }) => {
 
         <div className="flex items-center justify-between">
           <div className="flex gap-1">
+            <IconButton
+              size="small"
+              onClick={() => onViewFlats(building.id)}
+              disabled={isRowDisabled}
+              className="text-primary hover:bg-lightBackground"
+              sx={{ opacity: isRowDisabled ? 0.5 : 1 }}
+            >
+              <Apartment fontSize="small" />
+            </IconButton>
+
             <IconButton
               size="small"
               onClick={() => onEdit(building.id)}
@@ -864,7 +919,6 @@ export default function AdminBuildings() {
     }
   }, []);
 
-  // Initialize admin data
   useEffect(() => {
     const initializeAdminData = async () => {
       const societyId = await getAdminSocietyId();
@@ -910,7 +964,6 @@ export default function AdminBuildings() {
     initializeAdminData();
   }, [getAdminSocietyId]);
 
-  // CORRECT SUPABASE QUERY: Fetch only admin's society buildings
   const fetchBuildings = useCallback(async () => {
     setLoading(true);
 
@@ -1023,6 +1076,10 @@ export default function AdminBuildings() {
     setSelectedBuildingForFlat(null);
     fetchBuildings();
   }, []);
+  const handleViewFlats = useCallback((buildingId) => {
+    console.log("View Flats clicked:", buildingId);
+    window.location.href = `/admin/flats/${buildingId}`;
+  }, []);
   const headers = [
     "",
     "ID",
@@ -1034,7 +1091,6 @@ export default function AdminBuildings() {
     "Actions",
   ];
 
-  // Filter buildings based on search and status
   useEffect(() => {
     let filtered = buildings;
 
@@ -1429,6 +1485,7 @@ export default function AdminBuildings() {
                           onToggleRow={handleToggleRow}
                           onAddFlat={handleAddFlat}
                           isExpanded={!!openRows[building.id]}
+                          onViewFlats={handleViewFlats}
                         />
                       ))}
                     </TableBody>
@@ -1444,6 +1501,7 @@ export default function AdminBuildings() {
                         onEdit={handleEditBuilding}
                         onDelete={handleDeleteBuilding}
                         onStatusToggle={handleStatusToggle}
+                        onViewFlats={handleViewFlats}
                       />
                     ))}
                   </AnimatePresence>

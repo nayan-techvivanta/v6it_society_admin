@@ -5,7 +5,7 @@ import { BsThreeDots, BsBuildings } from "react-icons/bs";
 import { FiLogOut } from "react-icons/fi";
 import { MdDevices } from "react-icons/md";
 import { PiBuildingApartment } from "react-icons/pi";
-
+import { FaUserShield } from "react-icons/fa6";
 import { FiChevronDown } from "react-icons/fi";
 import { FaBuildingUser, FaHouse } from "react-icons/fa6";
 import { RxDashboard } from "react-icons/rx";
@@ -76,10 +76,10 @@ const AppSidebar = () => {
       roles: ["superadmin", "admin"],
     },
     {
-      icon: <FaHouse size={20} />,
-      name: "Flats",
-      path: `${basePath}/flats`,
-      roles: ["admin"],
+      icon: <FaUserShield size={20} />,
+      name: "Security",
+      path: `${basePath}/security`,
+      roles: ["superadmin", "admin"],
     },
     {
       icon: <FaRegIdCard size={20} />,

@@ -10,7 +10,10 @@ export default function UserDropdown() {
   const role = useMemo(() => {
     return localStorage.getItem("role");
   }, []);
-  if (!role) return null;
+  const email = useMemo(() => {
+    return localStorage.getItem("email");
+  }, []);
+  if (!role && !email) return null;
   const toggleDropdown = () => setIsOpen((prev) => !prev);
   const closeDropdown = () => setIsOpen(false);
   const handleLogout = () => {
@@ -34,7 +37,7 @@ export default function UserDropdown() {
         </span>
 
         <span className="block mr-1 font-medium text-sm text-black capitalize">
-          {role}
+          {email}
         </span>
         <svg
           className={`stroke-gray-500 transition-transform duration-200 ${
@@ -72,11 +75,11 @@ export default function UserDropdown() {
               />
             </div>
             <div>
-              <span className="block font-semibold text-gray-900 text-sm">
+              <span className="block font-semibold text-gray-900 text-sm capitalize">
                 {role}
               </span>
-              <span className="block text-xs text-hintText mt-0.5">
-                Logged in user
+              <span className="block text-xs text-gray-500 mt-0.5">
+                {email}
               </span>
             </div>
           </div>

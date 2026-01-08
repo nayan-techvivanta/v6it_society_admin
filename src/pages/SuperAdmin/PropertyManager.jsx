@@ -30,6 +30,13 @@ import {
   MenuItem,
 } from "@mui/material";
 import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+} from "@mui/material";
+
+import {
   KeyboardArrowDown,
   KeyboardArrowUp,
   Edit,
@@ -691,6 +698,8 @@ export default function PropertyManager() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterAnchorEl, setFilterAnchorEl] = useState(null);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [managerToDelete, setManagerToDelete] = useState(null);
 
   const fetchManagers = async () => {
     setLoading(true);
@@ -724,6 +733,7 @@ export default function PropertyManager() {
       name: m.name || "-",
       email: m.email || "-",
       assignedBuildings: 0,
+      role_type: m.role_type,
       status: m.is_active ? "active" : "inactive",
       registerDate: m.created_at
         ? new Date(m.created_at).toISOString().split("T")[0]
@@ -838,11 +848,79 @@ export default function PropertyManager() {
     setSelectedManager(manager);
     setOpenDialog(true);
   };
+  // const handleDeleteManager = async (id) => {
+  //   const manager = managers.find((m) => m.id === id);
 
+  //   // Safety check (frontend)
+  //   if (!manager || manager.role_type !== "Manager") {
+  //     toast.error("Invalid manager selected");
+  //     return;
+  //   }
+
+  //   const confirmDelete = window.confirm(
+  //     "Are you sure you want to delete this manager?"
+  //   );
+
+  //   if (!confirmDelete) return;
+
+  //   try {
+  //     const { error } = await supabase
+  //       .from("users")
+  //       .update({ is_delete: true })
+  //       .eq("id", id)
+  //       .eq("role_type", "Manager");
+
+  //     if (error) {
+  //       throw error;
+  //     }
+
+  //     setManagers((prev) => prev.filter((manager) => manager.id !== id));
+  //     setFilteredManagers((prev) =>
+  //       prev.filter((manager) => manager.id !== id)
+  //     );
+
+  //     toast.success("Manager deleted successfully!");
+  //   } catch (error) {
+  //     console.error(error);
+  //     toast.error("Failed to delete manager");
+  //   }
+  // };
   const handleDeleteManager = (id) => {
-    if (window.confirm("Are you sure you want to delete this manager?")) {
-      setManagers((prev) => prev.filter((manager) => manager.id !== id));
-      toast.success("Manager deleted successfully!");
+    const manager = managers.find((m) => m.id === id);
+
+    if (!manager || manager.role_type !== "Manager") {
+      toast.error("Invalid manager selected");
+      return;
+    }
+
+    setManagerToDelete(manager);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteManager = async () => {
+    if (!managerToDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from("users")
+        .update({ is_delete: true })
+        .eq("id", managerToDelete.id)
+        .eq("role_type", "Manager");
+
+      if (error) throw error;
+
+      setManagers((prev) => prev.filter((m) => m.id !== managerToDelete.id));
+      setFilteredManagers((prev) =>
+        prev.filter((m) => m.id !== managerToDelete.id)
+      );
+
+      toast.success("Manager deleted successfully");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to delete manager");
+    } finally {
+      setDeleteDialogOpen(false);
+      setManagerToDelete(null);
     }
   };
 
@@ -1236,6 +1314,45 @@ export default function PropertyManager() {
           manager={selectedManager}
           isEdit={!!selectedManager}
         />
+        <Dialog
+          open={deleteDialogOpen}
+          onClose={() => setDeleteDialogOpen(false)}
+          maxWidth="xs"
+          fullWidth
+        >
+          <DialogTitle className="font-roboto font-semibold">
+            Delete Manager
+          </DialogTitle>
+
+          <DialogContent dividers>
+            <Typography className="font-roboto text-sm text-gray-700">
+              Are you sure you want to delete{" "}
+              <strong>{managerToDelete?.name}</strong>? This action can be
+              undone later.
+            </Typography>
+          </DialogContent>
+
+          <DialogActions sx={{ p: 2 }}>
+            <Button
+              onClick={() => setDeleteDialogOpen(false)}
+              variant="outlined"
+              className="font-roboto"
+              sx={{ textTransform: "none" }}
+            >
+              Cancel
+            </Button>
+
+            <Button
+              onClick={confirmDeleteManager}
+              variant="contained"
+              color="error"
+              className="font-roboto"
+              sx={{ textTransform: "none" }}
+            >
+              Delete
+            </Button>
+          </DialogActions>
+        </Dialog>
       </motion.div>
     </div>
   );

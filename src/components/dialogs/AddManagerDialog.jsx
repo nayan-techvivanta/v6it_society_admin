@@ -17,6 +17,7 @@ import {
   InputAdornment,
   Paper,
   Divider,
+  CircularProgress,
 } from "@mui/material";
 import {
   Close,
@@ -29,6 +30,8 @@ import {
   Key,
   WhatsApp,
 } from "@mui/icons-material";
+import { AiOutlineEye, AiOutlineEyeInvisible } from "react-icons/ai";
+
 import {
   FaUserTie,
   FaBuilding,
@@ -113,9 +116,10 @@ const AddManagerDialog = ({
     contact: "",
     whatsapp: "",
   });
-
+  const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const [submitError, setSubmitError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -163,71 +167,13 @@ const AddManagerDialog = ({
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
-  // const handleSubmit = async (e) => {
-  //   e.preventDefault();
-  //   if (!validateForm()) return;
 
-  //   setSubmitError("");
-
-  //   try {
-  //     const managerData = {
-  //       name: formData.name.trim(),
-  //       email: formData.email.trim(),
-  //       password: !isEdit ? formData.password.trim() : undefined,
-  //       contact: formData.contact.trim(),
-  //       whatsapp: formData.whatsapp.trim() || formData.contact.trim(),
-  //     };
-
-  //     if (!isEdit) {
-  //       const newUser = await createUser(managerData);
-  //       console.log("New user created:", newUser);
-  //     }
-
-  //     await onSubmit(managerData);
-  //   } catch (error) {
-  //     console.error("Error creating/updating manager:", error);
-  //     setSubmitError(
-  //       error.message || "Failed to create/update manager. Please try again."
-  //     );
-  //   }
-  // };
-  // const handleSubmit = async (e) => {
-  //   e.preventDefault();
-  //   if (!validateForm()) return;
-
-  //   setSubmitError("");
-
-  //   try {
-  //     // Prepare full payload
-  //     const managerData = {
-  //       name: formData.name.trim(),
-  //       email: formData.email.trim(),
-  //       password: !isEdit ? formData.password.trim() : undefined,
-  //       contact: formData.contact.trim(),
-  //       whatsapp: formData.whatsapp.trim() || formData.contact.trim(),
-  //     };
-
-  //     if (!isEdit) {
-  //       // Call Edge Function to create user
-  //       const newUser = await createUser(managerData);
-  //       console.log("New user created:", newUser);
-  //     }
-
-  //     // Call your onSubmit to save manager in DB
-  //     await onSubmit(managerData);
-  //   } catch (error) {
-  //     console.error("Error creating/updating manager:", error);
-  //     setSubmitError(
-  //       error.message || "Failed to create/update manager. Please try again."
-  //     );
-  //   }
-  // };
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
 
     setSubmitError("");
-
+    setIsSubmitting(true);
     try {
       const managerData = {
         name: formData.name.trim(),
@@ -235,21 +181,32 @@ const AddManagerDialog = ({
         password: formData.password.trim(),
         contact: formData.contact.trim(),
         whatsapp: formData.whatsapp.trim() || formData.contact.trim(),
+        role_type: "Manager",
       };
 
       const userRes = await createUser(managerData);
       console.log("Supabase user created:", userRes);
 
+      if (!userRes?.user_id) {
+        throw new Error("User ID not returned from server");
+      }
+
       await onSubmit({
-        ...managerData,
-        user_id: userRes.user?.id,
-        role: "Manager",
+        user_id: userRes.user_id,
+        name: managerData.name,
+        email: managerData.email,
+        phone: managerData.contact,
+        whatsapp_number: managerData.whatsapp,
+        role_type: "Manager",
+        status: "active",
       });
 
       onClose();
     } catch (error) {
       console.error(error);
-      setSubmitError(error.message);
+      setSubmitError(error.message || "Failed to create manager");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -262,6 +219,9 @@ const AddManagerDialog = ({
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: "" }));
     }
+  };
+  const togglePasswordVisibility = () => {
+    setShowPassword((prev) => !prev);
   };
 
   return (
@@ -430,7 +390,7 @@ const AddManagerDialog = ({
                 fullWidth
                 placeholder="Password"
                 name="password"
-                type="password"
+                type={showPassword ? "text" : "password"} // 🔥 toggle here
                 value={formData.password}
                 onChange={handleInputChange}
                 error={!!errors.password}
@@ -439,6 +399,22 @@ const AddManagerDialog = ({
                   startAdornment: (
                     <InputAdornment position="start">
                       <Lock sx={{ color: "#8b0000" }} />
+                    </InputAdornment>
+                  ),
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        onClick={togglePasswordVisibility}
+                        edge="end"
+                        size="small"
+                        sx={{ color: "#8b0000" }}
+                      >
+                        {showPassword ? (
+                          <AiOutlineEyeInvisible size={20} />
+                        ) : (
+                          <AiOutlineEye size={20} />
+                        )}
+                      </IconButton>
                     </InputAdornment>
                   ),
                 }}
@@ -535,10 +511,9 @@ const AddManagerDialog = ({
             Cancel
           </Button>
           <motion.button
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.97 }}
+            whileHover={!isSubmitting ? { scale: 1.03 } : {}}
+            whileTap={!isSubmitting ? { scale: 0.97 } : {}}
             type="submit"
-            disabled={loading}
             style={{
               padding: "12px 36px",
               background: "linear-gradient(135deg, #8b0000 0%, #a00000 100%)",
@@ -548,23 +523,25 @@ const AddManagerDialog = ({
               fontFamily: "'Roboto', sans-serif",
               fontWeight: "bold",
               fontSize: "0.9375rem",
-              cursor: "pointer",
+              cursor: isSubmitting ? "not-allowed" : "pointer",
               display: "flex",
               alignItems: "center",
-              gap: "8px",
+              gap: "10px",
               boxShadow: "0 4px 12px rgba(139, 0, 0, 0.2)",
-              transition: "all 0.3s ease",
-              opacity: loading ? 0.7 : 1,
+              opacity: isSubmitting ? 0.7 : 1,
             }}
           >
-            <FaUserTie />
-            {loading
-              ? isEdit
-                ? "Updating..."
-                : "Adding Manager..."
-              : isEdit
-              ? "Update Manager"
-              : "Add Manager"}
+            {isSubmitting ? (
+              <>
+                <CircularProgress size={18} sx={{ color: "white" }} />
+                Processing...
+              </>
+            ) : (
+              <>
+                <FaUserTie />
+                {isEdit ? "Update Manager" : "Add Manager"}
+              </>
+            )}
           </motion.button>
         </DialogActions>
       </form>

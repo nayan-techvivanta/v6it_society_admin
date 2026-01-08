@@ -211,15 +211,37 @@ export default function AddFlatDialog({ open, onClose, building, societyId }) {
             exit={{ opacity: 0, y: 20 }}
             transition={{ duration: 0.2 }}
           >
-            <DialogTitle sx={{ pb: 1 }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                <HomeIcon sx={{ color: "#6F0B14", fontSize: "1.5rem" }} />
-                <Typography
-                  variant="h6"
-                  className="font-roboto font-semibold text-primary"
+            <DialogTitle
+              sx={{
+                p: 2.5,
+                borderBottom: "1px solid #e5e7eb",
+                background: "linear-gradient(90deg, #6F0B14 0%, #8B1D2C 100%)",
+                color: "#fff",
+              }}
+            >
+              <Box display="flex" alignItems="center" gap={2}>
+                <Box
+                  sx={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: "10px",
+                    backgroundColor: "rgba(255,255,255,0.15)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
                 >
-                  Add New Flat - {buildingName}
-                </Typography>
+                  <HomeIcon sx={{ fontSize: 22, color: "#fff" }} />
+                </Box>
+
+                <Box>
+                  <Typography variant="subtitle2" sx={{ opacity: 0.85 }}>
+                    {buildingName}
+                  </Typography>
+                  <Typography variant="h6" fontWeight={600}>
+                    Add New Flat / Office / Shop
+                  </Typography>
+                </Box>
               </Box>
             </DialogTitle>
 
@@ -254,75 +276,6 @@ export default function AddFlatDialog({ open, onClose, building, societyId }) {
                     sx={{ mb: 2 }}
                     inputProps={{ min: 0, max: 50 }}
                   />
-
-                  <FormControl
-                    fullWidth
-                    error={!!errors.bhk_type}
-                    sx={{ mb: 2 }}
-                  >
-                    <InputLabel>BHK Type</InputLabel>
-                    <Select
-                      name="bhk_type"
-                      value={formData.bhk_type}
-                      onChange={handleChange}
-                      label="BHK Type"
-                    >
-                      {bhkOptions.map((option) => (
-                        <MenuItem key={option.value} value={option.value}>
-                          {option.label}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                    {errors.bhk_type && (
-                      <FormHelperText>{errors.bhk_type}</FormHelperText>
-                    )}
-                  </FormControl>
-
-                  <TextField
-                    fullWidth
-                    label="Area (sqft)"
-                    name="area_sqft"
-                    type="number"
-                    value={formData.area_sqft}
-                    onChange={handleChange}
-                    error={!!errors.area_sqft}
-                    helperText={errors.area_sqft || "e.g., 1200"}
-                    sx={{ mb: 2 }}
-                    inputProps={{ min: 100, step: 0.01 }}
-                  />
-
-                  <FormControl fullWidth sx={{ mb: 3 }}>
-                    <InputLabel>Occupancy Status</InputLabel>
-                    <Select
-                      name="occupancy_status"
-                      value={formData.occupancy_status}
-                      onChange={handleChange}
-                      label="Occupancy Status"
-                    >
-                      {statusOptions.map((status) => (
-                        <MenuItem key={status.value} value={status.value}>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 1,
-                            }}
-                          >
-                            <Box
-                              sx={{
-                                width: 12,
-                                height: 12,
-                                borderRadius: "50%",
-                                bgcolor: status.color,
-                                boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
-                              }}
-                            />
-                            {status.label}
-                          </Box>
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
 
                   {errors.general && (
                     <Alert severity="error" sx={{ mt: 2 }}>
