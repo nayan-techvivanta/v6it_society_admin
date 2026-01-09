@@ -31,6 +31,7 @@ import { supabase } from "../../api/supabaseClient";
 import { motion } from "framer-motion";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
+import AddSecurityDialog from "../../components/dialogs/AdminDialogs/AddSecurityDialog";
 
 export default function Security() {
   const navigate = useNavigate();
@@ -40,9 +41,10 @@ export default function Security() {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [societyId] = useState(() => {
-    // Get current society ID from localStorage (adjust key as per your app)
     return localStorage.getItem("societyId") || "society_id";
   });
+  const [openDialog, setOpenDialog] = useState(false);
+  const [selectedGuard, setSelectedGuard] = useState(null);
 
   const theme = {
     primary: "#2563eb",
@@ -72,7 +74,7 @@ export default function Security() {
           "id, registed_user_id, name, email, number, role_type, building_id, is_active, created_at"
         )
         .eq("role_type", "Security")
-        .eq("society_id", societyId) // Filter by your society
+        .eq("society_id", societyId)
         .eq("is_delete", false)
         .order("created_at", { ascending: false });
 
@@ -304,7 +306,26 @@ export default function Security() {
                         </TableCell>
                         <TableCell align="center">
                           <div className="flex items-center gap-1">
+                            <Button
+                              variant="contained"
+                              onClick={() => {
+                                setSelectedGuard(null);
+                                setOpenDialog(true);
+                              }}
+                            >
+                              Add Security
+                            </Button>
                             <IconButton
+                              size="small"
+                              onClick={() => {
+                                setSelectedGuard(guard);
+                                setOpenDialog(true);
+                              }}
+                            >
+                              <Edit fontSize="small" />
+                            </IconButton>
+
+                            {/* <IconButton
                               size="small"
                               onClick={() =>
                                 handleToggleStatus(guard.id, guard.is_active)
@@ -324,13 +345,8 @@ export default function Security() {
                                   style={{ color: theme.success }}
                                 />
                               )}
-                            </IconButton>
-                            <IconButton size="small" title="Edit">
-                              <Edit
-                                fontSize="small"
-                                style={{ color: theme.primary }}
-                              />
-                            </IconButton>
+                            </IconButton> */}
+
                             <IconButton
                               size="small"
                               onClick={() => handleDelete(guard.id)}
@@ -366,6 +382,16 @@ export default function Security() {
           )}
         </Card>
       </motion.div>
+      <AddSecurityDialog
+        open={openDialog}
+        onClose={() => {
+          setOpenDialog(false);
+          setSelectedGuard(null);
+        }}
+        guard={selectedGuard}
+        societyId={societyId}
+        onSuccess={fetchSecurityGuards}
+      />
     </div>
   );
 }

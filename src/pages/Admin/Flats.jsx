@@ -22,6 +22,7 @@ import {
   TableSortLabel,
 } from "@mui/material";
 import { Breadcrumbs, Link } from "@mui/material";
+import { FaEye } from "react-icons/fa";
 import { ArrowBack, ChevronRight, PersonAdd } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import AddFlatDialog from "../../components/dialogs/AdminDialogs/AddFlat";
@@ -42,6 +43,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "react-toastify";
 import { useParams } from "react-router-dom";
 import AddOwnerDialog from "../../components/dialogs/AdminDialogs/AddOwnerDialog";
+import FlatMembersDialog from "../../components/dialogs/AdminDialogs/FlatMembersDialog";
 
 export default function Flats() {
   const { buildingId } = useParams();
@@ -58,6 +60,9 @@ export default function Flats() {
   const [expandedRows, setExpandedRows] = useState({});
   const [openAddOwner, setOpenAddOwner] = useState(false);
   const [selectedFlat, setSelectedFlat] = useState(null);
+  const [flatMembers, setFlatMembers] = useState([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [openMembersDialog, setOpenMembersDialog] = useState(false);
 
   const [buildingName, setBuildingName] = useState("Loading...");
   const [sortConfig, setSortConfig] = useState({
@@ -104,6 +109,44 @@ export default function Flats() {
     }
   }, [buildingId]);
 
+  // const fetchFlats = useCallback(async () => {
+  //   setLoading(true);
+  //   try {
+  //     const { data, error } = await supabase
+  //       .from("flats")
+  //       .select(
+  //         `
+  //         id, flat_number, floor_number, bhk_type, area_sqft,
+  //         occupancy_status, is_active, created_at,
+  //         updated_at,building_id, society_id
+  //       `
+  //       )
+  //       .eq("building_id", buildingId)
+  //       .eq("is_delete", false)
+  //       .order("floor_number", { ascending: true })
+  //       .order("flat_number", { ascending: true });
+
+  //     if (error) throw error;
+
+  //     // Map occupancy status colors
+  //     const mappedFlats = data.map((flat) => ({
+  //       ...flat,
+  //       statusColor:
+  //         flat.occupancy_status === "Occupied"
+  //           ? theme.success
+  //           : flat.occupancy_status === "Blocked"
+  //           ? theme.warning
+  //           : theme.secondary,
+  //     }));
+
+  //     setFlats(mappedFlats);
+  //   } catch (error) {
+  //     console.error("Error fetching flats:", error);
+  //     toast.error("Failed to fetch flats");
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // }, [buildingId]);
   const fetchFlats = useCallback(async () => {
     setLoading(true);
     try {
@@ -111,10 +154,10 @@ export default function Flats() {
         .from("flats")
         .select(
           `
-          id, flat_number, floor_number, bhk_type, area_sqft, 
-          occupancy_status, is_active, created_at,
-          updated_at
-        `
+        id, flat_number, floor_number, bhk_type, area_sqft, 
+        occupancy_status, is_active, created_at, updated_at,
+        building_id, society_id
+      `
         )
         .eq("building_id", buildingId)
         .eq("is_delete", false)
@@ -123,7 +166,6 @@ export default function Flats() {
 
       if (error) throw error;
 
-      // Map occupancy status colors
       const mappedFlats = data.map((flat) => ({
         ...flat,
         statusColor:
@@ -142,6 +184,28 @@ export default function Flats() {
       setLoading(false);
     }
   }, [buildingId]);
+  const fetchFlatMembers = async (flat) => {
+    setLoadingMembers(true);
+    try {
+      const { data, error } = await supabase
+        .from("users")
+        .select(
+          "id, name, email, number, role_type, whatsapp_number, profile_url"
+        )
+        .eq("flat_id", flat.id)
+        .eq("is_delete", false);
+
+      if (error) throw error;
+
+      setFlatMembers(data);
+      setOpenMembersDialog(true);
+    } catch (err) {
+      console.error("Error fetching flat members:", err);
+      toast.error("Failed to fetch flat members");
+    } finally {
+      setLoadingMembers(false);
+    }
+  };
 
   useEffect(() => {
     if (buildingId) {
@@ -238,7 +302,27 @@ export default function Flats() {
         transition={{ duration: 0.5 }}
         className="max-w-7xl mx-auto"
       >
-        <div className="mb-6 p-4 md:p-6  ">
+        {/* Back Button */}
+        <div className="mt-3">
+          <Button
+            variant="outlined"
+            startIcon={<ArrowBack />}
+            onClick={() =>
+              window.history.back() || navigate("/admin/buildings")
+            }
+            style={{
+              borderColor: theme.border,
+              color: theme.textPrimary,
+              borderRadius: "8px",
+              textTransform: "none",
+              fontWeight: 500,
+            }}
+            className="font-roboto"
+          >
+            Back to Buildings
+          </Button>
+        </div>
+        <div className="mb-6 p-4 md:p-6 ">
           <Breadcrumbs
             separator={
               <ChevronRight
@@ -292,27 +376,6 @@ export default function Flats() {
               Flats ({flats.length})
             </Typography>
           </Breadcrumbs>
-
-          {/* Back Button */}
-          <div className="mt-3">
-            <Button
-              variant="outlined"
-              startIcon={<ArrowBack />}
-              onClick={() =>
-                window.history.back() || navigate("/admin/buildings")
-              }
-              style={{
-                borderColor: theme.border,
-                color: theme.textPrimary,
-                borderRadius: "8px",
-                textTransform: "none",
-                fontWeight: 500,
-              }}
-              className="font-roboto"
-            >
-              Back to Buildings
-            </Button>
-          </div>
         </div>
 
         <div className="mb-8">
@@ -550,118 +613,6 @@ export default function Flats() {
                   <TableBody>
                     {paginatedFlats.map((flat) => (
                       <React.Fragment key={flat.id}>
-                        {/* <TableRow
-                          hover
-                          style={{ cursor: "pointer" }}
-                          onClick={() => toggleRowExpansion(flat.id)}
-                        >
-                          <TableCell>
-                            <IconButton size="small">
-                              {expandedRows[flat.id] ? (
-                                <KeyboardArrowUp />
-                              ) : (
-                                <KeyboardArrowDown />
-                              )}
-                            </IconButton>
-                          </TableCell>
-                          <TableCell>
-                            <Typography className="font-semibold">
-                              {flat.flat_number}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>{flat.floor_number || "-"}</TableCell>
-                          <TableCell>
-                            <Chip
-                              label={flat.bhk_type}
-                              size="small"
-                              style={{
-                                backgroundColor: `${theme.primary}15`,
-                                color: theme.primaryDark,
-                                fontWeight: 500,
-                                border: `1px solid ${theme.primary}30`,
-                              }}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            {flat.area_sqft ? (
-                              <Typography className="font-medium">
-                                {flat.area_sqft.toLocaleString()} sqft
-                              </Typography>
-                            ) : (
-                              "-"
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Chip
-                              label={flat.occupancy_status}
-                              size="small"
-                              style={{
-                                backgroundColor: `${flat.statusColor}15`,
-                                color: flat.statusColor,
-                                fontWeight: 500,
-                                border: `1px solid ${flat.statusColor}30`,
-                              }}
-                            />
-                          </TableCell>
-                          <TableCell align="center">
-                            <div className="flex items-center justify-center gap-1">
-                              <IconButton
-                                size="small"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleToggleStatus(
-                                    flat.id,
-                                    flat.occupancy_status
-                                  );
-                                }}
-                                title={
-                                  flat.occupancy_status === "Occupied"
-                                    ? "Mark as Vacant"
-                                    : "Mark as Occupied"
-                                }
-                              >
-                                {flat.occupancy_status === "Occupied" ? (
-                                  <VisibilityOff
-                                    fontSize="small"
-                                    style={{ color: theme.textSecondary }}
-                                  />
-                                ) : (
-                                  <Visibility
-                                    fontSize="small"
-                                    style={{ color: theme.success }}
-                                  />
-                                )}
-                              </IconButton>
-                              <IconButton
-                                size="small"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  // Edit functionality would go here
-                                  toast.info("Edit functionality coming soon!");
-                                }}
-                                title="Edit Flat"
-                              >
-                                <Edit
-                                  fontSize="small"
-                                  style={{ color: theme.primary }}
-                                />
-                              </IconButton>
-                              <IconButton
-                                size="small"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteFlat(flat.id);
-                                }}
-                                title="Delete Flat"
-                              >
-                                <Delete
-                                  fontSize="small"
-                                  style={{ color: theme.error }}
-                                />
-                              </IconButton>
-                            </div>
-                          </TableCell>
-                        </TableRow> */}
                         <TableRow
                           hover
                           style={{ cursor: "pointer" }}
@@ -712,18 +663,18 @@ export default function Flats() {
                                   setOpenAddOwner(true);
                                 }}
                               >
-                                <PersonAdd sx={{ color: theme.primary }} />
+                                <PersonAdd sx={{ color: "#6F0B14" }} />
                               </IconButton>
 
                               <IconButton
                                 size="small"
+                                title="View Members"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  toast.info("User action clicked");
+                                  fetchFlatMembers(flat);
                                 }}
-                                title="View Users"
                               >
-                                <IoIosHome style={{ color: theme.primary }} />
+                                <FaEye sx={{ color: "#6F0B14" }} />
                               </IconButton>
 
                               {/* EDIT */}
@@ -731,8 +682,10 @@ export default function Flats() {
                                 size="small"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  toast.info("Edit coming soon");
+                                  setSelectedFlat(flat);
+                                  setOpenDialog(true);
                                 }}
+                                title="Edit Flat"
                               >
                                 <Edit
                                   fontSize="small"
@@ -897,11 +850,21 @@ export default function Flats() {
         open={openDialog}
         onClose={() => {
           setOpenDialog(false);
+          setSelectedFlat(null);
           fetchFlats();
         }}
         building={building}
         societyId={societyId}
+        flat={selectedFlat}
       />
+      <FlatMembersDialog
+        open={openMembersDialog}
+        onClose={() => setOpenMembersDialog(false)}
+        members={flatMembers}
+        loading={loadingMembers}
+        fetchMembers={() => fetchFlatMembers(selectedFlat)}
+      />
+
       {openAddOwner && selectedFlat && (
         <AddOwnerDialog
           open={openAddOwner}
