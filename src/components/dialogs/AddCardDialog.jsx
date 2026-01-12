@@ -40,9 +40,11 @@ const AddCardDialog = ({
   cardData,
 }) => {
   const [formData, setFormData] = useState({
-    societyId: "",
+    society_id: "",
+    building_id: "",
     card_serial_number: "",
   });
+
   const [societies, setSocieties] = useState([]);
   const [loadingSocieties, setLoadingSocieties] = useState(false);
 
@@ -50,12 +52,12 @@ const AddCardDialog = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [touched, setTouched] = useState({});
   const [isFormValid, setIsFormValid] = useState(false);
+  const [buildings, setBuildings] = useState([]);
+  const [loadingBuildings, setLoadingBuildings] = useState(false);
 
-  // Generate serial ID based on selected society
   const generateSerialId = (society) => {
     if (!society) return "";
 
-    // Create serial ID: first 3 letters of society name + random 4 digits
     const prefix = society.name.substring(0, 3).toUpperCase();
     const randomNum = Math.floor(1000 + Math.random() * 9000);
     return `${prefix}-${randomNum}`;
@@ -85,32 +87,55 @@ const AddCardDialog = ({
     if (open) {
       if (isEdit && cardData) {
         setFormData({
-          societyId: cardData.society_id || "",
+          society_id: cardData.society_id || "",
+          building_id: cardData.building_id || "",
           card_serial_number: cardData.card_serial_number || "",
-          assigned: cardData.assigned || false,
-          notes: cardData.notes || "",
         });
+
+        if (cardData.society_id) {
+          fetchBuildings(cardData.society_id);
+        }
       } else {
-        // Generate initial serial ID
-        const initialSerialId = `CARD-${Math.floor(
-          1000 + Math.random() * 9000
-        )}`;
         setFormData({
-          societyId: "",
-          card_serial_number: initialSerialId,
-          assigned: false,
-          notes: "",
+          society_id: "",
+          building_id: "",
+          card_serial_number: `CARD-${Math.floor(1000 + Math.random() * 9000)}`,
         });
       }
+
       setErrors({});
       setTouched({});
     }
-  }, [open, cardData, isEdit]);
+  }, [open, isEdit, cardData]);
 
   // Find selected society
   const selectedSociety = societies.find((s) => s.id === formData.societyId);
 
-  // Validation
+  const fetchBuildings = async (societyId) => {
+    if (!societyId) return;
+
+    try {
+      setLoadingBuildings(true);
+
+      const { data, error } = await supabase
+        .from("buildings")
+        .select("id, name")
+        .eq("society_id", societyId) // ✅ no Number()
+        .eq("is_active", true)
+        .eq("is_delete", false)
+        .order("name");
+
+      if (error) throw error;
+
+      setBuildings(data || []);
+    } catch (error) {
+      toast.error("Failed to load buildings");
+      setBuildings([]);
+    } finally {
+      setLoadingBuildings(false);
+    }
+  };
+
   const validateForm = () => {
     const newErrors = {};
 
@@ -143,36 +168,28 @@ const AddCardDialog = ({
     try {
       let query;
 
+      const payload = {
+        society_id: formData.society_id,
+        card_serial_number: formData.card_serial_number,
+        building_id: formData.building_id,
+      };
+
       if (isEdit && cardData?.id) {
         // 🔹 UPDATE CARD
         query = supabase
           .from("cards")
-          .update({
-            society_id: formData.societyId,
-            card_serial_number: formData.card_serial_number,
-          })
+          .update(payload)
           .eq("id", cardData.id)
           .select()
           .single();
       } else {
-        // 🔹 INSERT NEW CARD
-        query = supabase
-          .from("cards")
-          .insert([
-            {
-              society_id: formData.societyId,
-              card_serial_number: formData.card_serial_number,
-            },
-          ])
-          .select()
-          .single();
+        // 🔹 INSERT CARD
+        query = supabase.from("cards").insert([payload]).select().single();
       }
 
-      const { data, error } = await query;
+      const { error } = await query;
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       toast.success(
         isEdit ? "Card updated successfully!" : "Card created successfully!"
@@ -190,22 +207,29 @@ const AddCardDialog = ({
   const handleFieldChange = (field) => (e) => {
     const value = e.target.value;
 
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+    setFormData((prev) => {
+      const updated = { ...prev, [field]: value };
+
+      if (field === "society_id") {
+        updated.building_id = "";
+        setBuildings([]);
+        if (value) fetchBuildings(value);
+      }
+
+      return updated;
+    });
 
     setTouched((prev) => ({
       ...prev,
       [field]: true,
+      ...(field === "society_id" && { building_id: false }),
     }));
 
-    if (errors[field]) {
-      setErrors((prev) => ({
-        ...prev,
-        [field]: "",
-      }));
-    }
+    setErrors((prev) => ({
+      ...prev,
+      [field]: "",
+      ...(field === "society_id" && { building_id: "" }),
+    }));
   };
 
   const handleClose = () => {
@@ -286,25 +310,51 @@ const AddCardDialog = ({
       <DialogContent sx={{ p: 0 }}>
         <Box sx={{ p: 3 }}>
           <form onSubmit={handleSubmit}>
-            {/* Error Alert */}
-            {Object.values(errors).some(Boolean) && (
-              <Alert
-                severity="error"
+            <Box sx={{ mb: 3 }}>
+              <Typography
+                component="label"
+                variant="caption"
+                fontWeight={600}
+                display="block"
+                mb={1}
+                color="#6F0B14"
                 sx={{
-                  borderRadius: 2,
-                  mb: 3,
-                  backgroundColor: alpha("#B31B1B", 0.1),
-                  color: "#B31B1B",
-                  border: `1px solid ${alpha("#B31B1B", 0.2)}`,
-                  "& .MuiAlert-icon": { color: "#B31B1B" },
+                  "&::after": {
+                    content: '"*"',
+                    color: "#B31B1B",
+                    marginLeft: 0.5,
+                  },
                 }}
               >
-                <Typography variant="body2" fontWeight="600">
-                  Please fix all errors before submitting
-                </Typography>
-              </Alert>
-            )}
+                Card Serial Number
+              </Typography>
 
+              <TextField
+                fullWidth
+                value={formData.card_serial_number}
+                onChange={handleFieldChange("card_serial_number")}
+                error={
+                  !!errors.card_serial_number && touched.card_serial_number
+                }
+                helperText={
+                  (touched.card_serial_number && errors.card_serial_number) ||
+                  "Format: ABC-1234"
+                }
+                InputProps={{
+                  startAdornment: (
+                    <Box sx={{ color: "#A29EB6", mr: 1 }}>
+                      <Tag sx={{ fontSize: 20 }} />
+                    </Box>
+                  ),
+                  sx: {
+                    borderRadius: 1.5,
+                    height: 44,
+                  },
+                }}
+                placeholder="e.g., SOC-1234"
+                size="small"
+              />
+            </Box>
             {/* Society Selection */}
             <Box sx={{ mb: 3 }}>
               <Typography
@@ -328,7 +378,7 @@ const AddCardDialog = ({
               <FormControl fullWidth error={!!errors.societyId} size="small">
                 <Select
                   value={formData.societyId}
-                  onChange={handleFieldChange("societyId")}
+                  onChange={handleFieldChange("society_id")}
                   displayEmpty
                   sx={{
                     borderRadius: 1.5,
@@ -516,8 +566,7 @@ const AddCardDialog = ({
                 )}
               </FormControl>
             </Box>
-
-            {/* Serial ID */}
+            {/* Building Selection */}
             <Box sx={{ mb: 3 }}>
               <Typography
                 component="label"
@@ -534,35 +583,38 @@ const AddCardDialog = ({
                   },
                 }}
               >
-                Card Serial Number
+                Select Building
               </Typography>
 
-              <TextField
+              <FormControl
                 fullWidth
-                value={formData.card_serial_number}
-                onChange={handleFieldChange("card_serial_number")}
-                error={
-                  !!errors.card_serial_number && touched.card_serial_number
-                }
-                helperText={
-                  (touched.card_serial_number && errors.card_serial_number) ||
-                  "Format: ABC-1234"
-                }
-                InputProps={{
-                  startAdornment: (
-                    <Box sx={{ color: "#A29EB6", mr: 1 }}>
-                      <Tag sx={{ fontSize: 20 }} />
-                    </Box>
-                  ),
-                  sx: {
-                    borderRadius: 1.5,
-                    height: 44,
-                  },
-                }}
-                placeholder="e.g., SOC-1234"
                 size="small"
-              />
+                disabled={!formData.society_id || loadingBuildings}
+              >
+                <Select
+                  value={formData.building_id}
+                  onChange={handleFieldChange("building_id")}
+                  displayEmpty
+                  renderValue={(selected) => {
+                    if (loadingBuildings) return "Loading buildings...";
+                    if (!selected) return "Select building";
+                    const building = buildings.find((b) => b.id === selected);
+                    return building ? building.name : "Select building";
+                  }}
+                >
+                  <MenuItem value="" disabled>
+                    Select building
+                  </MenuItem>
+                  {buildings.map((b) => (
+                    <MenuItem key={b.id} value={b.id}>
+                      {b.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             </Box>
+
+            {/* Serial ID */}
 
             {/* Selected Society Preview */}
             {selectedSociety && (

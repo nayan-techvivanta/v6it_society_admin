@@ -85,7 +85,6 @@ const AddDeviceDialog = ({
     }
   }, [formData.society_id]);
 
-  // Initialize form data
   useEffect(() => {
     if (open) {
       if (isEdit && deviceData) {
@@ -98,18 +97,12 @@ const AddDeviceDialog = ({
           status: deviceData.status || "active",
         });
 
-        // If device has society_id, fetch its buildings
         if (deviceData.society_id) {
           fetchBuildings(deviceData.society_id);
         }
       } else {
-        // Generate initial device serial number
-        const prefix = "DEV";
-        const randomNum = Math.floor(10000 + Math.random() * 90000);
-        const initialSerial = `${prefix}${randomNum}`;
-
         setFormData({
-          device_serial_number: initialSerial,
+          device_serial_number: "",
           society_id: "",
           building_id: "",
           issue_date: new Date().toISOString().split("T")[0],
@@ -141,31 +134,24 @@ const AddDeviceDialog = ({
     }
   };
 
-  // Fetch buildings for selected society
   const fetchBuildings = async (societyId) => {
     try {
       setLoadingBuildings(true);
+
       const { data, error } = await supabase
         .from("buildings")
-        .select("id, name, floors, address")
+        .select("id, name, flat_limit, building_type")
         .eq("society_id", societyId)
+        .eq("is_delete", false)
+        .eq("is_active", true)
         .order("name");
 
       if (error) throw error;
+
       setBuildings(data || []);
       setFilteredBuildings(data || []);
-
-      // If in edit mode and building exists in the list, keep it selected
-      if (isEdit && deviceData?.building_id) {
-        const buildingExists = data?.some(
-          (b) => b.id === deviceData.building_id
-        );
-        if (!buildingExists) {
-          setFormData((prev) => ({ ...prev, building_id: "" }));
-        }
-      }
     } catch (error) {
-      console.error("Error fetching buildings:", error);
+      console.error("Fetch buildings error:", error);
       toast.error("Failed to load buildings");
       setBuildings([]);
       setFilteredBuildings([]);
@@ -187,13 +173,6 @@ const AddDeviceDialog = ({
         building.address?.toLowerCase().includes(searchValue.toLowerCase())
     );
     setFilteredBuildings(filtered);
-  };
-
-  // Generate device serial number
-  const generateSerialNumber = () => {
-    const prefix = "DEV";
-    const randomNum = Math.floor(10000 + Math.random() * 90000);
-    return `${prefix}${randomNum}`;
   };
 
   // Validation
@@ -227,6 +206,33 @@ const AddDeviceDialog = ({
     validateForm();
   }, [formData]);
 
+  // const handleSubmit = async (e) => {
+  //   e.preventDefault();
+
+  //   if (!isFormValid) {
+  //     toast.error("Please fix all errors before submitting");
+  //     return;
+  //   }
+
+  //   setIsSubmitting(true);
+  //   try {
+  //     // Prepare data for parent component
+  //     const devicePayload = {
+  //       device_serial_number: formData.device_serial_number,
+  //       society_id: formData.society_id,
+  //       building_id: formData.building_id,
+  //       issue_date: formData.issue_date,
+  //       status: formData.status,
+  //     };
+
+  //     onSubmit(devicePayload);
+  //   } catch (error) {
+  //     console.error("Error in device submission:", error);
+  //     toast.error(`Failed to ${isEdit ? "update" : "add"} device`);
+  //   } finally {
+  //     setIsSubmitting(false);
+  //   }
+  // };
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -236,20 +242,31 @@ const AddDeviceDialog = ({
     }
 
     setIsSubmitting(true);
+
     try {
-      // Prepare data for parent component
       const devicePayload = {
         device_serial_number: formData.device_serial_number,
-        society_id: formData.society_id,
-        building_id: formData.building_id,
+        society_id: Number(formData.society_id), // bigint safety
+        building_id: Number(formData.building_id), // bigint safety
         issue_date: formData.issue_date,
         status: formData.status,
       };
 
-      onSubmit(devicePayload);
+      await onSubmit(devicePayload);
+
+      toast.success(
+        isEdit
+          ? "Device updated successfully ✅"
+          : "Device added successfully ✅"
+      );
+
+      onClose();
     } catch (error) {
       console.error("Error in device submission:", error);
-      toast.error(`Failed to ${isEdit ? "update" : "add"} device`);
+
+      toast.error(
+        error?.message || `Failed to ${isEdit ? "update" : "add"} device`
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -266,17 +283,20 @@ const AddDeviceDialog = ({
     }
   };
 
-  const handleSocietyChange = (e) => {
+  const handleSocietyChange = async (e) => {
     const societyId = e.target.value;
+
     setFormData((prev) => ({
       ...prev,
       society_id: societyId,
-      building_id: "", // Reset building when society changes
+      building_id: "",
     }));
-    setTouched((prev) => ({ ...prev, society_id: true }));
 
-    if (errors.society_id) {
-      setErrors((prev) => ({ ...prev, society_id: "" }));
+    setBuildings([]);
+    setFilteredBuildings([]);
+
+    if (societyId) {
+      await fetchBuildings(Number(societyId)); // 👈 ensure bigint
     }
   };
 
@@ -389,25 +409,6 @@ const AddDeviceDialog = ({
       <DialogContent sx={{ p: 0 }}>
         <Box sx={{ p: 3 }}>
           <form onSubmit={handleSubmit}>
-            {/* Error Alert */}
-            {Object.values(errors).some(Boolean) && (
-              <Alert
-                severity="error"
-                sx={{
-                  borderRadius: 2,
-                  mb: 3,
-                  backgroundColor: alpha("#B31B1B", 0.1),
-                  color: "#B31B1B",
-                  border: `1px solid ${alpha("#B31B1B", 0.2)}`,
-                  "& .MuiAlert-icon": { color: "#B31B1B" },
-                }}
-              >
-                <Typography variant="body2" fontWeight="600">
-                  Please fix all errors before submitting
-                </Typography>
-              </Alert>
-            )}
-
             <Grid container spacing={3}>
               {/* Device Serial Number */}
               <Grid item xs={12} md={6}>
@@ -430,7 +431,7 @@ const AddDeviceDialog = ({
                     Device Serial Number
                   </Typography>
 
-                  <TextField
+                  {/* <TextField
                     fullWidth
                     value={formData.device_serial_number}
                     onChange={handleFieldChange("device_serial_number")}
@@ -449,17 +450,7 @@ const AddDeviceDialog = ({
                           <Tag sx={{ color: "#A29EB6", fontSize: 20 }} />
                         </InputAdornment>
                       ),
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          <IconButton
-                            size="small"
-                            onClick={handleGenerateSerial}
-                            sx={{ mr: -1 }}
-                          >
-                            <QrCode fontSize="small" />
-                          </IconButton>
-                        </InputAdornment>
-                      ),
+
                       sx: {
                         borderRadius: 1.5,
                         height: 44,
@@ -467,14 +458,23 @@ const AddDeviceDialog = ({
                     }}
                     placeholder="e.g., DEV12345"
                     size="small"
-                  />
-                  <Button
+                  /> */}
+                  <TextField
+                    fullWidth
+                    value={formData.device_serial_number}
+                    onChange={handleFieldChange("device_serial_number")}
+                    error={
+                      !!errors.device_serial_number &&
+                      touched.device_serial_number
+                    }
+                    helperText={
+                      (touched.device_serial_number &&
+                        errors.device_serial_number) ||
+                      "Enter unique device serial number"
+                    }
+                    placeholder="Enter device serial number"
                     size="small"
-                    onClick={handleGenerateSerial}
-                    sx={{ mt: 1, textTransform: "none" }}
-                  >
-                    Generate New Serial
-                  </Button>
+                  />
                 </Box>
               </Grid>
 
