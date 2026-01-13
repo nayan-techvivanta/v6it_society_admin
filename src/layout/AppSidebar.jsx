@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router";
 import { FaRegIdCard } from "react-icons/fa";
 import { BsThreeDots, BsBuildings } from "react-icons/bs";
 import { FiLogOut } from "react-icons/fi";
-import { MdDevices } from "react-icons/md";
+import { MdCampaign, MdDevices, MdOutlineHowToReg } from "react-icons/md";
 import { PiBuildingApartment } from "react-icons/pi";
 import { FaUserShield } from "react-icons/fa6";
 import { FiChevronDown } from "react-icons/fi";
@@ -92,6 +92,18 @@ const AppSidebar = () => {
       name: "Devices",
       path: `${basePath}/devices`,
       roles: ["superadmin"],
+    },
+    {
+      icon: <MdCampaign size={20} />,
+      name: "Broadcast",
+      path: `${basePath}/broadcast`,
+      roles: ["superadmin", "propertymanager"],
+    },
+    {
+      icon: <MdOutlineHowToReg size={20} />,
+      name: "Visitors Log",
+      path: `${basePath}/visiters`,
+      roles: ["admin"],
     },
   ];
   const filteredNavItems = useMemo(() => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -54,14 +54,9 @@ const AddCardDialog = ({
   const [isFormValid, setIsFormValid] = useState(false);
   const [buildings, setBuildings] = useState([]);
   const [loadingBuildings, setLoadingBuildings] = useState(false);
-
-  const generateSerialId = (society) => {
-    if (!society) return "";
-
-    const prefix = society.name.substring(0, 3).toUpperCase();
-    const randomNum = Math.floor(1000 + Math.random() * 9000);
-    return `${prefix}-${randomNum}`;
-  };
+  const serialRef = useRef(null);
+  const societyRef = useRef(null);
+  const buildingRef = useRef(null);
 
   useEffect(() => {
     const fetchSocieties = async () => {
@@ -99,17 +94,19 @@ const AddCardDialog = ({
         setFormData({
           society_id: "",
           building_id: "",
-          card_serial_number: `CARD-${Math.floor(1000 + Math.random() * 9000)}`,
+          card_serial_number: "",
         });
       }
 
       setErrors({});
       setTouched({});
+
+      // ✅ focus first empty field
+      setTimeout(focusEmptyField, 100); // small delay to ensure dialog rendered
     }
   }, [open, isEdit, cardData]);
 
-  // Find selected society
-  const selectedSociety = societies.find((s) => s.id === formData.societyId);
+  const selectedSociety = societies.find((s) => s.id === formData.society_id);
 
   const fetchBuildings = async (societyId) => {
     if (!societyId) return;
@@ -120,7 +117,7 @@ const AddCardDialog = ({
       const { data, error } = await supabase
         .from("buildings")
         .select("id, name")
-        .eq("society_id", societyId) // ✅ no Number()
+        .eq("society_id", societyId)
         .eq("is_active", true)
         .eq("is_delete", false)
         .order("name");
@@ -139,8 +136,8 @@ const AddCardDialog = ({
   const validateForm = () => {
     const newErrors = {};
 
-    if (!formData.societyId) {
-      newErrors.societyId = "Please select a society";
+    if (!formData.society_id) {
+      newErrors.society_id = "Please select a society";
     }
 
     if (!formData.card_serial_number.trim()) {
@@ -155,6 +152,64 @@ const AddCardDialog = ({
     validateForm();
   }, [formData]);
 
+  const focusEmptyField = () => {
+    if (!formData.card_serial_number?.trim() && serialRef.current) {
+      serialRef.current.focus();
+    } else if (!formData.society_id && societyRef.current) {
+      societyRef.current.focus();
+    } else if (!formData.building_id && buildingRef.current) {
+      buildingRef.current.focus();
+    }
+  };
+
+  // const handleSubmit = async (e) => {
+  //   e.preventDefault();
+
+  //   if (!isFormValid) {
+  //     toast.error("Please fix all errors before submitting");
+  //     return;
+  //   }
+
+  //   setIsSubmitting(true);
+
+  //   try {
+  //     let query;
+
+  //     const payload = {
+  //       society_id: formData.society_id,
+  //       card_serial_number: formData.card_serial_number,
+  //       building_id: formData.building_id,
+  //     };
+
+  //     if (isEdit && cardData?.id) {
+  //       // 🔹 UPDATE CARD
+  //       query = supabase
+  //         .from("cards")
+  //         .update(payload)
+  //         .eq("id", cardData.id)
+  //         .select()
+  //         .single();
+  //     } else {
+  //       // 🔹 INSERT CARD
+  //       query = supabase.from("cards").insert([payload]).select().single();
+  //     }
+
+  //     const { error } = await query;
+
+  //     if (error) throw error;
+
+  //     toast.success(
+  //       isEdit ? "Card updated successfully!" : "Card created successfully!"
+  //     );
+
+  //     onClose(); // parent will refresh list
+  //   } catch (error) {
+  //     console.error("Save card error:", error);
+  //     toast.error(error.message || "Failed to save card");
+  //   } finally {
+  //     setIsSubmitting(false);
+  //   }
+  // };
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -166,16 +221,15 @@ const AddCardDialog = ({
     setIsSubmitting(true);
 
     try {
-      let query;
-
       const payload = {
         society_id: formData.society_id,
         card_serial_number: formData.card_serial_number,
         building_id: formData.building_id,
+        is_assigned: true,
       };
 
+      let query;
       if (isEdit && cardData?.id) {
-        // 🔹 UPDATE CARD
         query = supabase
           .from("cards")
           .update(payload)
@@ -183,11 +237,10 @@ const AddCardDialog = ({
           .select()
           .single();
       } else {
-        // 🔹 INSERT CARD
         query = supabase.from("cards").insert([payload]).select().single();
       }
 
-      const { error } = await query;
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -195,7 +248,7 @@ const AddCardDialog = ({
         isEdit ? "Card updated successfully!" : "Card created successfully!"
       );
 
-      onClose(); // parent will refresh list
+      onClose();
     } catch (error) {
       console.error("Save card error:", error);
       toast.error(error.message || "Failed to save card");
@@ -331,6 +384,7 @@ const AddCardDialog = ({
 
               <TextField
                 fullWidth
+                inputRef={serialRef}
                 value={formData.card_serial_number}
                 onChange={handleFieldChange("card_serial_number")}
                 error={
@@ -375,9 +429,10 @@ const AddCardDialog = ({
                 Select Society
               </Typography>
 
-              <FormControl fullWidth error={!!errors.societyId} size="small">
+              <FormControl fullWidth error={!!errors.society_id} size="small">
                 <Select
-                  value={formData.societyId}
+                  inputRef={societyRef}
+                  value={formData.society_id}
                   onChange={handleFieldChange("society_id")}
                   displayEmpty
                   sx={{
@@ -427,38 +482,6 @@ const AddCardDialog = ({
 
                     const society = societies.find((s) => s.id === selected);
                     return society?.name;
-                    return (
-                      <Box display="flex" alignItems="center" gap={2}>
-                        <Box
-                          sx={{
-                            backgroundColor: "rgba(111, 11, 20, 0.1)",
-                            borderRadius: 1,
-                            p: 0.75,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            width: 36,
-                            height: 36,
-                          }}
-                        >
-                          <Typography
-                            fontWeight={600}
-                            color="#6F0B14"
-                            fontSize="0.875rem"
-                          >
-                            {society?.name?.substring(0, 2).toUpperCase()}
-                          </Typography>
-                        </Box>
-                        <Box>
-                          <Typography fontWeight={600} color="text.primary">
-                            {society?.name}
-                          </Typography>
-                          <Typography variant="caption" color="#A29EB6">
-                            ID: {society?.id}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    );
                   }}
                 >
                   <MenuItem value="" disabled>
@@ -586,31 +609,33 @@ const AddCardDialog = ({
                 Select Building
               </Typography>
 
-              <FormControl
-                fullWidth
-                size="small"
-                disabled={!formData.society_id || loadingBuildings}
-              >
+              <FormControl fullWidth size="small" margin="normal">
+                <InputLabel id="building-label">Select Building</InputLabel>
                 <Select
+                  inputRef={buildingRef}
+                  labelId="building-label"
                   value={formData.building_id}
                   onChange={handleFieldChange("building_id")}
-                  displayEmpty
-                  renderValue={(selected) => {
-                    if (loadingBuildings) return "Loading buildings...";
-                    if (!selected) return "Select building";
-                    const building = buildings.find((b) => b.id === selected);
-                    return building ? building.name : "Select building";
-                  }}
+                  disabled={!formData.society_id || loadingBuildings}
+                  error={!!errors.building_id}
                 >
-                  <MenuItem value="" disabled>
-                    Select building
-                  </MenuItem>
-                  {buildings.map((b) => (
-                    <MenuItem key={b.id} value={b.id}>
-                      {b.name}
+                  {loadingBuildings ? (
+                    <MenuItem value="">
+                      <em>Loading...</em>
                     </MenuItem>
-                  ))}
+                  ) : (
+                    buildings.map((b) => (
+                      <MenuItem key={b.id} value={b.id}>
+                        {b.name}
+                      </MenuItem>
+                    ))
+                  )}
                 </Select>
+                {errors.building_id && (
+                  <Typography variant="caption" color="error">
+                    {errors.building_id}
+                  </Typography>
+                )}
               </FormControl>
             </Box>
 

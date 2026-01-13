@@ -1269,7 +1269,7 @@ export default function AdminBuildings() {
               )}
             </div>
 
-            {adminSocietyId && (
+            {/* {adminSocietyId && (
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -1341,7 +1341,7 @@ export default function AdminBuildings() {
                   />
                 </button>
               </motion.div>
-            )}
+            )} */}
           </div>
         </div>
 

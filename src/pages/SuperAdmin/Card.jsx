@@ -13,9 +13,11 @@ import {
   Typography,
   useMediaQuery,
   useTheme,
+  Switch,
+  FormControlLabel,
 } from "@mui/material";
 import { supabase } from "../../api/supabaseClient";
-import { Edit, Delete, MoreVert, Add } from "@mui/icons-material";
+import { Edit, Delete, Add } from "@mui/icons-material";
 import { motion, AnimatePresence } from "framer-motion";
 import AddCardDialog from "../../components/dialogs/AddCardDialog";
 
@@ -67,7 +69,126 @@ const statusLabels = {
   unassigned: "Unassigned",
 };
 
-const CardRow = ({ card, isMobile, onEdit, onDelete }) => {
+// const StatusSwitch = ({ card, onStatusChange }) => {
+//   const [loading, setLoading] = useState(false);
+
+//   const handleSwitchChange = async (event) => {
+//     const newStatus = event.target.checked;
+//     setLoading(true);
+
+//     try {
+//       await onStatusChange(card.id, newStatus);
+//     } catch (error) {
+//       console.error("Status update failed:", error);
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   return (
+//     <FormControlLabel
+//       control={
+//         <Switch
+//           checked={card.status === "assigned"}
+//           onChange={handleSwitchChange}
+//           disabled={loading}
+//           color="primary"
+//           sx={{
+//             "& .MuiSwitch-switchBase.Mui-checked": {
+//               color: statusColors.assigned,
+//               "&:hover": {
+//                 backgroundColor: "rgba(147, 189, 87, 0.08)",
+//               },
+//             },
+//             "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": {
+//               backgroundColor: statusColors.assigned,
+//             },
+//           }}
+//         />
+//       }
+//       label={
+//         <Typography
+//           className="font-roboto text-xs font-semibold"
+//           sx={{
+//             color:
+//               card.status === "assigned"
+//                 ? statusColors.assigned
+//                 : statusColors.unassigned,
+//           }}
+//         >
+//           {statusLabels[card.status]}
+//         </Typography>
+//       }
+//       labelPlacement="end"
+//     />
+//   );
+// };
+const StatusSwitch = ({ card, onStatusChange, onAssign }) => {
+  const [loading, setLoading] = useState(false);
+
+  const handleSwitchChange = async (event) => {
+    const newStatus = event.target.checked;
+
+    if (!card.isAssigned && newStatus) {
+      // If card is unassigned and user switches ON → open edit dialog
+      onAssign(card.id);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await onStatusChange(card.id, newStatus);
+    } catch (error) {
+      console.error("Status update failed:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <FormControlLabel
+      control={
+        <Switch
+          checked={card.isAssigned}
+          onChange={handleSwitchChange}
+          disabled={loading}
+          color="primary"
+          sx={{
+            "& .MuiSwitch-switchBase.Mui-checked": {
+              color: statusColors.assigned,
+              "&:hover": { backgroundColor: "rgba(147, 189, 87, 0.08)" },
+            },
+            "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": {
+              backgroundColor: statusColors.assigned,
+            },
+          }}
+        />
+      }
+      label={
+        <Typography
+          className="font-roboto text-xs font-semibold"
+          sx={{
+            color: card.isAssigned
+              ? statusColors.assigned
+              : statusColors.unassigned,
+          }}
+        >
+          {card.status}
+        </Typography>
+      }
+      labelPlacement="end"
+    />
+  );
+};
+
+const CardRow = ({
+  card,
+  isMobile,
+  onEdit,
+  onDelete,
+  onStatusChange,
+  onAssign,
+}) => {
   const handleEdit = () => {
     onEdit(card.id);
   };
@@ -96,7 +217,12 @@ const CardRow = ({ card, isMobile, onEdit, onDelete }) => {
 
       <TableCell className="p-4">
         <Typography className="font-roboto text-sm font-semibold text-black">
-          {card.societyId || "-"}
+          {card.societyName}
+        </Typography>
+      </TableCell>
+      <TableCell className="p-4">
+        <Typography className="font-roboto text-sm font-semibold text-black">
+          {card.buildingName}
         </Typography>
       </TableCell>
 
@@ -107,11 +233,10 @@ const CardRow = ({ card, isMobile, onEdit, onDelete }) => {
       </TableCell>
 
       <TableCell className="p-4">
-        <Chip
-          label={statusLabels[card.status]}
-          className="font-roboto font-semibold text-white"
-          style={{ backgroundColor: statusColors[card.status] }}
-          size="medium"
+        <StatusSwitch
+          card={card}
+          onStatusChange={onStatusChange}
+          onAssign={onAssign}
         />
       </TableCell>
 
@@ -145,13 +270,17 @@ const CardRow = ({ card, isMobile, onEdit, onDelete }) => {
   );
 };
 
-const CardCard = ({ cardItem, onEdit, onDelete }) => {
+const CardCard = ({ cardItem, onEdit, onDelete, onStatusChange }) => {
   const handleEdit = () => {
     onEdit(cardItem.id);
   };
 
   const handleDelete = () => {
     onDelete(cardItem.id);
+  };
+
+  const handleStatusChange = (event) => {
+    onStatusChange(cardItem.id, event.target.checked);
   };
 
   return (
@@ -169,10 +298,10 @@ const CardCard = ({ cardItem, onEdit, onDelete }) => {
             </Avatar>
             <div>
               <Typography className="font-roboto font-semibold text-primary">
-                {cardItem.buildingName}
+                {cardItem.societyName}
               </Typography>
               <Typography className="font-roboto text-xs text-hintText">
-                #{cardItem.id.toString().padStart(3, "0")}
+                {cardItem.buildingName}
               </Typography>
             </div>
           </div>
@@ -192,12 +321,32 @@ const CardCard = ({ cardItem, onEdit, onDelete }) => {
             <Typography className="font-roboto text-xs text-hintText mb-1">
               Status
             </Typography>
-            <Chip
-              label={statusLabels[cardItem.status]}
-              className="font-roboto font-semibold text-white"
-              style={{ backgroundColor: statusColors[cardItem.status] }}
-              size="small"
-            />
+            <div className="flex items-center">
+              <Switch
+                checked={cardItem.status === "assigned"}
+                onChange={handleStatusChange}
+                size="small"
+                sx={{
+                  "& .MuiSwitch-switchBase.Mui-checked": {
+                    color: statusColors.assigned,
+                  },
+                  "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": {
+                    backgroundColor: statusColors.assigned,
+                  },
+                }}
+              />
+              <Typography
+                className="font-roboto text-xs font-semibold ml-2"
+                sx={{
+                  color:
+                    cardItem.status === "assigned"
+                      ? statusColors.assigned
+                      : statusColors.unassigned,
+                }}
+              >
+                {statusLabels[cardItem.status]}
+              </Typography>
+            </div>
           </div>
         </div>
 
@@ -233,6 +382,7 @@ export default function Card() {
   const [loading, setLoading] = useState(false);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+
   const fetchCards = async () => {
     setLoading(true);
 
@@ -242,8 +392,15 @@ export default function Card() {
         `
       id,
       card_serial_number,
+      created_at,
+      is_assigned,
       society_id,
-      created_at
+      building_id,
+      societies (
+        id,
+        name,
+        buildings (id, name)
+      )
     `
       )
       .order("created_at", { ascending: false });
@@ -254,17 +411,25 @@ export default function Card() {
       return;
     }
 
-    const mappedCards = data.map((card) => ({
-      id: card.id,
-      buildingName: `Society #${card.society_id}`,
-      status: "assigned",
-      avatar: card.card_serial_number
-        ? card.card_serial_number.slice(0, 2).toUpperCase()
-        : "CR",
-      serialNumber: card.card_serial_number,
-      societyId: card.society_id,
-      createdAt: card.created_at,
-    }));
+    const mappedCards = data.map((card) => {
+      const assignedBuilding = card.societies?.buildings?.find(
+        (b) => b.id === card.building_id
+      );
+
+      return {
+        id: card.id,
+        serialNumber: card.card_serial_number,
+        societyId: card.societies?.id || "-",
+        societyName: card.societies?.name || "-",
+        buildingName: assignedBuilding?.name || "-",
+        isAssigned: card.is_assigned || false,
+        status: card.is_assigned ? "assigned" : "unassigned",
+        avatar: card.card_serial_number
+          ? card.card_serial_number.slice(0, 2).toUpperCase()
+          : "CR",
+        createdAt: card.created_at,
+      };
+    });
 
     setCards(mappedCards);
     setLoading(false);
@@ -277,15 +442,63 @@ export default function Card() {
   const headers = [
     "Id",
     "Card Serial Number",
-    "Society ID",
+    "Society Name",
+    "Building Name",
     "Created At",
     "Status",
     "Actions",
   ];
 
+  const handleStatusChange = async (cardId, isAssigned) => {
+    try {
+      const { error } = await supabase
+        .from("cards")
+        .update({
+          is_assigned: isAssigned,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", cardId);
+
+      if (error) throw error;
+
+      // Local state update for instant UI feedback
+      setCards((prevCards) =>
+        prevCards.map((card) =>
+          card.id === cardId
+            ? {
+                ...card,
+                isAssigned,
+                status: isAssigned ? "assigned" : "unassigned",
+              }
+            : card
+        )
+      );
+    } catch (error) {
+      console.error("Error updating card status:", error);
+      alert("Failed to update card status");
+      // Re-fetch to sync with database
+      fetchCards();
+    }
+  };
+
   const handleAddNewCard = () => {
     setIsEditMode(false);
     setSelectedCard(null);
+    setOpenDialog(true);
+  };
+  const handleAssignCard = (cardId) => {
+    const cardToEdit = cards.find((card) => card.id === cardId);
+    if (!cardToEdit) return;
+
+    setIsEditMode(true);
+    setSelectedCard({
+      id: cardToEdit.id,
+      society_id: cardToEdit.societyId,
+      building_id: cardToEdit.buildingId || "",
+      card_serial_number: cardToEdit.serialNumber,
+      is_assigned: true,
+    });
+
     setOpenDialog(true);
   };
 
@@ -298,7 +511,9 @@ export default function Card() {
     setSelectedCard({
       id: cardToEdit.id,
       society_id: cardToEdit.societyId,
+      building_id: cardToEdit.buildingId,
       card_serial_number: cardToEdit.serialNumber,
+      is_assigned: cardToEdit.isAssigned,
     });
     setOpenDialog(true);
   };
@@ -314,10 +529,6 @@ export default function Card() {
       return;
     }
 
-    fetchCards();
-  };
-
-  const handleSubmitCard = () => {
     fetchCards();
   };
 
@@ -352,31 +563,30 @@ export default function Card() {
             <button
               onClick={handleAddNewCard}
               className="
-                                                  group
-                                                  bg-white
-                                                  font-roboto
-                                                  font-medium
-                                                  px-8
-                                                  py-3.5
-                                                  text-primary
-                                                  text-sm
-                                                  rounded-xl
-                                                  border-2
-                                                  border-primary
-                                                  hover:bg-primary
-                                                  hover:text-white
-                                                  transition-all
-                                                  duration-300
-                                                  relative
-                                                  overflow-hidden
-                                                  flex
-                                                  items-center
-                                                  gap-3
-                                                  shadow-sm
-                                                  hover:shadow-md
-                                                "
+                group
+                bg-white
+                font-roboto
+                font-medium
+                px-8
+                py-3.5
+                text-primary
+                text-sm
+                rounded-xl
+                border-2
+                border-primary
+                hover:bg-primary
+                hover:text-white
+                transition-all
+                duration-300
+                relative
+                overflow-hidden
+                flex
+                items-center
+                gap-3
+                shadow-sm
+                hover:shadow-md
+              "
             >
-              {/* Underline animation */}
               <motion.div
                 className="absolute bottom-0 left-0 h-0.5 bg-primary group-hover:bg-white"
                 initial={{ width: "0%" }}
@@ -399,51 +609,23 @@ export default function Card() {
               </svg>
               <span className="tracking-wide">New Card</span>
 
-              {/* Hover fill effect */}
               <div
                 className="
-                                                    absolute
-                                                    inset-0
-                                                    bg-primary
-                                                    transform
-                                                    -translate-x-full
-                                                    group-hover:translate-x-0
-                                                    transition-transform
-                                                    duration-300
-                                                    -z-10
-                                                  "
+                  absolute
+                  inset-0
+                  bg-primary
+                  transform
+                  -translate-x-full
+                  group-hover:translate-x-0
+                  transition-transform
+                  duration-300
+                  -z-10
+                "
               />
             </button>
           </motion.div>
-          {/* <motion.button
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.2 }}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={handleAddNewCard}
-            className="
-              bg-button
-              text-white
-              font-roboto
-              font-semibold
-              px-6
-              py-3
-              rounded-lg
-              hover:bg-darkTrackSelect
-              transition-colors
-              duration-200
-              flex
-              items-center
-              gap-3
-              shadow-sm
-              hover:shadow-md
-            "
-          >
-            <Add />
-            <span>New Card</span>
-          </motion.button> */}
         </div>
+
         {loading && (
           <div className="p-6 text-center">
             <Typography className="font-roboto text-hintText">
@@ -457,11 +639,11 @@ export default function Card() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3 }}
-          className="bg-white rounded-lg shadow overflow-hidden  border border-gray-200"
+          className="bg-white rounded-lg shadow overflow-hidden border border-gray-200"
         >
           {!isMobile ? (
             <TableContainer component={Paper} elevation={0}>
-              <Table aria-label="cards table ">
+              <Table aria-label="cards table">
                 <TableHead className="bg-lightBackground">
                   <TableRow>
                     {headers.map((header, index) => (
@@ -483,6 +665,8 @@ export default function Card() {
                         isMobile={isMobile}
                         onEdit={handleEditCard}
                         onDelete={handleDeleteCard}
+                        onStatusChange={handleStatusChange}
+                        onAssign={handleAssignCard}
                       />
                     ))}
                   </AnimatePresence>
@@ -490,7 +674,6 @@ export default function Card() {
               </Table>
             </TableContainer>
           ) : (
-            // Mobile Card View
             <div className="p-4">
               <AnimatePresence>
                 {cards.map((card) => (
@@ -499,6 +682,7 @@ export default function Card() {
                     cardItem={card}
                     onEdit={handleEditCard}
                     onDelete={handleDeleteCard}
+                    onStatusChange={handleStatusChange}
                   />
                 ))}
               </AnimatePresence>
@@ -506,7 +690,7 @@ export default function Card() {
           )}
         </motion.div>
 
-        {cards.length === 0 && (
+        {cards.length === 0 && !loading && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

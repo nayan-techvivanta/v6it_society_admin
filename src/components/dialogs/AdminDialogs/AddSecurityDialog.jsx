@@ -38,13 +38,13 @@ import { supabase } from "../../../api/supabaseClient";
 import { toast } from "react-toastify";
 import { uploadImage } from "../../../api/uploadImage";
 import { motion } from "framer-motion";
+import { createUser } from "../../../api/createUser";
 
 export default function AddSecurityDialog({
   open,
   onClose,
   guard,
   buildings = [],
-
   societyId,
   onSuccess,
 }) {
@@ -54,18 +54,25 @@ export default function AddSecurityDialog({
   const [showPassword, setShowPassword] = useState(false);
   const fileInputRef = useRef(null);
 
+  const [existingSecurity, setExistingSecurity] = useState(null);
+  const [securityLoading, setSecurityLoading] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
     phone: "",
-    building_id: "",
+    whatsapp_number: "",
+    building_id: null,
     profile_url: "",
+    role_type: "Security",
     is_active: true,
   });
 
   const [errors, setErrors] = useState({});
 
+  // Theme colors
   const theme = {
     primary: "#6F0B14",
     textAndTab: "#6F0B14",
@@ -75,26 +82,20 @@ export default function AddSecurityDialog({
     trackSelect: "rgba(111, 11, 20, 0.44)",
     darkTrackSelect: "rgba(111, 11, 20, 0.61)",
     success: "#008000",
+    pending: "#DBA400",
+    reschedule: "#E86100",
     reject: "#B31B1B",
+    black: "#000000",
     white: "#FFFFFF",
   };
 
+  // Fetch existing security when dialog opens (like AddOwnerDialog)
   useEffect(() => {
-    if (open) {
-      resetForm();
-      if (guard) {
-        setFormData({
-          name: guard.name || "",
-          email: guard.email || "",
-          //   password: "", // Don't show existing password
-          phone: guard.number || "",
-          building_id: guard.building_id || "",
-          profile_url: guard.profile_url || "",
-          is_active: guard.is_active,
-        });
-      }
+    if (open && societyId) {
+      checkExistingSecurity();
+      if (!guard) resetForm();
     }
-  }, [open, guard]);
+  }, [open, societyId]);
 
   const resetForm = () => {
     setFormData({
@@ -102,12 +103,48 @@ export default function AddSecurityDialog({
       email: "",
       password: "",
       phone: "",
-      building_id: "",
+      whatsapp_number: "",
+      building_id: null,
       profile_url: "",
+      role_type: "Security",
       is_active: true,
     });
     setErrors({});
     setShowPassword(false);
+    setIsEditMode(false);
+    setExistingSecurity(null);
+  };
+
+  // Check existing security (same pattern as checkExistingOwner)
+  const checkExistingSecurity = async () => {
+    setSecurityLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("users")
+        .select(
+          "id, name, email, number, whatsapp_number, profile_url, role_type, building_id, is_active"
+        )
+        .eq("society_id", societyId)
+        .eq("role_type", "Security")
+        .eq("is_delete", false)
+        .eq("is_active", true)
+        .limit(1);
+
+      if (error) {
+        console.error("Error checking security:", error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        setExistingSecurity(data[0]);
+      } else {
+        setExistingSecurity(null);
+      }
+    } catch (error) {
+      console.error("Error checking existing security:", error);
+    } finally {
+      setSecurityLoading(false);
+    }
   };
 
   const validateForm = () => {
@@ -123,9 +160,10 @@ export default function AddSecurityDialog({
       newErrors.email = "Enter a valid email address";
     }
 
-    if (!guard && !formData.password.trim()) {
+    // Same validation pattern as AddOwnerDialog
+    if (!isEditMode && !formData.password.trim()) {
       newErrors.password = "Password is required";
-    } else if (!guard && formData.password.length < 6) {
+    } else if (!isEditMode && formData.password.length < 6) {
       newErrors.password = "Password must be at least 6 characters";
     }
 
@@ -135,6 +173,13 @@ export default function AddSecurityDialog({
       newErrors.phone = "Enter a valid 10-digit phone number";
     }
 
+    if (
+      formData.whatsapp_number &&
+      !/^[0-9]{10}$/.test(formData.whatsapp_number.replace(/\D/g, ""))
+    ) {
+      newErrors.whatsapp_number = "Enter a valid 10-digit WhatsApp number";
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -142,14 +187,19 @@ export default function AddSecurityDialog({
   const handleChange = (field) => (e) => {
     const value = e.target.value;
 
-    if (field === "phone") {
+    if (field === "phone" || field === "whatsapp_number") {
       const digits = value.replace(/\D/g, "");
       const formatted = digits.slice(0, 10);
       setFormData({ ...formData, [field]: formatted });
-      if (errors[field]) setErrors({ ...errors, [field]: "" });
+
+      if (errors[field]) {
+        setErrors({ ...errors, [field]: "" });
+      }
     } else {
       setFormData({ ...formData, [field]: value });
-      if (errors[field]) setErrors({ ...errors, [field]: "" });
+      if (errors[field]) {
+        setErrors({ ...errors, [field]: "" });
+      }
     }
   };
 
@@ -226,9 +276,112 @@ export default function AddSecurityDialog({
     }));
   };
 
-  const handleSubmit = async () => {
-    if (!validateForm()) return;
+  // Update security user in users table (same pattern as updateMemberUser)
+  const updateSecurityUser = async ({ registedUserId }) => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
+    if (!user?.id) throw new Error("Admin not authenticated");
+
+    const payload = {
+      society_id: societyId,
+      building_id: formData.building_id,
+      profile_url: formData.profile_url || null,
+      role_type: "Security",
+      is_active: true,
+      is_delete: false,
+      created_by: user.id,
+      updated_by: user.id,
+      updated_at: new Date().toISOString(),
+    };
+
+    console.log("🧾 Security user update payload:", payload);
+
+    const { error } = await supabase
+      .from("users")
+      .update(payload)
+      .eq("registed_user_id", registedUserId);
+
+    if (error) throw error;
+  };
+
+  // Handle edit security (same pattern as handleEditOwner)
+  const handleEditSecurity = () => {
+    if (existingSecurity) {
+      setIsEditMode(true);
+      setFormData({
+        name: existingSecurity.name,
+        email: existingSecurity.email,
+        password: "",
+        phone: existingSecurity.number,
+        whatsapp_number: existingSecurity.whatsapp_number || "",
+        building_id: existingSecurity.building_id ?? null,
+        profile_url: existingSecurity.profile_url || "",
+        role_type: existingSecurity.role_type,
+        is_active: existingSecurity.is_active ?? true,
+      });
+    }
+  };
+
+  // Single handleSubmit (same pattern as AddOwnerDialog)
+  const handleSubmit = async () => {
+    if (!validateForm()) {
+      toast.error("Please fix the errors in the form");
+      return;
+    }
+
+    if (isEditMode) {
+      await handleUpdateSecurity(existingSecurity.id);
+    } else {
+      await handleAddSecurity();
+    }
+  };
+
+  // Add new security (same pattern as handleAddUser)
+  const handleAddSecurity = async () => {
+    try {
+      setLoading(true);
+
+      if (!societyId) {
+        throw new Error("Society ID missing");
+      }
+
+      const apiResult = await createUser({
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        password: formData.password,
+        contact: formData.phone,
+        whatsapp: formData.whatsapp_number || formData.phone,
+        role_type: "Security",
+      });
+
+      const registeredUserId =
+        apiResult.user_id || apiResult.user?.id || apiResult.id;
+
+      if (!registeredUserId) {
+        throw new Error("User ID not returned from API");
+      }
+
+      console.log("✅ Registered Security User ID:", registeredUserId);
+
+      // Update users table with society/building + image
+      await updateSecurityUser({ registedUserId: registeredUserId });
+
+      toast.success("Security guard added successfully");
+      resetForm();
+      onClose();
+      onSuccess?.();
+    } catch (error) {
+      console.error("❌ Add security error:", error);
+      toast.error(error.message || "Failed to add security guard");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Update existing security (same pattern as handleUpdateUser)
+  const handleUpdateSecurity = async (userId) => {
     try {
       setLoading(true);
 
@@ -236,49 +389,36 @@ export default function AddSecurityDialog({
         data: { user: adminUser },
       } = await supabase.auth.getUser();
 
-      if (!adminUser?.id) {
-        throw new Error("Admin not authenticated");
-      }
+      if (!adminUser?.id) throw new Error("Admin not authenticated");
 
       const payload = {
         name: formData.name.trim(),
         email: formData.email.trim(),
         number: formData.phone,
-        role_type: "Security",
-        building_id: formData.building_id || null,
-        society_id: societyId,
+        whatsapp_number: formData.whatsapp_number || formData.phone,
         profile_url: formData.profile_url || null,
+        building_id: formData.building_id,
+        society_id: societyId,
         is_active: formData.is_active,
-        is_delete: false,
         updated_by: adminUser.id,
         updated_at: new Date().toISOString(),
       };
 
-      if (guard) {
-        // ✅ UPDATE
-        const { error } = await supabase
-          .from("users")
-          .update(payload)
-          .eq("id", guard.id);
+      const { error } = await supabase
+        .from("users")
+        .update(payload)
+        .eq("id", userId);
 
-        if (error) throw error;
-        toast.success("Security guard updated");
-      } else {
-        // ✅ INSERT
-        payload.created_by = adminUser.id;
-        payload.created_at = new Date().toISOString();
+      if (error) throw error;
 
-        const { error } = await supabase.from("users").insert([payload]);
-
-        if (error) throw error;
-        toast.success("Security guard added");
-      }
-
-      onSuccess?.();
+      toast.success("Security guard updated successfully");
+      await checkExistingSecurity();
+      resetForm();
       onClose();
-    } catch (err) {
-      console.error(err);
-      toast.error(err.message || "Failed to save guard");
+      onSuccess?.();
+    } catch (error) {
+      console.error("Update security error:", error);
+      toast.error(error.message || "Failed to update security guard");
     } finally {
       setLoading(false);
     }
@@ -882,6 +1022,51 @@ export default function AddSecurityDialog({
                             ))}
                           </Select>
                         </FormControl>
+                      </Grid>
+                      {/* WhatsApp Number */}
+                      <Grid item xs={12}>
+                        <TextField
+                          label="WhatsApp Number"
+                          fullWidth
+                          value={formData.whatsapp_number}
+                          onChange={handleChange("whatsapp_number")}
+                          error={!!errors.whatsapp_number}
+                          helperText={errors.whatsapp_number || "Optional"}
+                          InputProps={{
+                            startAdornment: (
+                              <InputAdornment position="start">
+                                <Phone sx={{ color: theme.primary }} />
+                              </InputAdornment>
+                            ),
+                            inputProps: {
+                              maxLength: 10,
+                            },
+                          }}
+                          sx={{
+                            "& .MuiInputLabel-root": {
+                              fontFamily: "'Roboto', sans-serif",
+                              color: theme.hintText,
+                            },
+                            "& .MuiInputLabel-root.Mui-focused": {
+                              color: theme.primary,
+                            },
+                            "& .MuiOutlinedInput-root": {
+                              fontFamily: "'Roboto', sans-serif",
+                              "& fieldset": {
+                                borderColor: theme.trackSelect,
+                                borderWidth: 2,
+                              },
+                              "&:hover fieldset": {
+                                borderColor: theme.primary,
+                              },
+                              "&.Mui-focused fieldset": {
+                                borderColor: theme.primary,
+                                borderWidth: 2,
+                              },
+                              borderRadius: 2,
+                            },
+                          }}
+                        />
                       </Grid>
 
                       {/* Info Box */}

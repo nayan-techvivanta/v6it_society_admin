@@ -23,6 +23,13 @@ import AdminDashboard from "../pages/Admin/AdminDashboard";
 import AdminBuildings from "../pages/Admin/AdminBuildings";
 import Security from "../pages/Admin/Security";
 import Flats from "../pages/Admin/Flats";
+import AdminSecurityPage from "../pages/SuperAdmin/AdminSecurityPage";
+import PMBuildings from "../pages/PropertyManager/PMBuildings";
+import PMSociety from "../pages/PropertyManager/PMSociety";
+import PMBroadCast from "../pages/PropertyManager/PMBroadCast";
+import Visitors from "../pages/SuperAdmin/Visitors";
+import BroadCast from "../pages/SuperAdmin/BroadCast";
+import VisiterLog from "../pages/Admin/VisiterLog";
 // import AdminComplaints from "../pages/Admin/Complaints";
 
 export default function Router() {
@@ -56,9 +63,12 @@ export default function Router() {
             element={<SAPropertyManager />}
           />
           <Route path="/superadmin/buildings" element={<SABuildings />} />
+          <Route path="/superadmin/security" element={<AdminSecurityPage />} />
           <Route path="/superadmin/society" element={<Society />} />
           <Route path="/superadmin/cards" element={<SACards />} />
           <Route path="/superadmin/devices" element={<SADevices />} />
+          <Route path="/superadmin/visitors" element={<Visitors />} />
+          <Route path="/superadmin/broadcast" element={<BroadCast />} />
         </Route>
 
         {/* ================= PROPERTY MANAGER ================= */}
@@ -72,6 +82,9 @@ export default function Router() {
         >
           <Route path="/property/dashboard" element={<PMDashboard />} />
           <Route path="/property/admin" element={<AdminPage />} />
+          <Route path="/property/society" element={<PMSociety />} />
+          <Route path="/property/buildings" element={<PMBuildings />} />
+          <Route path="/property/broadcast" element={<PMBroadCast />} />
         </Route>
 
         {/* ================= ADMIN ================= */}
@@ -87,6 +100,7 @@ export default function Router() {
           <Route path="/admin/buildings" element={<AdminBuildings />} />
           <Route path="/admin/flats/:buildingId" element={<Flats />} />
           <Route path="/admin/security" element={<Security />} />
+          <Route path="/admin/visiters" element={<VisiterLog />} />
         </Route>
 
         {/* Unauthorized */}
