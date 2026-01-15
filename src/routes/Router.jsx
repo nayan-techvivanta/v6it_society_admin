@@ -30,6 +30,8 @@ import PMBroadCast from "../pages/PropertyManager/PMBroadCast";
 import Visitors from "../pages/SuperAdmin/Visitors";
 import BroadCast from "../pages/SuperAdmin/BroadCast";
 import VisiterLog from "../pages/Admin/VisiterLog";
+import AdminCards from "../pages/Admin/AdminCards";
+import AdminBroadcast from "../pages/Admin/AdminBroadcast";
 // import AdminComplaints from "../pages/Admin/Complaints";
 
 export default function Router() {
@@ -101,6 +103,8 @@ export default function Router() {
           <Route path="/admin/flats/:buildingId" element={<Flats />} />
           <Route path="/admin/security" element={<Security />} />
           <Route path="/admin/visiters" element={<VisiterLog />} />
+          <Route path="/admin/broadcast" element={<AdminBroadcast />} />
+          <Route path="/admin/cards" element={<AdminCards />} />
         </Route>
 
         {/* Unauthorized */}

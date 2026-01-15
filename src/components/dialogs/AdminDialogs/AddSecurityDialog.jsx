@@ -975,55 +975,6 @@ export default function AddSecurityDialog({
                           }}
                         />
                       </Grid>
-
-                      {/* Building Selection */}
-                      <Grid item xs={12}>
-                        <FormControl fullWidth>
-                          <InputLabel
-                            sx={{
-                              fontFamily: "'Roboto', sans-serif",
-                              color: theme.hintText,
-                            }}
-                          >
-                            Assign to Building (Optional)
-                          </InputLabel>
-                          <Select
-                            value={formData.building_id}
-                            onChange={handleChange("building_id")}
-                            label="Assign to Building (Optional)"
-                            sx={{
-                              fontFamily: "'Roboto', sans-serif",
-                              "& .MuiOutlinedInput-notchedOutline": {
-                                borderColor: theme.trackSelect,
-                                borderWidth: 2,
-                              },
-                              "&:hover .MuiOutlinedInput-notchedOutline": {
-                                borderColor: theme.primary,
-                              },
-                              "&.Mui-focused .MuiOutlinedInput-notchedOutline":
-                                {
-                                  borderColor: theme.primary,
-                                  borderWidth: 2,
-                                },
-                              borderRadius: 2,
-                            }}
-                          >
-                            <MenuItem value="">
-                              <em>Society-wide (All Buildings)</em>
-                            </MenuItem>
-                            {buildings.map((building) => (
-                              <MenuItem
-                                key={building.id}
-                                value={building.id}
-                                sx={{ fontFamily: "'Roboto', sans-serif" }}
-                              >
-                                {building.name}
-                              </MenuItem>
-                            ))}
-                          </Select>
-                        </FormControl>
-                      </Grid>
-                      {/* WhatsApp Number */}
                       <Grid item xs={12}>
                         <TextField
                           label="WhatsApp Number"
@@ -1068,6 +1019,120 @@ export default function AddSecurityDialog({
                           }}
                         />
                       </Grid>
+                      {/* Building Selection */}
+                      {/* <Grid item xs={12}>
+                        <FormControl fullWidth>
+                          <InputLabel
+                            sx={{
+                              fontFamily: "'Roboto', sans-serif",
+                              color: theme.hintText,
+                            }}
+                          >
+                            Assign to Building (Optional)
+                          </InputLabel>
+                          <Select
+                            value={formData.building_id}
+                            onChange={handleChange("building_id")}
+                            label="Assign to Building (Optional)"
+                            sx={{
+                              fontFamily: "'Roboto', sans-serif",
+                              "& .MuiOutlinedInput-notchedOutline": {
+                                borderColor: theme.trackSelect,
+                                borderWidth: 2,
+                              },
+                              "&:hover .MuiOutlinedInput-notchedOutline": {
+                                borderColor: theme.primary,
+                              },
+                              "&.Mui-focused .MuiOutlinedInput-notchedOutline":
+                                {
+                                  borderColor: theme.primary,
+                                  borderWidth: 2,
+                                },
+                              borderRadius: 2,
+                            }}
+                          >
+                            <MenuItem value="">
+                              <em>Society-wide (All Buildings)</em>
+                            </MenuItem>
+                            {buildings.map((building) => (
+                              <MenuItem
+                                key={building.id}
+                                value={building.id}
+                                sx={{ fontFamily: "'Roboto', sans-serif" }}
+                              >
+                                {building.name}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                      </Grid> */}
+                      {/* Building Selection */}
+                      <Grid item xs={12}>
+                        <FormControl
+                          fullWidth
+                          size="medium"
+                          sx={{
+                            "& .MuiInputLabel-root": {
+                              fontFamily: "'Roboto', sans-serif",
+                              color: theme.hintText,
+                              fontSize: "14px",
+                            },
+                            "& .MuiInputLabel-root.Mui-focused": {
+                              color: theme.primary,
+                            },
+                            "& .MuiOutlinedInput-root": {
+                              height: "56px",
+                              borderRadius: "12px",
+                              fontFamily: "'Roboto', sans-serif",
+                              "& fieldset": {
+                                borderColor: theme.trackSelect,
+                                borderWidth: 2,
+                              },
+                              "&:hover fieldset": {
+                                borderColor: theme.primary,
+                              },
+                              "&.Mui-focused fieldset": {
+                                borderColor: theme.primary,
+                                borderWidth: 2,
+                              },
+                            },
+                          }}
+                        >
+                          <InputLabel shrink>
+                            Assign to Building (Optional)
+                          </InputLabel>
+
+                          <Select
+                            value={formData.building_id || ""}
+                            onChange={handleChange("building_id")}
+                            displayEmpty
+                            renderValue={(selected) =>
+                              selected
+                                ? buildings.find((b) => b.id === selected)?.name
+                                : "Society-wide (All Buildings)"
+                            }
+                          >
+                            <MenuItem value="">
+                              <em>Society-wide (All Buildings)</em>
+                            </MenuItem>
+
+                            {buildings?.map((building) => (
+                              <MenuItem
+                                key={building.id}
+                                value={building.id}
+                                sx={{
+                                  fontFamily: "'Roboto', sans-serif",
+                                  fontSize: "14px",
+                                }}
+                              >
+                                {building.name}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                      </Grid>
+
+                      {/* WhatsApp Number */}
 
                       {/* Info Box */}
                       <Grid item xs={12}>

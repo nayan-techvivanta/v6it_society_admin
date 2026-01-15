@@ -488,8 +488,7 @@ export default function Security() {
             <div>
               <Typography
                 variant="h4"
-                className="font-bold mb-2"
-                style={{ color: theme.textPrimary }}
+                className="font-roboto font-bold text-primary mb-2"
               >
                 Security Management
               </Typography>

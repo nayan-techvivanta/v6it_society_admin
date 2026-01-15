@@ -85,7 +85,7 @@ const AppSidebar = () => {
       icon: <FaRegIdCard size={20} />,
       name: "Cards",
       path: `${basePath}/cards`,
-      roles: ["superadmin"],
+      roles: ["superadmin", "admin"],
     },
     {
       icon: <MdDevices size={20} />,
@@ -94,10 +94,10 @@ const AppSidebar = () => {
       roles: ["superadmin"],
     },
     {
-      icon: <MdCampaign size={20} />,
+      icon: <MdCampaign size={22} />,
       name: "Broadcast",
       path: `${basePath}/broadcast`,
-      roles: ["superadmin", "propertymanager"],
+      roles: ["superadmin", "admin", "propertymanager"],
     },
     {
       icon: <MdOutlineHowToReg size={20} />,
