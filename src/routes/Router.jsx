@@ -32,6 +32,7 @@ import BroadCast from "../pages/SuperAdmin/BroadCast";
 import VisiterLog from "../pages/Admin/VisiterLog";
 import AdminCards from "../pages/Admin/AdminCards";
 import AdminBroadcast from "../pages/Admin/AdminBroadcast";
+import Users from "../pages/SuperAdmin/Users";
 // import AdminComplaints from "../pages/Admin/Complaints";
 
 export default function Router() {
@@ -70,6 +71,7 @@ export default function Router() {
           <Route path="/superadmin/cards" element={<SACards />} />
           <Route path="/superadmin/devices" element={<SADevices />} />
           <Route path="/superadmin/visitors" element={<Visitors />} />
+          <Route path="/superadmin/users" element={<Users />} />
           <Route path="/superadmin/broadcast" element={<BroadCast />} />
         </Route>
 
@@ -102,7 +104,7 @@ export default function Router() {
           <Route path="/admin/buildings" element={<AdminBuildings />} />
           <Route path="/admin/flats/:buildingId" element={<Flats />} />
           <Route path="/admin/security" element={<Security />} />
-          <Route path="/admin/visiters" element={<VisiterLog />} />
+          <Route path="/admin/visitors" element={<VisiterLog />} />
           <Route path="/admin/broadcast" element={<AdminBroadcast />} />
           <Route path="/admin/cards" element={<AdminCards />} />
         </Route>

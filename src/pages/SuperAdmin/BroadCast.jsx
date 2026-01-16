@@ -1308,7 +1308,7 @@ const Broadcast = () => {
               </motion.div>
 
               {/* Quick Stats */}
-              <StyledCard>
+              {/* <StyledCard>
                 <CardContent className="p-6">
                   <Typography
                     variant="subtitle2"
@@ -1386,7 +1386,7 @@ const Broadcast = () => {
                     </div>
                   </div>
                 </CardContent>
-              </StyledCard>
+              </StyledCard> */}
             </motion.div>
           </div>
         </form>

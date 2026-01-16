@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
-import { FaRegIdCard } from "react-icons/fa";
+import { FaRegIdCard, FaUsers } from "react-icons/fa";
 import { BsThreeDots, BsBuildings } from "react-icons/bs";
 import { FiLogOut } from "react-icons/fi";
 import { MdCampaign, MdDevices, MdOutlineHowToReg } from "react-icons/md";
@@ -76,6 +76,13 @@ const AppSidebar = () => {
       roles: ["superadmin", "admin"],
     },
     {
+      icon: <FaUsers size={20} />,
+      name: "Users/Tanent",
+      path: `${basePath}/users`,
+      roles: ["superadmin", "admin"],
+    },
+
+    {
       icon: <FaUserShield size={20} />,
       name: "Security",
       path: `${basePath}/security`,
@@ -102,8 +109,8 @@ const AppSidebar = () => {
     {
       icon: <MdOutlineHowToReg size={20} />,
       name: "Visitors Log",
-      path: `${basePath}/visiters`,
-      roles: ["admin"],
+      path: `${basePath}/visitors`,
+      roles: ["superadmin", "propertymanager", "admin"],
     },
   ];
   const filteredNavItems = useMemo(() => {

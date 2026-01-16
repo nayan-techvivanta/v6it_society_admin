@@ -52,10 +52,13 @@ import {
   Email,
   Business,
   CalendarToday,
+  Apartment,
+  Link as LinkIcon,
 } from "@mui/icons-material";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "../../api/supabaseClient";
 import AddManagerDialog from "../../components/dialogs/AddManagerDialog";
+import AssignSocietiesDialog from "../../components/dialogs/AssignSocietiesDialog";
 import { toast } from "react-toastify";
 
 // Custom styled switch for property managers
@@ -111,6 +114,7 @@ const PropertyManagerRow = ({
   onEdit,
   onDelete,
   onStatusToggle,
+  onAssignSocieties,
   isExpanded,
   onToggleRow,
 }) => {
@@ -149,7 +153,7 @@ const PropertyManagerRow = ({
 
         <TableCell className="p-4">
           <Typography className="font-roboto font-semibold text-sm text-gray-800">
-            #{manager.id.toString().padStart(3, "0")}
+            #{manager.id}
           </Typography>
         </TableCell>
 
@@ -192,8 +196,8 @@ const PropertyManagerRow = ({
 
         <TableCell className="p-4">
           <Chip
-            label={`${manager.assignedBuildings} building${
-              manager.assignedBuildings !== 1 ? "s" : ""
+            label={`${manager.assignedSocieties?.length || 0} building${
+              (manager.assignedSocieties?.length || 0) !== 1 ? "s" : ""
             }`}
             className="font-roboto font-medium"
             sx={{
@@ -239,7 +243,7 @@ const PropertyManagerRow = ({
           </Box>
         </TableCell>
 
-        <TableCell className="p-4">
+        {/* <TableCell className="p-4">
           <div className="flex items-center gap-1">
             <FormControlLabel
               control={
@@ -266,6 +270,57 @@ const PropertyManagerRow = ({
               disabled={isRowDisabled}
               className="text-reject hover:bg-[rgba(179,27,27,0.09)]"
               sx={{ opacity: isRowDisabled ? 0.5 : 1 }}
+            >
+              <Delete fontSize="small" />
+            </IconButton>
+          </div>
+        </TableCell> */}
+        <TableCell className="p-4">
+          <div className="flex items-center gap-1">
+            {/* Status Toggle */}
+            <FormControlLabel
+              control={
+                <PrimarySwitch
+                  checked={currentStatus === "active"}
+                  onChange={() => onStatusToggle(manager.id, currentStatus)}
+                  size="small"
+                />
+              }
+              sx={{ m: 0 }}
+            />
+
+            {/* Assign Societies */}
+            <IconButton
+              size="small"
+              onClick={() => onAssignSocieties(manager)}
+              disabled={isRowDisabled}
+              className="text-primary hover:bg-lightBackground"
+              sx={{ opacity: isRowDisabled ? 0.5 : 1 }}
+              title="Assign Societies"
+            >
+              <LinkIcon fontSize="small" />
+            </IconButton>
+
+            {/* Edit */}
+            <IconButton
+              size="small"
+              onClick={() => onEdit(manager.id)}
+              disabled={isRowDisabled}
+              className="text-primary hover:bg-lightBackground"
+              sx={{ opacity: isRowDisabled ? 0.5 : 1 }}
+              title="Edit Manager"
+            >
+              <Edit fontSize="small" />
+            </IconButton>
+
+            {/* Delete */}
+            <IconButton
+              size="small"
+              onClick={() => onDelete(manager.id)}
+              disabled={isRowDisabled}
+              className="text-reject hover:bg-[rgba(179,27,27,0.09)]"
+              sx={{ opacity: isRowDisabled ? 0.5 : 1 }}
+              title="Delete Manager"
             >
               <Delete fontSize="small" />
             </IconButton>
@@ -428,10 +483,10 @@ const PropertyManagerRow = ({
                           <div className="flex items-center justify-between p-3 bg-lightBackground rounded-lg">
                             <div>
                               <Typography className="font-roboto text-xs text-hintText">
-                                Assigned Buildings
+                                Assigned Societies
                               </Typography>
                               <Typography className="font-roboto font-semibold text-2xl text-primary">
-                                {manager.assignedBuildings}
+                                {manager.assignedSocieties?.length || 0}
                               </Typography>
                             </div>
                             <Business className="text-primary" />
@@ -440,6 +495,99 @@ const PropertyManagerRow = ({
                       </CardContent>
                     </Card>
                   </div>
+
+                  {/* Assigned Societies Section */}
+                  <Card className="rounded-xl border border-gray-200 shadow-sm mb-6">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between mb-4">
+                        <Typography
+                          className="font-roboto font-semibold text-primary"
+                          variant="subtitle1"
+                        >
+                          Assigned Societies
+                        </Typography>
+                        <Button
+                          size="small"
+                          startIcon={<LinkIcon />}
+                          onClick={() => onAssignSocieties(manager)}
+                          disabled={isRowDisabled}
+                          className="font-roboto font-medium text-primary hover:bg-lightBackground"
+                          sx={{ textTransform: "none" }}
+                        >
+                          {manager.assignedSocieties?.length > 0
+                            ? "Edit"
+                            : "Assign"}{" "}
+                          Societies
+                        </Button>
+                      </div>
+
+                      {manager.assignedSocieties?.length > 0 ? (
+                        <div className="space-y-2">
+                          {manager.assignedSocieties.map((society) => {
+                            const location = `${society.city || ""}${
+                              society.city && society.state ? ", " : ""
+                            }${society.state || ""}`;
+
+                            return (
+                              <motion.div
+                                key={society.id}
+                                initial={{ opacity: 0, x: -10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                              >
+                                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                                  <div className="flex items-center gap-3">
+                                    <Apartment
+                                      className="text-primary"
+                                      fontSize="small"
+                                    />
+                                    <div>
+                                      <Typography className="font-roboto font-medium">
+                                        {society.name}
+                                      </Typography>
+                                      <Typography className="font-roboto text-xs text-gray-600">
+                                        {location ||
+                                          society.address ||
+                                          "No location specified"}
+                                      </Typography>
+                                    </div>
+                                  </div>
+                                  <Chip
+                                    label={
+                                      society.is_active ? "Active" : "Inactive"
+                                    }
+                                    size="small"
+                                    className="font-roboto"
+                                    sx={{
+                                      backgroundColor: society.is_active
+                                        ? "rgba(147, 189, 87, 0.1)"
+                                        : "rgba(249, 110, 91, 0.1)",
+                                      color: society.is_active
+                                        ? "#93BD57"
+                                        : "#F96E5B",
+                                    }}
+                                  />
+                                </div>
+                              </motion.div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="text-center py-6">
+                          <Apartment
+                            className="text-gray-400 mb-2"
+                            sx={{ fontSize: 48 }}
+                          />
+                          <Typography className="font-roboto text-gray-500 mb-2">
+                            No societies assigned
+                          </Typography>
+                          <Typography className="font-roboto text-sm text-gray-400">
+                            Click "Assign Societies" to assign societies to this
+                            manager
+                          </Typography>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
 
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
@@ -477,7 +625,13 @@ const PropertyManagerRow = ({
 };
 
 // Mobile Card View
-const PropertyManagerCard = ({ manager, onEdit, onDelete, onStatusToggle }) => {
+const PropertyManagerCard = ({
+  manager,
+  onEdit,
+  onDelete,
+  onStatusToggle,
+  onAssignSocieties,
+}) => {
   const [expanded, setExpanded] = useState(false);
   const currentStatus = manager.status || "inactive";
   const isRowDisabled = currentStatus === "inactive";
@@ -541,10 +695,10 @@ const PropertyManagerCard = ({ manager, onEdit, onDelete, onStatusToggle }) => {
           </div>
           <div className="p-3 bg-gray-50 rounded-lg">
             <Typography className="font-roboto text-xs text-hintText mb-1">
-              Buildings
+              Societies
             </Typography>
             <Chip
-              label={manager.assignedBuildings}
+              label={`${manager.assignedSocieties?.length || 0}`}
               className="font-roboto font-medium"
               sx={{
                 backgroundColor: "rgba(111, 11, 20, 0.09)",
@@ -641,19 +795,6 @@ const PropertyManagerCard = ({ manager, onEdit, onDelete, onStatusToggle }) => {
 
           <div className="space-y-3">
             <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-gray-200">
-              <LocationOn className="text-primary mt-0.5" fontSize="small" />
-              <div>
-                <Typography className="font-roboto text-xs text-hintText mb-1">
-                  Location
-                </Typography>
-                <Typography className="font-roboto text-sm">
-                  {manager.address.city}, {manager.address.state},{" "}
-                  {manager.address.country}
-                </Typography>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-gray-200">
               <Phone className="text-primary mt-0.5" fontSize="small" />
               <div>
                 <Typography className="font-roboto text-xs text-hintText mb-1">
@@ -677,6 +818,77 @@ const PropertyManagerCard = ({ manager, onEdit, onDelete, onStatusToggle }) => {
               </div>
             </div>
           </div>
+
+          {/* Assigned Societies Section for Mobile */}
+          <div className="pt-4 mt-4 border-t border-gray-300">
+            <div className="flex items-center justify-between mb-3">
+              <Typography className="font-roboto font-semibold text-primary">
+                Assigned Societies
+              </Typography>
+              <Button
+                size="small"
+                startIcon={<LinkIcon fontSize="small" />}
+                onClick={() => onAssignSocieties(manager)}
+                disabled={isRowDisabled}
+                className="font-roboto font-medium text-primary"
+                sx={{ textTransform: "none" }}
+              >
+                {manager.assignedSocieties?.length > 0 ? "Edit" : "Assign"}
+              </Button>
+            </div>
+
+            {manager.assignedSocieties?.length > 0 ? (
+              <div className="space-y-2">
+                {manager.assignedSocieties.slice(0, 3).map((society) => {
+                  const location = `${society.city || ""}${
+                    society.city && society.state ? ", " : ""
+                  }${society.state || ""}`;
+
+                  return (
+                    <div
+                      key={society.id}
+                      className="p-3 bg-white rounded-lg border border-gray-200"
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <Apartment className="text-primary" fontSize="small" />
+                        <Typography className="font-roboto font-medium">
+                          {society.name}
+                        </Typography>
+                      </div>
+                      <Typography className="font-roboto text-xs text-gray-600">
+                        {location || society.address || "No location specified"}
+                      </Typography>
+                      <Chip
+                        label={society.is_active ? "Active" : "Inactive"}
+                        size="small"
+                        sx={{
+                          backgroundColor: society.is_active
+                            ? "rgba(147, 189, 87, 0.1)"
+                            : "rgba(249, 110, 91, 0.1)",
+                          color: society.is_active ? "#93BD57" : "#F96E5B",
+                          height: 20,
+                          fontSize: "0.7rem",
+                          mt: 1,
+                        }}
+                      />
+                    </div>
+                  );
+                })}
+                {manager.assignedSocieties.length > 3 && (
+                  <Typography className="font-roboto text-xs text-gray-500 text-center">
+                    + {manager.assignedSocieties.length - 3} more societies
+                  </Typography>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-4 bg-white rounded-lg border border-gray-200">
+                <Apartment className="text-gray-300 mb-2" />
+                <Typography className="font-roboto text-sm text-gray-500">
+                  No societies assigned
+                </Typography>
+              </div>
+            )}
+          </div>
         </motion.div>
       </Collapse>
     </motion.div>
@@ -689,6 +901,9 @@ export default function PropertyManager() {
 
   const theme = useTheme();
   const [openDialog, setOpenDialog] = useState(false);
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [selectedManagerForAssign, setSelectedManagerForAssign] =
+    useState(null);
   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const [selectedManager, setSelectedManager] = useState(null);
   const [openRows, setOpenRows] = useState({});
@@ -704,55 +919,87 @@ export default function PropertyManager() {
   const fetchManagers = async () => {
     setLoading(true);
 
-    const { data, error } = await supabase
-      .from("users")
-      .select(
+    try {
+      // Fetch managers
+      const { data, error } = await supabase
+        .from("users")
+        .select(
+          `
+          id,
+          name,
+          email,
+          number,
+          whatsapp_number,
+          role_type,
+          is_active,
+          created_at
         `
-      id,
-      name,
-      email,
-      number,
-      whatsapp_number,
-      role_type,
-      is_active,
-      created_at
-    `
-      )
-      .eq("role_type", "Manager")
-      .eq("is_delete", false);
+        )
+        .eq("role_type", "Manager")
+        .eq("is_delete", false);
 
-    if (error) {
+      if (error) throw error;
+
+      // Fetch assigned societies for each manager
+      const managersWithSocieties = await Promise.all(
+        data.map(async (m) => {
+          // Fetch assigned societies from pm_society table
+          const { data: societyData } = await supabase
+            .from("pm_society")
+            .select(
+              `
+              society_id,
+              societies (
+                id,
+                name,
+                address,
+                city,
+                state,
+                country,
+                pincode,
+                is_active
+              )
+            `
+            )
+            .eq("pm_id", m.id);
+
+          const assignedSocieties =
+            societyData
+              ?.map((item) => item.societies)
+              .filter((s) => s && !s.is_delete) || [];
+
+          return {
+            id: m.id,
+            name: m.name || "-",
+            email: m.email || "-",
+            assignedSocieties,
+            role_type: m.role_type,
+            status: m.is_active ? "active" : "inactive",
+            registerDate: m.created_at
+              ? new Date(m.created_at).toLocaleDateString("en-GB")
+              : "-",
+            avatar: m.name
+              ? m.name
+                  .split(" ")
+                  .map((n) => n[0])
+                  .join("")
+              : "U",
+            address: {
+              contact: m.number || "-",
+              whatsapp: m.whatsapp_number || "-",
+            },
+          };
+        })
+      );
+
+      setManagers(managersWithSocieties);
+      setFilteredManagers(managersWithSocieties);
+    } catch (error) {
       console.error(error);
       toast.error(error.message);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const mappedManagers = data.map((m) => ({
-      id: m.id,
-      name: m.name || "-",
-      email: m.email || "-",
-      assignedBuildings: 0,
-      role_type: m.role_type,
-      status: m.is_active ? "active" : "inactive",
-      registerDate: m.created_at
-        ? new Date(m.created_at).toISOString().split("T")[0]
-        : "-",
-      avatar: m.name
-        ? m.name
-            .split(" ")
-            .map((n) => n[0])
-            .join("")
-        : "U",
-      address: {
-        contact: m.number || "-",
-        whatsapp: m.whatsapp_number || "-",
-      },
-    }));
-
-    setManagers(mappedManagers);
-    setFilteredManagers(mappedManagers);
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -796,13 +1043,21 @@ export default function PropertyManager() {
     );
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      // Update in database
+      const { error } = await supabase
+        .from("users")
+        .update({ is_active: newStatus === "active" })
+        .eq("id", managerId);
+
+      if (error) throw error;
+
       toast.success(
         `Manager ${
           newStatus === "active" ? "activated" : "deactivated"
         } successfully!`
       );
     } catch (error) {
+      // Revert optimistic update on error
       setManagers((prev) =>
         prev.map((manager) =>
           manager.id === managerId
@@ -848,43 +1103,7 @@ export default function PropertyManager() {
     setSelectedManager(manager);
     setOpenDialog(true);
   };
-  // const handleDeleteManager = async (id) => {
-  //   const manager = managers.find((m) => m.id === id);
 
-  //   // Safety check (frontend)
-  //   if (!manager || manager.role_type !== "Manager") {
-  //     toast.error("Invalid manager selected");
-  //     return;
-  //   }
-
-  //   const confirmDelete = window.confirm(
-  //     "Are you sure you want to delete this manager?"
-  //   );
-
-  //   if (!confirmDelete) return;
-
-  //   try {
-  //     const { error } = await supabase
-  //       .from("users")
-  //       .update({ is_delete: true })
-  //       .eq("id", id)
-  //       .eq("role_type", "Manager");
-
-  //     if (error) {
-  //       throw error;
-  //     }
-
-  //     setManagers((prev) => prev.filter((manager) => manager.id !== id));
-  //     setFilteredManagers((prev) =>
-  //       prev.filter((manager) => manager.id !== id)
-  //     );
-
-  //     toast.success("Manager deleted successfully!");
-  //   } catch (error) {
-  //     console.error(error);
-  //     toast.error("Failed to delete manager");
-  //   }
-  // };
   const handleDeleteManager = (id) => {
     const manager = managers.find((m) => m.id === id);
 
@@ -922,6 +1141,16 @@ export default function PropertyManager() {
       setDeleteDialogOpen(false);
       setManagerToDelete(null);
     }
+  };
+
+  const handleAssignSocieties = (manager) => {
+    setSelectedManagerForAssign(manager);
+    setAssignDialogOpen(true);
+  };
+
+  const handleAssignmentSuccess = async () => {
+    await fetchManagers(); // Refresh the list
+    toast.success("Societies assigned successfully!");
   };
 
   const handleAddNewManager = () => {
@@ -1206,6 +1435,7 @@ export default function PropertyManager() {
                           onEdit={handleEditManager}
                           onDelete={handleDeleteManager}
                           onStatusToggle={handleStatusToggle}
+                          onAssignSocieties={handleAssignSocieties}
                           onToggleRow={handleToggleRow}
                           isExpanded={!!openRows[manager.id]}
                         />
@@ -1224,6 +1454,7 @@ export default function PropertyManager() {
                         onEdit={handleEditManager}
                         onDelete={handleDeleteManager}
                         onStatusToggle={handleStatusToggle}
+                        onAssignSocieties={handleAssignSocieties}
                       />
                     ))}
                   </AnimatePresence>
@@ -1314,6 +1545,19 @@ export default function PropertyManager() {
           manager={selectedManager}
           isEdit={!!selectedManager}
         />
+
+        {/* Assign Societies Dialog */}
+        <AssignSocietiesDialog
+          open={assignDialogOpen}
+          onClose={() => {
+            setAssignDialogOpen(false);
+            setSelectedManagerForAssign(null);
+          }}
+          manager={selectedManagerForAssign}
+          onAssignSuccess={handleAssignmentSuccess}
+        />
+
+        {/* Delete Confirmation Dialog */}
         <Dialog
           open={deleteDialogOpen}
           onClose={() => setDeleteDialogOpen(false)}

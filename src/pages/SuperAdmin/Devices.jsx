@@ -64,7 +64,12 @@ const DeviceRow = ({ device, isMobile, onEdit, onDelete }) => {
     >
       {/* Device ID */}
       <TableCell className="p-4">
-        <Typography className="font-roboto font-semibold text-black">
+        <Typography className="font-roboto font-semibold text-black text-center">
+          {device.id}
+        </Typography>
+      </TableCell>
+      <TableCell className="p-4">
+        <Typography className="font-roboto font-semibold text-black ">
           {device.device_serial_number}
         </Typography>
       </TableCell>
@@ -368,6 +373,7 @@ export default function Devices() {
   // Updated table headers for new requirements
   const headers = [
     "Device ID",
+    "Device Serial Number",
     "Device Name",
     "Society Name",
     "Building Name",

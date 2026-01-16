@@ -382,20 +382,6 @@ const BuildingRow = ({
                                 </Typography>
                               </div>
                             </div>
-                            <div className="flex items-start gap-2">
-                              <Business
-                                className="text-primary mt-0.5"
-                                fontSize="small"
-                              />
-                              <div>
-                                <Typography className="font-roboto text-xs text-hintText">
-                                  Property Manager
-                                </Typography>
-                                <Typography className="font-roboto text-sm">
-                                  {building.manager}
-                                </Typography>
-                              </div>
-                            </div>
                           </div>
                         </div>
                       </CardContent>
@@ -428,29 +414,6 @@ const BuildingRow = ({
                             <Typography className="font-roboto font-semibold text-xl">
                               {building.flat_limit || 0}
                             </Typography>
-                          </div>
-                          <div className="relative pt-1">
-                            <div className="flex items-center justify-between mb-1">
-                              <Typography className="font-roboto text-xs text-hintText">
-                                Occupancy Progress
-                              </Typography>
-                              <Typography className="font-roboto text-xs font-medium">
-                                {building.occupancy}%
-                              </Typography>
-                            </div>
-                            <div className="overflow-hidden h-2 text-xs flex rounded bg-gray-200">
-                              <div
-                                style={{ width: `${building.occupancy}%` }}
-                                // className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center rounded-full"
-                                className={`rounded-full ${
-                                  building.occupancy > 70
-                                    ? "bg-[#93BD57]"
-                                    : building.occupancy > 40
-                                    ? "bg-[#DBA400]"
-                                    : "bg-[#F96E5B]"
-                                }`}
-                              />
-                            </div>
                           </div>
                         </div>
                       </CardContent>

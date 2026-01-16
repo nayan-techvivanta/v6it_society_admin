@@ -53,8 +53,6 @@ import { supabase } from "../../api/supabaseClient";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "react-toastify";
 import AddSocietyDialog from "../../components/dialogs/AddSocietyDialog";
-import AssignManagerDialog from "../../components/dialogs/AssignManagerDialog";
-import { FaUserEdit, FaUserPlus } from "react-icons/fa";
 
 const PrimarySwitch = styled(Switch)(({ theme }) => ({
   "& .MuiSwitch-switchBase.Mui-checked": {
@@ -85,7 +83,6 @@ const SocietyRow = ({
   onStatusToggle,
   isExpanded,
   onToggleRow,
-  onAssign,
 }) => {
   const currentStatus = society.is_active ? "active" : "inactive";
   const isRowDisabled = !society.is_active;
@@ -242,25 +239,6 @@ const SocietyRow = ({
               <Person fontSize="small" />
             </IconButton> */}
             {/* Assign / Change Manager */}
-            <IconButton
-              size="small"
-              onClick={() => onAssign(society)}
-              disabled={!society.is_active}
-              sx={{
-                color: society.user_id ? "#9CA3AF" : "#2563EB",
-                "&:hover": {
-                  backgroundColor: society.user_id
-                    ? "rgba(156,163,175,0.15)"
-                    : "rgba(37,99,235,0.08)",
-                },
-              }}
-            >
-              {society.user_id ? (
-                <FaUserEdit size={20} fontSize="small" />
-              ) : (
-                <FaUserPlus size={20} fontSize="small" />
-              )}
-            </IconButton>
 
             <FormControlLabel
               control={
@@ -527,13 +505,7 @@ const SocietyRow = ({
 };
 
 // Society Card Component for Mobile
-const SocietyCard = ({
-  society,
-  onEdit,
-  onDelete,
-  onStatusToggle,
-  onAssign,
-}) => {
+const SocietyCard = ({ society, onEdit, onDelete, onStatusToggle }) => {
   const [expanded, setExpanded] = useState(false);
   const currentStatus = society.is_active ? "active" : "inactive";
   const isRowDisabled = !society.is_active;
@@ -658,15 +630,6 @@ const SocietyCard = ({
           <div className="flex gap-1">
             <IconButton
               size="small"
-              onClick={() => onAssign(society)}
-              disabled={!society.is_active}
-              sx={{ color: "#2563EB" }}
-            >
-              <Person fontSize="small" />
-            </IconButton>
-
-            <IconButton
-              size="small"
               onClick={() => onEdit(society)}
               disabled={isRowDisabled}
               className="text-primary hover:bg-lightBackground"
@@ -771,8 +734,6 @@ export default function Society() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterAnchorEl, setFilterAnchorEl] = useState(null);
   const [statusFilter, setStatusFilter] = useState("all");
-  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
-  const [assignSociety, setAssignSociety] = useState(null);
 
   const fetchSocieties = useCallback(async () => {
     setLoading(true);
@@ -891,10 +852,6 @@ export default function Society() {
     },
     [openRows]
   );
-  const handleAssignSociety = (society) => {
-    setAssignSociety(society);
-    setAssignDialogOpen(true);
-  };
 
   const handleEditSociety = (society) => {
     setSelectedSociety(society);
@@ -1218,7 +1175,6 @@ export default function Society() {
                           onStatusToggle={handleStatusToggle}
                           onToggleRow={handleToggleRow}
                           isExpanded={!!openRows[society.id]}
-                          onAssign={handleAssignSociety}
                         />
                       ))}
                     </TableBody>
@@ -1325,15 +1281,6 @@ export default function Society() {
           onSubmit={handleSubmitSociety}
           society={selectedSociety}
           isEdit={!!selectedSociety}
-        />
-        <AssignManagerDialog
-          open={assignDialogOpen}
-          onClose={() => {
-            setAssignDialogOpen(false);
-            setAssignSociety(null);
-          }}
-          society={assignSociety}
-          onSuccess={fetchSocieties}
         />
       </motion.div>
     </div>
