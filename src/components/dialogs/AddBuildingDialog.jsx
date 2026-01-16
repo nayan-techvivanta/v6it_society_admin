@@ -42,28 +42,24 @@ const BUILDING_TYPES = [
     label: "Residential",
     icon: <Home fontSize="small" />,
     color: "#1976d2",
-    description: "Only residential apartments",
   },
   {
     value: "commercial",
     label: "Commercial",
     icon: <BusinessCenter fontSize="small" />,
     color: "#ed6c02",
-    description: "Office spaces and commercial units",
   },
   {
     value: "mixed",
     label: "Mixed Use",
     icon: <FamilyRestroom fontSize="small" />,
     color: "#2e7d32",
-    description: "Both residential and commercial units",
   },
   {
     value: "other",
     label: "Other",
     icon: <Business fontSize="small" />,
     color: "#9c27b0",
-    description: "Other types of buildings",
   },
 ];
 
@@ -594,20 +590,6 @@ const AddBuildingDialog = ({
                         <Box display="flex" alignItems="center" gap={1}>
                           <Box sx={{ color: type?.color }}>{type?.icon}</Box>
                           <Typography>{type?.label}</Typography>
-                          <Chip
-                            label={type?.description}
-                            size="small"
-                            sx={{
-                              ml: "auto",
-                              fontSize: "0.7rem",
-                              height: 20,
-                              backgroundColor: alpha(
-                                type?.color || "#000",
-                                0.1
-                              ),
-                              color: type?.color,
-                            }}
-                          />
                         </Box>
                       );
                     }}

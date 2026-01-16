@@ -54,7 +54,27 @@ import relativeTime from "dayjs/plugin/relativeTime";
 import "dayjs/locale/en";
 
 dayjs.extend(relativeTime);
-
+const theme = {
+  primary: "#6F0B14",
+  textAndTab: "#6F0B14",
+  hintText: "#A29EB6",
+  button: "#6F0B14",
+  checkbox: "#6F0B14",
+  lightBackground: "rgba(111, 11, 20, 0.09)",
+  trackSelect: "rgba(111, 11, 20, 0.44)",
+  darkTrackSelect: "rgba(111, 11, 20, 0.61)",
+  success: "#008000",
+  pending: "#DBA400",
+  reschedule: "#E86100",
+  reject: "#B31B1B",
+  black: "#000000",
+  white: "#FFFFFF",
+  border: "#e2e8f0",
+  background: "#f8fafc",
+  cardBg: "#ffffff",
+  textPrimary: "#1e293b",
+  textSecondary: "#64748b",
+};
 export default function AdminCards() {
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -270,7 +290,7 @@ export default function AdminCards() {
       </div>
 
       {/* Quick Stats */}
-      <div className="mb-6 p-4 bg-lightBackground rounded-lg">
+      {/* <div className="mb-6 p-4 bg-lightBackground rounded-lg">
         <div className="flex flex-wrap gap-4 items-center">
           <div className="flex items-center gap-2">
             <Badge badgeContent={stats.total} color="primary" className="mr-2">
@@ -322,6 +342,85 @@ export default function AdminCards() {
             </div>
           </div>
         </div>
+      </div> */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        {/* Total Cards */}
+        <Card className="rounded-lg border shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <Typography
+                  variant="body2"
+                  style={{ color: theme.textSecondary }}
+                >
+                  Total Cards
+                </Typography>
+                <Typography
+                  variant="h5"
+                  className="font-bold"
+                  style={{ color: theme.textPrimary }}
+                >
+                  {stats.total}
+                </Typography>
+              </div>
+              <Avatar className="bg-blue-50" style={{ color: theme.primary }}>
+                <CreditCard />
+              </Avatar>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Assigned Cards */}
+        <Card className="rounded-lg border shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <Typography
+                  variant="body2"
+                  style={{ color: theme.textSecondary }}
+                >
+                  Assigned Cards
+                </Typography>
+                <Typography
+                  variant="h5"
+                  className="font-bold"
+                  style={{ color: theme.success }}
+                >
+                  {stats.assigned}
+                </Typography>
+              </div>
+              <Avatar className="bg-green-50" style={{ color: theme.success }}>
+                <CheckCircle />
+              </Avatar>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Unassigned Cards */}
+        <Card className="rounded-lg border shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <Typography
+                  variant="body2"
+                  style={{ color: theme.textSecondary }}
+                >
+                  Unassigned Cards
+                </Typography>
+                <Typography
+                  variant="h5"
+                  className="font-bold"
+                  style={{ color: theme.reject }}
+                >
+                  {stats.unassigned}
+                </Typography>
+              </div>
+              <Avatar className="bg-red-100" style={{ color: theme.reject }}>
+                <Cancel />
+              </Avatar>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Filters Section */}

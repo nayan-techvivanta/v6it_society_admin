@@ -83,7 +83,7 @@ const GradientButton = styled(Button)(({ theme }) => ({
   color: "#FFFFFF",
   fontFamily: "'Roboto', sans-serif",
   fontWeight: 600,
-  padding: "12px 28px",
+  //   padding: "12px 28px",
   borderRadius: "10px",
   textTransform: "none",
   fontSize: "15px",

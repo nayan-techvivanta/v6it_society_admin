@@ -58,7 +58,27 @@ import relativeTime from "dayjs/plugin/relativeTime";
 import "dayjs/locale/en";
 
 dayjs.extend(relativeTime);
-
+const theme = {
+  primary: "#6F0B14",
+  textAndTab: "#6F0B14",
+  hintText: "#A29EB6",
+  button: "#6F0B14",
+  checkbox: "#6F0B14",
+  lightBackground: "rgba(111, 11, 20, 0.09)",
+  trackSelect: "rgba(111, 11, 20, 0.44)",
+  darkTrackSelect: "rgba(111, 11, 20, 0.61)",
+  success: "#008000",
+  pending: "#DBA400",
+  reschedule: "#E86100",
+  reject: "#B31B1B",
+  black: "#000000",
+  white: "#FFFFFF",
+  border: "#e2e8f0",
+  background: "#f8fafc",
+  cardBg: "#ffffff",
+  textPrimary: "#1e293b",
+  textSecondary: "#64748b",
+};
 export default function VisitorLog() {
   const [visitors, setVisitors] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -283,7 +303,7 @@ export default function VisitorLog() {
       </div>
 
       {/* Stats Cards */}
-      <Grid container spacing={3} className="mb-6">
+      {/* <Grid container spacing={3} className="mb-6">
         <Grid item xs={12} sm={6} md={3}>
           <Card className="shadow-sm border border-gray-100">
             <CardContent>
@@ -355,6 +375,125 @@ export default function VisitorLog() {
                 </div>
                 <Avatar className="bg-primary bg-opacity-10">
                   <Check className="text-primary" />
+                </Avatar>
+              </div>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid> */}
+      <Grid container spacing={3} className="mb-6">
+        {/* Total Visitors */}
+        <Grid item xs={12} sm={6} md={3}>
+          <Card className="rounded-lg border shadow-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Typography
+                    variant="body2"
+                    style={{ color: theme.textSecondary }}
+                  >
+                    Total Visitors
+                  </Typography>
+                  <Typography
+                    variant="h5"
+                    className="font-bold"
+                    style={{ color: theme.textPrimary }}
+                  >
+                    {stats.total}
+                  </Typography>
+                </div>
+                <Avatar className="bg-blue-50" style={{ color: theme.primary }}>
+                  <Person />
+                </Avatar>
+              </div>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Pending */}
+        <Grid item xs={12} sm={6} md={3}>
+          <Card className="rounded-lg border shadow-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Typography
+                    variant="body2"
+                    style={{ color: theme.textSecondary }}
+                  >
+                    Pending
+                  </Typography>
+                  <Typography
+                    variant="h5"
+                    className="font-bold"
+                    style={{ color: theme.pending }}
+                  >
+                    {stats.pending}
+                  </Typography>
+                </div>
+                <Avatar
+                  className="bg-yellow-50"
+                  style={{ color: theme.pending }}
+                >
+                  <WatchLater />
+                </Avatar>
+              </div>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Approved */}
+        <Grid item xs={12} sm={6} md={3}>
+          <Card className="rounded-lg border shadow-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Typography
+                    variant="body2"
+                    style={{ color: theme.textSecondary }}
+                  >
+                    Approved
+                  </Typography>
+                  <Typography
+                    variant="h5"
+                    className="font-bold"
+                    style={{ color: theme.success }}
+                  >
+                    {stats.approved}
+                  </Typography>
+                </div>
+                <Avatar
+                  className="bg-green-50"
+                  style={{ color: theme.success }}
+                >
+                  <CheckCircle />
+                </Avatar>
+              </div>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Checked Out */}
+        <Grid item xs={12} sm={6} md={3}>
+          <Card className="rounded-lg border shadow-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Typography
+                    variant="body2"
+                    style={{ color: theme.textSecondary }}
+                  >
+                    Checked Out
+                  </Typography>
+                  <Typography
+                    variant="h5"
+                    className="font-bold"
+                    style={{ color: theme.primary }}
+                  >
+                    {stats.checkedOut}
+                  </Typography>
+                </div>
+                <Avatar className="bg-blue-50" style={{ color: theme.primary }}>
+                  <Check />
                 </Avatar>
               </div>
             </CardContent>

@@ -20,6 +20,9 @@ import {
   MenuItem,
   Switch,
   FormControlLabel,
+  Checkbox,
+  ListItemText,
+  Autocomplete,
 } from "@mui/material";
 
 import {
@@ -32,6 +35,8 @@ import {
   Announcement as AnnouncementIcon,
   Business as BuildingIcon,
   Apartment as ApartmentIcon,
+  Groups as GroupsIcon,
+  Close as CloseIcon,
 } from "@mui/icons-material";
 
 import { styled } from "@mui/material/styles";
@@ -140,6 +145,28 @@ const itemVariants = {
   },
 };
 
+// Type definitions
+const SocietyType = {
+  id: "",
+  name: "",
+  address: "",
+  buildings: [],
+};
+
+const BuildingType = {
+  id: "",
+  name: "",
+  address: "",
+  society_id: "",
+};
+
+const SelectedSocietyType = {
+  id: "",
+  name: "",
+  sendTo: "society", // "society" or "building"
+  selectedBuildings: [],
+};
+
 const Broadcast = () => {
   const [formData, setFormData] = useState({
     title: "",
@@ -148,10 +175,11 @@ const Broadcast = () => {
     scheduleForLater: false,
     scheduledDate: "",
     scheduledTime: "",
-    broadcastType: "society",
-    buildingId: null,
   });
 
+  const [selectedSocieties, setSelectedSocieties] = useState([]);
+  const [allSocieties, setAllSocieties] = useState([]);
+  const [allBuildings, setAllBuildings] = useState({});
   const [files, setFiles] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -160,80 +188,58 @@ const Broadcast = () => {
     message: "",
     severity: "success",
   });
-  const [societyId, setSocietyId] = useState(null);
-  const [buildings, setBuildings] = useState([]);
+  const [loadingSocieties, setLoadingSocieties] = useState(true);
   const [loadingBuildings, setLoadingBuildings] = useState(false);
-  const [viewMode, setViewMode] = useState("list");
-  const [broadcasts, setBroadcasts] = useState([]);
-  const [loadingBroadcasts, setLoadingBroadcasts] = useState(true);
   const fileInputRef = useRef(null);
-  // Get society ID from localStorage on component mount
-  useEffect(() => {
-    const storedSocietyId = localStorage.getItem("societyId");
-    if (storedSocietyId) {
-      setSocietyId(parseInt(storedSocietyId));
-      // Fetch buildings for this society
-      fetchBuildings(parseInt(storedSocietyId));
-    } else {
-      setSnackbar({
-        open: true,
-        message: "Society ID not found. Please login again.",
-        severity: "error",
-      });
-    }
-  }, []);
-  useEffect(() => {
-    if (viewMode === "list") {
-      fetchBroadcasts();
-    }
-  }, [viewMode]);
 
-  const fetchBroadcasts = async () => {
-    setLoadingBroadcasts(true);
+  // Fetch societies on component mount
+  useEffect(() => {
+    fetchSocieties();
+  }, []);
+
+  // Fetch societies from Supabase
+  const fetchSocieties = async () => {
+    setLoadingSocieties(true);
     try {
       const { data, error } = await supabase
-        .from("broadcast")
-        .select(
-          `
-          id,
-          title,
-          message,
-          socity_id,
-          building_id,
-          document,
-          created_at
-        `
-        )
-        .order("created_at", { ascending: false });
+        .from("societies")
+        .select("id, name, address")
+        .order("name");
 
       if (error) throw error;
-      setBroadcasts(data || []);
+      setAllSocieties(data || []);
     } catch (error) {
-      console.error("Error fetching broadcasts:", error);
+      console.error("Error fetching societies:", error);
       setSnackbar({
         open: true,
-        message: "Failed to load broadcasts.",
+        message: "Failed to load societies. Please try again.",
         severity: "error",
       });
     } finally {
-      setLoadingBroadcasts(false);
+      setLoadingSocieties(false);
     }
   };
-  // Fetch buildings for the society
-  const fetchBuildings = async (societyId) => {
+
+  // In the fetchBuildingsForSociety function, update the query:
+  const fetchBuildingsForSociety = async (societyId) => {
     if (!societyId) return;
 
     setLoadingBuildings(true);
     try {
       const { data, error } = await supabase
         .from("buildings")
-        .select("id, name")
+        .select("id, name, description, building_type, flat_limit, society_id")
         .eq("society_id", societyId)
+        .eq("is_active", true) // Only fetch active buildings
+        .eq("is_delete", false) // Exclude deleted buildings
         .order("name");
 
       if (error) throw error;
 
-      setBuildings(data || []);
+      setAllBuildings((prev) => ({
+        ...prev,
+        [societyId]: data || [],
+      }));
     } catch (error) {
       console.error("Error fetching buildings:", error);
       setSnackbar({
@@ -246,12 +252,69 @@ const Broadcast = () => {
     }
   };
 
+  // Fetch buildings for newly selected societies
+  useEffect(() => {
+    selectedSocieties.forEach((society) => {
+      if (!allBuildings[society.id]) {
+        fetchBuildingsForSociety(society.id);
+      }
+    });
+  }, [selectedSocieties]);
+
   const handleInputChange = (e) => {
     const { name, value, checked, type } = e.target;
     setFormData((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
+  };
+
+  const handleSocietySelection = (event, newValue) => {
+    // Filter out duplicates and map to selected society format
+    const newSocieties = newValue
+      .filter(
+        (society, index, self) =>
+          index === self.findIndex((s) => s.id === society.id)
+      )
+      .map((society) => ({
+        id: society.id,
+        name: society.name,
+        sendTo: "society", // Default to entire society
+        selectedBuildings: [],
+      }));
+
+    setSelectedSocieties(newSocieties);
+  };
+
+  const handleSocietySendToChange = (societyId, sendTo) => {
+    setSelectedSocieties((prev) =>
+      prev.map((society) =>
+        society.id === societyId
+          ? {
+              ...society,
+              sendTo,
+              selectedBuildings:
+                sendTo === "society" ? [] : society.selectedBuildings,
+            }
+          : society
+      )
+    );
+  };
+
+  const handleBuildingSelection = (societyId, buildingIds) => {
+    setSelectedSocieties((prev) =>
+      prev.map((society) =>
+        society.id === societyId
+          ? { ...society, selectedBuildings: buildingIds }
+          : society
+      )
+    );
+  };
+
+  const removeSociety = (societyId) => {
+    setSelectedSocieties((prev) =>
+      prev.filter((society) => society.id !== societyId)
+    );
   };
 
   const handleFileChange = (e) => {
@@ -342,7 +405,7 @@ const Broadcast = () => {
   const uploadFileToSupabase = async (file) => {
     try {
       const result = await uploadImage(file);
-      return result.url; // Assuming the uploadImage function returns { url: string }
+      return result.url;
     } catch (error) {
       console.error("Error uploading file:", error);
       throw new Error(`Failed to upload ${file.name}: ${error.message}`);
@@ -350,7 +413,7 @@ const Broadcast = () => {
   };
 
   // Save broadcast to database
-  const saveBroadcastToDatabase = async (broadcastData, fileUrls) => {
+  const saveBroadcastToDatabase = async (broadcastData) => {
     const { data, error } = await supabase
       .from("broadcast")
       .insert([broadcastData])
@@ -362,6 +425,15 @@ const Broadcast = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (selectedSocieties.length === 0) {
+      setSnackbar({
+        open: true,
+        message: "Please select at least one society",
+        severity: "error",
+      });
+      return;
+    }
 
     if (!formData.title.trim()) {
       setSnackbar({
@@ -381,19 +453,18 @@ const Broadcast = () => {
       return;
     }
 
-    if (formData.broadcastType === "building" && !formData.buildingId) {
-      setSnackbar({
-        open: true,
-        message: "Please select a building",
-        severity: "error",
-      });
-      return;
-    }
+    // Validate building selections
+    const invalidSelections = selectedSocieties.filter(
+      (society) =>
+        society.sendTo === "building" && society.selectedBuildings.length === 0
+    );
 
-    if (!societyId) {
+    if (invalidSelections.length > 0) {
       setSnackbar({
         open: true,
-        message: "Society ID not found. Please login again.",
+        message: `Please select buildings for ${invalidSelections
+          .map((s) => s.name)
+          .join(", ")}`,
         severity: "error",
       });
       return;
@@ -411,27 +482,50 @@ const Broadcast = () => {
         fileUrls = await Promise.all(uploadPromises);
       }
 
-      // Prepare broadcast data
-      const broadcastData = {
-        title: formData.title.trim(),
-        message: formData.description.trim(),
-        socity_id: societyId,
-        building_id:
-          formData.broadcastType === "building" ? formData.buildingId : null,
-        document: fileUrls.length > 0 ? fileUrls.join(",") : null,
-        created_at: new Date().toISOString(),
-      };
+      // Prepare broadcast data for each society/building combination
+      const broadcastPromises = [];
 
-      // Save to database
-      await saveBroadcastToDatabase(broadcastData, fileUrls);
+      selectedSocieties.forEach((society) => {
+        if (society.sendTo === "society") {
+          // Send to entire society
+          const broadcastData = {
+            title: formData.title.trim(),
+            message: formData.description.trim(),
+            socity_id: society.id,
+            building_id: null,
+            document: fileUrls.length > 0 ? fileUrls.join(",") : null,
+            created_at: new Date().toISOString(),
+          };
+          broadcastPromises.push(saveBroadcastToDatabase(broadcastData));
+        } else if (society.sendTo === "building") {
+          // Send to specific buildings in this society
+          society.selectedBuildings.forEach((buildingId) => {
+            const broadcastData = {
+              title: formData.title.trim(),
+              message: formData.description.trim(),
+              socity_id: society.id,
+              building_id: buildingId,
+              document: fileUrls.length > 0 ? fileUrls.join(",") : null,
+              created_at: new Date().toISOString(),
+            };
+            broadcastPromises.push(saveBroadcastToDatabase(broadcastData));
+          });
+        }
+      });
 
-      // Success
+      // Save all broadcasts
+      await Promise.all(broadcastPromises);
+
+      // Success message
+      const totalBroadcasts = selectedSocieties.reduce((total, society) => {
+        if (society.sendTo === "society") return total + 1;
+        return total + society.selectedBuildings.length;
+      }, 0);
+
       setSnackbar({
         open: true,
-        message: `Broadcast sent successfully to ${
-          formData.broadcastType === "society"
-            ? "entire society"
-            : "selected building"
+        message: `Broadcast sent successfully to ${totalBroadcasts} destination${
+          totalBroadcasts !== 1 ? "s" : ""
         }!`,
         severity: "success",
       });
@@ -440,13 +534,12 @@ const Broadcast = () => {
       setFormData({
         title: "",
         description: "",
-        // category: "general",
+        category: "general",
         scheduleForLater: false,
         scheduledDate: "",
         scheduledTime: "",
-        broadcastType: "society",
-        buildingId: null,
       });
+      setSelectedSocieties([]);
       setFiles([]);
     } catch (error) {
       console.error("Error sending broadcast:", error);
@@ -464,6 +557,14 @@ const Broadcast = () => {
     setSnackbar((prev) => ({ ...prev, open: false }));
   };
 
+  // Calculate total destinations
+  const getTotalDestinations = () => {
+    return selectedSocieties.reduce((total, society) => {
+      if (society.sendTo === "society") return total + 1;
+      return total + society.selectedBuildings.length;
+    }, 0);
+  };
+
   return (
     <motion.div
       initial="hidden"
@@ -476,7 +577,7 @@ const Broadcast = () => {
         <motion.div variants={itemVariants} className="mb-8">
           <Typography
             variant="h4"
-            className=" text-primary"
+            className="text-primary"
             sx={{ fontFamily: "'Roboto', sans-serif", fontWeight: 700 }}
           >
             <AnnouncementIcon className="mr-3" />
@@ -487,9 +588,8 @@ const Broadcast = () => {
             className="mt-2 text-hintText"
             sx={{ fontFamily: "'Roboto', sans-serif" }}
           >
-            Send important announcements, notifications, and updates to society
-            members
-            {societyId && ` (Society ID: ${societyId})`}
+            Send important announcements, notifications, and updates to multiple
+            societies and buildings
           </Typography>
         </motion.div>
 
@@ -502,6 +602,319 @@ const Broadcast = () => {
             >
               <StyledCard>
                 <CardContent className="p-6 space-y-6">
+                  {/* Society Selection - Multiple */}
+                  <motion.div variants={itemVariants}>
+                    <FormControl fullWidth>
+                      <Autocomplete
+                        multiple
+                        options={allSocieties}
+                        getOptionLabel={(option) => option.name}
+                        value={selectedSocieties
+                          .map((s) => allSocieties.find((as) => as.id === s.id))
+                          .filter(Boolean)}
+                        onChange={handleSocietySelection}
+                        renderInput={(params) => (
+                          <TextField
+                            {...params}
+                            label="Select Societies *"
+                            placeholder="Select one or more societies..."
+                            sx={{
+                              "& .MuiOutlinedInput-root": {
+                                borderRadius: "8px",
+                                "& .MuiOutlinedInput-notchedOutline": {
+                                  borderColor: "rgba(111, 11, 20, 0.2)",
+                                },
+                                "&:hover .MuiOutlinedInput-notchedOutline": {
+                                  borderColor: "#6F0B14",
+                                },
+                                "&.Mui-focused .MuiOutlinedInput-notchedOutline":
+                                  {
+                                    borderColor: "#6F0B14",
+                                    borderWidth: "2px",
+                                  },
+                              },
+                              "& .MuiInputLabel-root": {
+                                fontFamily: "'Roboto', sans-serif",
+                                color: "#6F0B14",
+                              },
+                            }}
+                          />
+                        )}
+                        renderOption={(props, option) => (
+                          <li {...props}>
+                            <div>
+                              <Typography
+                                sx={{
+                                  fontFamily: "'Roboto', sans-serif",
+                                  fontWeight: 500,
+                                }}
+                              >
+                                {option.name}
+                              </Typography>
+                              {option.address && (
+                                <Typography
+                                  variant="caption"
+                                  sx={{
+                                    fontFamily: "'Roboto', sans-serif",
+                                    color: "text.secondary",
+                                  }}
+                                >
+                                  {option.address}
+                                </Typography>
+                              )}
+                            </div>
+                          </li>
+                        )}
+                        renderTags={(value, getTagProps) =>
+                          value.map((option, index) => (
+                            <Chip
+                              {...getTagProps({ index })}
+                              key={option.id}
+                              label={option.name}
+                              size="small"
+                              deleteIcon={<CloseIcon />}
+                              sx={{
+                                backgroundColor: "rgba(111, 11, 20, 0.1)",
+                                color: "#6F0B14",
+                                fontFamily: "'Roboto', sans-serif",
+                                fontWeight: 500,
+                                margin: "2px",
+                              }}
+                            />
+                          ))
+                        }
+                        loading={loadingSocieties}
+                        disabled={loadingSocieties}
+                      />
+                    </FormControl>
+                  </motion.div>
+
+                  {/* Selected Societies Configuration */}
+                  <AnimatePresence>
+                    {selectedSocieties.length > 0 && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        variants={itemVariants}
+                        className="space-y-4"
+                      >
+                        <Typography
+                          variant="subtitle1"
+                          className="font-semibold text-primary"
+                          sx={{ fontFamily: "'Roboto', sans-serif" }}
+                        >
+                          Configure Broadcast Destinations
+                        </Typography>
+
+                        {selectedSocieties.map((society) => (
+                          <div
+                            key={society.id}
+                            className="p-4 border border-gray-200 rounded-lg"
+                          >
+                            <div className="flex justify-between items-start mb-3">
+                              <div>
+                                <Typography
+                                  sx={{
+                                    fontFamily: "'Roboto', sans-serif",
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  {society.name}
+                                </Typography>
+                              </div>
+                              <IconButton
+                                size="small"
+                                onClick={() => removeSociety(society.id)}
+                                className="text-reject hover:bg-red-50"
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </div>
+
+                            <div className="space-y-3">
+                              {/* Send To Selection */}
+                              <FormControl fullWidth size="small">
+                                <InputLabel
+                                  sx={{ fontFamily: "'Roboto', sans-serif" }}
+                                >
+                                  Send To
+                                </InputLabel>
+                                <Select
+                                  value={society.sendTo}
+                                  onChange={(e) =>
+                                    handleSocietySendToChange(
+                                      society.id,
+                                      e.target.value
+                                    )
+                                  }
+                                  label="Send To"
+                                  sx={{ fontFamily: "'Roboto', sans-serif" }}
+                                >
+                                  <MenuItem
+                                    value="society"
+                                    sx={{ fontFamily: "'Roboto', sans-serif" }}
+                                  >
+                                    Entire Society
+                                  </MenuItem>
+                                  <MenuItem
+                                    value="building"
+                                    sx={{ fontFamily: "'Roboto', sans-serif" }}
+                                    disabled={
+                                      !allBuildings[society.id] ||
+                                      allBuildings[society.id]?.length === 0
+                                    }
+                                  >
+                                    Specific Buildings
+                                  </MenuItem>
+                                </Select>
+                              </FormControl>
+
+                              {/* Building Selection (if sendTo is building) */}
+                              {society.sendTo === "building" &&
+                                allBuildings[society.id] && (
+                                  <FormControl fullWidth size="small">
+                                    <InputLabel
+                                      sx={{
+                                        fontFamily: "'Roboto', sans-serif",
+                                      }}
+                                    >
+                                      Select Buildings *
+                                    </InputLabel>
+                                    <Select
+                                      multiple
+                                      value={society.selectedBuildings}
+                                      onChange={(e) =>
+                                        handleBuildingSelection(
+                                          society.id,
+                                          e.target.value
+                                        )
+                                      }
+                                      label="Select Buildings *"
+                                      // renderValue={(selected) => (
+                                      //   <div className="flex flex-wrap gap-1">
+                                      //     {selected.map((buildingId) => {
+                                      //       const building = allBuildings[
+                                      //         society.id
+                                      //       ]?.find((b) => b.id === buildingId);
+                                      //       return building ? (
+                                      //         <Chip
+                                      //           key={buildingId}
+                                      //           label={building.name}
+                                      //           size="small"
+                                      //           sx={{
+                                      //             backgroundColor:
+                                      //               "rgba(111, 11, 20, 0.1)",
+                                      //             color: "#6F0B14",
+                                      //             fontFamily:
+                                      //               "'Roboto', sans-serif",
+                                      //           }}
+                                      //         />
+                                      //       ) : null;
+                                      //     })}
+                                      //   </div>
+                                      // )}
+                                      // In the renderValue for building selection, update:
+                                      renderValue={(selected) => (
+                                        <div className="flex flex-wrap gap-1">
+                                          {selected.map((buildingId) => {
+                                            const building = allBuildings[
+                                              society.id
+                                            ]?.find((b) => b.id === buildingId);
+                                            return building ? (
+                                              <Chip
+                                                key={buildingId}
+                                                label={`${building.name}${
+                                                  building.building_type
+                                                    ? ` (${building.building_type})`
+                                                    : ""
+                                                }`}
+                                                size="small"
+                                                sx={{
+                                                  backgroundColor:
+                                                    "rgba(111, 11, 20, 0.1)",
+                                                  color: "#6F0B14",
+                                                  fontFamily:
+                                                    "'Roboto', sans-serif",
+                                                }}
+                                              />
+                                            ) : null;
+                                          })}
+                                        </div>
+                                      )}
+                                      sx={{
+                                        fontFamily: "'Roboto', sans-serif",
+                                      }}
+                                    >
+                                      {/* {allBuildings[society.id]?.map(
+                                        (building) => (
+                                          <MenuItem
+                                            key={building.id}
+                                            value={building.id}
+                                          >
+                                            <Checkbox
+                                              checked={society.selectedBuildings.includes(
+                                                building.id
+                                              )}
+                                            />
+                                            <ListItemText
+                                              primary={building.name}
+                                              secondary={building.address}
+                                              sx={{
+                                                fontFamily:
+                                                  "'Roboto', sans-serif",
+                                              }}
+                                            />
+                                          </MenuItem>
+                                        )
+                                      )} */}
+                                      {allBuildings[society.id]?.map(
+                                        (building) => (
+                                          <MenuItem
+                                            key={building.id}
+                                            value={building.id}
+                                          >
+                                            <Checkbox
+                                              checked={society.selectedBuildings.includes(
+                                                building.id
+                                              )}
+                                            />
+                                            <ListItemText
+                                              primary={building.name}
+                                              secondary={
+                                                <React.Fragment>
+                                                  <Typography
+                                                    component="span"
+                                                    variant="body2"
+                                                    color="text.primary"
+                                                  >
+                                                    {building.building_type ||
+                                                      "Standard Building"}
+                                                  </Typography>
+                                                  {building.description &&
+                                                    ` - ${building.description}`}
+                                                  {building.flat_limit &&
+                                                    ` (Max ${building.flat_limit} flats)`}
+                                                </React.Fragment>
+                                              }
+                                              sx={{
+                                                fontFamily:
+                                                  "'Roboto', sans-serif",
+                                              }}
+                                            />
+                                          </MenuItem>
+                                        )
+                                      )}
+                                    </Select>
+                                  </FormControl>
+                                )}
+                            </div>
+                          </div>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
                   {/* Title */}
                   <motion.div variants={itemVariants}>
                     <TextField
@@ -577,121 +990,6 @@ const Broadcast = () => {
                       }}
                     />
                   </motion.div>
-
-                  {/* Broadcast Type Selection */}
-                  <motion.div variants={itemVariants}>
-                    <FormControl fullWidth>
-                      <InputLabel
-                        sx={{
-                          fontFamily: "'Roboto', sans-serif",
-                          color: "#6F0B14",
-                        }}
-                      >
-                        Send To
-                      </InputLabel>
-                      <Select
-                        name="broadcastType"
-                        value={formData.broadcastType}
-                        onChange={handleInputChange}
-                        label="Send To"
-                        sx={{
-                          fontFamily: "'Roboto', sans-serif",
-                          borderRadius: "8px",
-                          "& .MuiOutlinedInput-notchedOutline": {
-                            borderColor: "rgba(111, 11, 20, 0.2)",
-                          },
-                          "&:hover .MuiOutlinedInput-notchedOutline": {
-                            borderColor: "#6F0B14",
-                          },
-                          "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                            borderColor: "#6F0B14",
-                            borderWidth: "2px",
-                          },
-                        }}
-                      >
-                        <MenuItem
-                          value="society"
-                          sx={{ fontFamily: "'Roboto', sans-serif" }}
-                        >
-                          <ApartmentIcon className="mr-2 text-primary" />
-                          Entire Society
-                        </MenuItem>
-                        <MenuItem
-                          value="building"
-                          sx={{ fontFamily: "'Roboto', sans-serif" }}
-                        >
-                          <BuildingIcon className="mr-2 text-primary" />
-                          Specific Building
-                        </MenuItem>
-                      </Select>
-                    </FormControl>
-                  </motion.div>
-
-                  {/* Building Selection (shown only when broadcastType is 'building') */}
-                  <AnimatePresence>
-                    {formData.broadcastType === "building" && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        variants={itemVariants}
-                      >
-                        <FormControl fullWidth>
-                          <InputLabel
-                            sx={{
-                              fontFamily: "'Roboto', sans-serif",
-                              color: "#6F0B14",
-                            }}
-                          >
-                            Select Building
-                          </InputLabel>
-                          <Select
-                            name="buildingId"
-                            value={formData.buildingId || ""}
-                            onChange={handleInputChange}
-                            label="Select Building"
-                            disabled={loadingBuildings}
-                            sx={{
-                              fontFamily: "'Roboto', sans-serif",
-                              borderRadius: "8px",
-                              "& .MuiOutlinedInput-notchedOutline": {
-                                borderColor: "rgba(111, 11, 20, 0.2)",
-                              },
-                              "&:hover .MuiOutlinedInput-notchedOutline": {
-                                borderColor: "#6F0B14",
-                              },
-                              "&.Mui-focused .MuiOutlinedInput-notchedOutline":
-                                {
-                                  borderColor: "#6F0B14",
-                                  borderWidth: "2px",
-                                },
-                            }}
-                          >
-                            {loadingBuildings ? (
-                              <MenuItem disabled>
-                                <CircularProgress size={20} className="mr-2" />
-                                Loading buildings...
-                              </MenuItem>
-                            ) : buildings.length === 0 ? (
-                              <MenuItem disabled>
-                                No buildings found for this society
-                              </MenuItem>
-                            ) : (
-                              buildings.map((building) => (
-                                <MenuItem
-                                  key={building.id}
-                                  value={building.id}
-                                  sx={{ fontFamily: "'Roboto', sans-serif" }}
-                                >
-                                  {building.name}
-                                </MenuItem>
-                              ))
-                            )}
-                          </Select>
-                        </FormControl>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
                 </CardContent>
               </StyledCard>
 
@@ -821,6 +1119,29 @@ const Broadcast = () => {
                         className="text-hintText"
                         sx={{ fontFamily: "'Roboto', sans-serif" }}
                       >
+                        Selected Societies
+                      </Typography>
+                      <Typography
+                        variant="body1"
+                        className="font-medium text-primary"
+                        sx={{ fontFamily: "'Roboto', sans-serif" }}
+                      >
+                        {selectedSocieties.length === 0
+                          ? "No societies selected"
+                          : `${selectedSocieties.length} societ${
+                              selectedSocieties.length !== 1 ? "ies" : "y"
+                            } selected`}
+                      </Typography>
+                    </div>
+
+                    <Divider className="bg-lightBackground" />
+
+                    <div>
+                      <Typography
+                        variant="caption"
+                        className="text-hintText"
+                        sx={{ fontFamily: "'Roboto', sans-serif" }}
+                      >
                         Title
                       </Typography>
                       <Typography
@@ -853,56 +1174,81 @@ const Broadcast = () => {
 
                     <Divider className="bg-lightBackground" />
 
-                    <div className="flex justify-between">
-                      <div>
-                        <Typography
-                          variant="caption"
-                          className="text-hintText"
-                          sx={{ fontFamily: "'Roboto', sans-serif" }}
-                        >
-                          Category
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          className="font-medium capitalize text-primary"
-                          sx={{ fontFamily: "'Roboto', sans-serif" }}
-                        >
-                          {formData.category}
-                        </Typography>
-                      </div>
-                      <div>
-                        <Typography
-                          variant="caption"
-                          className="text-hintText"
-                          sx={{ fontFamily: "'Roboto', sans-serif" }}
-                        >
-                          Send To
-                        </Typography>
-                        <div className="mt-1">
-                          <Chip
-                            label={
-                              formData.broadcastType === "society"
-                                ? "Entire Society"
-                                : buildings.find(
-                                    (b) => b.id === formData.buildingId
-                                  )?.building_name || "Select Building"
-                            }
-                            size="small"
-                            sx={{
-                              backgroundColor: "rgba(111, 11, 20, 0.1)",
-                              color: "#6F0B14",
-                              fontFamily: "'Roboto', sans-serif",
-                              fontWeight: 500,
-                            }}
-                            icon={
-                              formData.broadcastType === "society" ? (
-                                <ApartmentIcon fontSize="small" />
-                              ) : (
-                                <BuildingIcon fontSize="small" />
-                              )
-                            }
-                          />
-                        </div>
+                    <div>
+                      <Typography
+                        variant="caption"
+                        className="text-hintText"
+                        sx={{ fontFamily: "'Roboto', sans-serif" }}
+                      >
+                        Total Destinations
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        className="font-medium text-primary"
+                        sx={{ fontFamily: "'Roboto', sans-serif" }}
+                      >
+                        {getTotalDestinations()} destination
+                        {getTotalDestinations() !== 1 ? "s" : ""}
+                      </Typography>
+                    </div>
+
+                    <Divider className="bg-lightBackground" />
+
+                    <div>
+                      <Typography
+                        variant="caption"
+                        className="text-hintText"
+                        sx={{ fontFamily: "'Roboto', sans-serif" }}
+                      >
+                        Configuration Summary
+                      </Typography>
+                      <div className="mt-2 space-y-2 max-h-40 overflow-y-auto">
+                        {selectedSocieties.map((society) => (
+                          <div key={society.id} className="text-sm">
+                            <Typography
+                              sx={{
+                                fontFamily: "'Roboto', sans-serif",
+                                fontWeight: 500,
+                              }}
+                            >
+                              {society.name}:
+                            </Typography>
+                            {society.sendTo === "society" ? (
+                              <Chip
+                                label="Entire Society"
+                                size="small"
+                                sx={{
+                                  backgroundColor: "rgba(111, 11, 20, 0.1)",
+                                  color: "#6F0B14",
+                                  fontFamily: "'Roboto', sans-serif",
+                                  marginTop: "2px",
+                                }}
+                              />
+                            ) : (
+                              <div className="mt-1">
+                                {society.selectedBuildings.map((buildingId) => {
+                                  const building = allBuildings[
+                                    society.id
+                                  ]?.find((b) => b.id === buildingId);
+                                  return building ? (
+                                    <Chip
+                                      key={buildingId}
+                                      label={building.name}
+                                      size="small"
+                                      sx={{
+                                        backgroundColor:
+                                          "rgba(111, 11, 20, 0.1)",
+                                        color: "#6F0B14",
+                                        fontFamily: "'Roboto', sans-serif",
+                                        margin: "2px",
+                                      }}
+                                    />
+                                  ) : null;
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     </div>
 
@@ -941,7 +1287,7 @@ const Broadcast = () => {
                 <GradientButton
                   fullWidth
                   type="submit"
-                  disabled={loading || !societyId}
+                  disabled={loading || selectedSocieties.length === 0}
                   startIcon={
                     loading ? (
                       <CircularProgress size={20} color="inherit" />
@@ -955,7 +1301,9 @@ const Broadcast = () => {
                     ? "Sending..."
                     : formData.scheduleForLater
                     ? "Schedule Broadcast"
-                    : "Send Broadcast"}
+                    : `Send to ${getTotalDestinations()} destination${
+                        getTotalDestinations() !== 1 ? "s" : ""
+                      }`}
                 </GradientButton>
               </motion.div>
 
@@ -1018,6 +1366,22 @@ const Broadcast = () => {
                         {formatFileSize(
                           files.reduce((acc, file) => acc + file.size, 0)
                         )}
+                      </Typography>
+                    </div>
+                    <div className="flex justify-between">
+                      <Typography
+                        variant="body2"
+                        className="text-primary"
+                        sx={{ fontFamily: "'Roboto', sans-serif" }}
+                      >
+                        Total Destinations
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        className="font-medium text-primary"
+                        sx={{ fontFamily: "'Roboto', sans-serif" }}
+                      >
+                        {getTotalDestinations()}
                       </Typography>
                     </div>
                   </div>
