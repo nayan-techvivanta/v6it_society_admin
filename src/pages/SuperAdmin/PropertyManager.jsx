@@ -940,10 +940,8 @@ export default function PropertyManager() {
 
       if (error) throw error;
 
-      // Fetch assigned societies for each manager
       const managersWithSocieties = await Promise.all(
         data.map(async (m) => {
-          // Fetch assigned societies from pm_society table
           const { data: societyData } = await supabase
             .from("pm_society")
             .select(
@@ -1023,13 +1021,12 @@ export default function PropertyManager() {
       );
     }
 
-    // Apply status filter
     if (statusFilter !== "all") {
       filtered = filtered.filter((manager) => manager.status === statusFilter);
     }
 
     setFilteredManagers(filtered);
-    setPage(0); // Reset to first page when filters change
+    setPage(0);
   }, [managers, searchTerm, statusFilter]);
 
   const handleStatusToggle = useCallback(async (managerId, currentStatus) => {
@@ -1149,7 +1146,7 @@ export default function PropertyManager() {
   };
 
   const handleAssignmentSuccess = async () => {
-    await fetchManagers(); // Refresh the list
+    await fetchManagers();
     toast.success("Societies assigned successfully!");
   };
 

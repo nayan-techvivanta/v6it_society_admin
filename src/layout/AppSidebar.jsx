@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router";
 import { FaRegIdCard, FaUsers } from "react-icons/fa";
 import { BsThreeDots, BsBuildings } from "react-icons/bs";
 import { FiLogOut } from "react-icons/fi";
+import { IoMdPerson } from "react-icons/io";
 import { MdCampaign, MdDevices, MdOutlineHowToReg } from "react-icons/md";
 import { PiBuildingApartment } from "react-icons/pi";
 import { FaUserShield } from "react-icons/fa6";
@@ -51,6 +52,19 @@ const AppSidebar = () => {
       path: `${basePath}/dashboard`,
       roles: ["superadmin", "admin", "propertymanager"],
     },
+
+    {
+      icon: <PiBuildingApartment size={22} />,
+      name: "Society",
+      path: `${basePath}/society`,
+      roles: ["superadmin", "propertymanager"],
+    },
+    {
+      icon: <BsBuildings size={20} />,
+      name: "Buildings",
+      path: `${basePath}/buildings`,
+      roles: ["superadmin", "admin", "propertymanager"],
+    },
     {
       icon: <FaBuildingUser size={20} />,
       name: "Property Manager",
@@ -58,22 +72,10 @@ const AppSidebar = () => {
       roles: ["superadmin"],
     },
     {
-      icon: <FaBuildingUser size={20} />,
+      icon: <IoMdPerson size={20} />,
       name: "Admin",
       path: `${basePath}/admin`,
-      roles: ["propertymanager"],
-    },
-    {
-      icon: <PiBuildingApartment size={22} />,
-      name: "Society",
-      path: `${basePath}/society`,
-      roles: ["superadmin"],
-    },
-    {
-      icon: <BsBuildings size={20} />,
-      name: "Buildings",
-      path: `${basePath}/buildings`,
-      roles: ["superadmin", "admin"],
+      roles: ["propertymanager", "superadmin"],
     },
     {
       icon: <FaUsers size={20} />,

@@ -726,11 +726,9 @@ export default function AdminPage() {
   // };
   const handleAssignToSociety = async (userId, societyId) => {
     try {
-      // 1️⃣ Get current user's existing society (if any)
       const currentUser = users.find((u) => u.id === userId);
       const previousSocietyId = currentUser?.society_id || null;
 
-      // 2️⃣ If user was already assigned → remove from old society
       if (previousSocietyId) {
         const { error: removeError } = await supabase
           .from("societies")

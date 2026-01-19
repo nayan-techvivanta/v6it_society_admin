@@ -33,6 +33,8 @@ import VisiterLog from "../pages/Admin/VisiterLog";
 import AdminCards from "../pages/Admin/AdminCards";
 import AdminBroadcast from "../pages/Admin/AdminBroadcast";
 import Users from "../pages/SuperAdmin/Users";
+import CommonProfile from "../pages/CommonProfile";
+import SAdminpage from "../pages/SuperAdmin/SAdminpage";
 // import AdminComplaints from "../pages/Admin/Complaints";
 
 export default function Router() {
@@ -51,7 +53,18 @@ export default function Router() {
             </AuthRoute>
           }
         />
-
+        {/* ================= COMMON PROFILE ================= */}
+        <Route
+          element={
+            <ProtectedRoute
+              allowedRoles={["superadmin", "admin", "propertymanager"]}
+            >
+              <AppLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/profile" element={<CommonProfile />} />
+        </Route>
         {/* ================= SUPER ADMIN ================= */}
         <Route
           element={
@@ -72,6 +85,7 @@ export default function Router() {
           <Route path="/superadmin/devices" element={<SADevices />} />
           <Route path="/superadmin/visitors" element={<Visitors />} />
           <Route path="/superadmin/users" element={<Users />} />
+          <Route path="/superadmin/admin" element={<SAdminpage />} />
           <Route path="/superadmin/broadcast" element={<BroadCast />} />
         </Route>
 

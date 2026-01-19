@@ -15,7 +15,6 @@ const LayoutContent = () => {
   useEffect(() => {
     if (location.state?.fromLogin) {
       setShowWelcome(true);
-      // clear state so it doesn't repeat on refresh
       window.history.replaceState({}, document.title);
     }
   }, [location]);
