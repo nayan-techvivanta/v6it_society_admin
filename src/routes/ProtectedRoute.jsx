@@ -36,7 +36,7 @@ const ProtectedRoute = ({ allowedRoles, children }) => {
   const normalizedAllowedRoles = allowedRoles?.map((r) => {
     let normalized = r.toLowerCase();
     if (normalized === "super") normalized = "superadmin";
-    if (normalized === "Manager") normalized = "propertymanager";
+    if (normalized === "manager") normalized = "propertymanager"; // Changed "Manager" to "manager" because r is already lowercased
     return normalized;
   });
 

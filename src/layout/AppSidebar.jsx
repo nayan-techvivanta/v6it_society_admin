@@ -29,17 +29,17 @@ const AppSidebar = () => {
     userRole === "superadmin"
       ? "/superadmin"
       : userRole === "propertymanager"
-      ? "/property"
-      : userRole === "admin"
-      ? "/admin"
-      : "";
+        ? "/property"
+        : userRole === "admin"
+          ? "/admin"
+          : "";
   const roleDisplayNames = useMemo(
     () => ({
       superadmin: "Super Admin",
       propertymanager: "Property Manager",
       admin: "Admin",
     }),
-    []
+    [],
   );
 
   const displayRole =
@@ -81,7 +81,7 @@ const AppSidebar = () => {
       icon: <FaUsers size={20} />,
       name: "Users/Tanent",
       path: `${basePath}/users`,
-      roles: ["superadmin", "admin"],
+      roles: ["superadmin", "admin", "propertymanager"],
     },
 
     {
@@ -125,7 +125,7 @@ const AppSidebar = () => {
   };
   const isActive = useCallback(
     (path) => location.pathname === path,
-    [location.pathname]
+    [location.pathname],
   );
 
   useEffect(() => {
@@ -281,8 +281,8 @@ const AppSidebar = () => {
       isExpanded || isMobileOpen
         ? "w-[270px]"
         : isHovered
-        ? "w-[270px]"
-        : "w-[95px]"
+          ? "w-[270px]"
+          : "w-[95px]"
     }
     ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
     lg:translate-x-0`}

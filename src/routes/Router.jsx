@@ -35,6 +35,8 @@ import AdminBroadcast from "../pages/Admin/AdminBroadcast";
 import Users from "../pages/SuperAdmin/Users";
 import CommonProfile from "../pages/CommonProfile";
 import SAdminpage from "../pages/SuperAdmin/SAdminpage";
+import PmVisitors from "../pages/PropertyManager/PmVisitors";
+import PMUsers from "../pages/PropertyManager/PMUsers";
 // import AdminComplaints from "../pages/Admin/Complaints";
 
 export default function Router() {
@@ -53,11 +55,22 @@ export default function Router() {
             </AuthRoute>
           }
         />
+
         {/* ================= COMMON PROFILE ================= */}
+        {/* <Route element={<AppLayout />}>
+          <Route path="/profile" element={<CommonProfile />} />
+        </Route> */}
+
         <Route
           element={
             <ProtectedRoute
-              allowedRoles={["superadmin", "admin", "propertymanager"]}
+              allowedRoles={[
+                "superadmin",
+                "admin",
+                "propertymanager",
+                "Super",
+                "Manager",
+              ]}
             >
               <AppLayout />
             </ProtectedRoute>
@@ -65,6 +78,7 @@ export default function Router() {
         >
           <Route path="/profile" element={<CommonProfile />} />
         </Route>
+
         {/* ================= SUPER ADMIN ================= */}
         <Route
           element={
@@ -103,6 +117,8 @@ export default function Router() {
           <Route path="/property/society" element={<PMSociety />} />
           <Route path="/property/buildings" element={<PMBuildings />} />
           <Route path="/property/broadcast" element={<PMBroadCast />} />
+          <Route path="/property/users" element={<PMUsers />} />
+          <Route path="/property/visitors" element={<PmVisitors />} />
         </Route>
 
         {/* ================= ADMIN ================= */}

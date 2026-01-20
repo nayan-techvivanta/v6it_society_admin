@@ -35,6 +35,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Autocomplete,
 } from "@mui/material";
 import {
   CloudUpload as CloudUploadIcon,
@@ -52,6 +53,7 @@ import {
   List as ListIcon,
   Add as AddIcon,
   Download as DownloadIcon,
+  LocationCity as SocietyIcon,
 } from "@mui/icons-material";
 import { styled } from "@mui/material/styles";
 import { supabase } from "../../api/supabaseClient";
@@ -83,7 +85,6 @@ const GradientButton = styled(Button)(({ theme }) => ({
   color: "#FFFFFF",
   fontFamily: "'Roboto', sans-serif",
   fontWeight: 600,
-  //   padding: "12px 28px",
   borderRadius: "10px",
   textTransform: "none",
   fontSize: "15px",
@@ -180,6 +181,7 @@ const PMBroadCast = () => {
     scheduledDate: "",
     scheduledTime: "",
     broadcastType: "society",
+    societyId: null,
     buildingId: null,
   });
 
@@ -191,33 +193,130 @@ const PMBroadCast = () => {
     message: "",
     severity: "success",
   });
-  const [societyId, setSocietyId] = useState(null);
+
+  // Get PM ID from localStorage
+  const [pmId, setPmId] = useState(null);
+  const [assignedSocieties, setAssignedSocieties] = useState([]);
   const [buildings, setBuildings] = useState([]);
+  const [loadingSocieties, setLoadingSocieties] = useState(false);
   const [loadingBuildings, setLoadingBuildings] = useState(false);
   const fileInputRef = useRef(null);
 
+  // Fetch PM ID and assigned societies
   useEffect(() => {
-    const storedSocietyId = localStorage.getItem("societyId");
-    if (storedSocietyId) {
-      setSocietyId(parseInt(storedSocietyId));
-      fetchBuildings(parseInt(storedSocietyId));
-    } else {
-      setSnackbar({
-        open: true,
-        message: "Society ID not found. Please login again.",
-        severity: "error",
-      });
-    }
+    const fetchPMData = async () => {
+      const profileId = localStorage.getItem("profileId");
+      if (!profileId) {
+        setSnackbar({
+          open: true,
+          message: "Please login to access broadcast features.",
+          severity: "error",
+        });
+        return;
+      }
+
+      setPmId(profileId);
+      await fetchAssignedSocieties(profileId);
+    };
+
+    fetchPMData();
   }, []);
 
-  // Fetch broadcasts when in list mode
+  // Fetch societies assigned to this PM
+  const fetchAssignedSocieties = async (pmId) => {
+    setLoadingSocieties(true);
+    try {
+      // First, get society IDs from pm_society table
+      const { data: pmSocieties, error: pmError } = await supabase
+        .from("pm_society")
+        .select("society_id")
+        .eq("pm_id", pmId);
 
-  // Fetch broadcasts
-  const fetchBroadcasts = async () => {
-    if (!societyId) {
+      if (pmError) throw pmError;
+
+      if (!pmSocieties || pmSocieties.length === 0) {
+        setAssignedSocieties([]);
+        setSnackbar({
+          open: true,
+          message: "No societies are assigned to you yet.",
+          severity: "info",
+        });
+        return;
+      }
+
+      const societyIds = pmSocieties.map((item) => item.society_id);
+
+      // Then, get full society details
+      const { data: societiesData, error: societiesError } = await supabase
+        .from("societies")
+        .select("*")
+        .in("id", societyIds)
+        .order("name", { ascending: true });
+
+      if (societiesError) throw societiesError;
+
+      setAssignedSocieties(societiesData || []);
+
+      // Set first society as default if available
+      if (societiesData && societiesData.length > 0) {
+        setFormData((prev) => ({
+          ...prev,
+          societyId: societiesData[0].id,
+        }));
+        await fetchBuildingsForSociety(societiesData[0].id);
+      }
+    } catch (error) {
+      console.error("Error fetching assigned societies:", error);
       setSnackbar({
         open: true,
-        message: "Society ID not found. Cannot load broadcasts.",
+        message: "Failed to load your assigned societies.",
+        severity: "error",
+      });
+    } finally {
+      setLoadingSocieties(false);
+    }
+  };
+
+  // Fetch buildings for a specific society
+  const fetchBuildingsForSociety = async (societyId) => {
+    if (!societyId) return;
+
+    setLoadingBuildings(true);
+    try {
+      const { data, error } = await supabase
+        .from("buildings")
+        .select("id, name")
+        .eq("society_id", societyId)
+        .order("name");
+
+      if (error) throw error;
+
+      setBuildings(data || []);
+
+      // Set first building as default if available and broadcast type is building
+      if (data && data.length > 0 && formData.broadcastType === "building") {
+        setFormData((prev) => ({
+          ...prev,
+          buildingId: data[0].id,
+        }));
+      }
+    } catch (error) {
+      console.error("Error fetching buildings:", error);
+      setSnackbar({
+        open: true,
+        message: "Failed to load buildings for this society.",
+        severity: "error",
+      });
+    } finally {
+      setLoadingBuildings(false);
+    }
+  };
+
+  const fetchBroadcasts = async () => {
+    if (!pmId) {
+      setSnackbar({
+        open: true,
+        message: "PM ID not found. Please login again.",
         severity: "error",
       });
       return;
@@ -225,22 +324,33 @@ const PMBroadCast = () => {
 
     setLoadingBroadcasts(true);
     try {
+      const { data: pmSocieties, error: pmError } = await supabase
+        .from("pm_society")
+        .select("society_id")
+        .eq("pm_id", pmId);
+
+      if (pmError) throw pmError;
+
+      if (!pmSocieties || pmSocieties.length === 0) {
+        setBroadcasts([]);
+        return;
+      }
+
+      const societyIds = pmSocieties.map((item) => item.society_id);
+
       const { data, error } = await supabase
         .from("broadcast")
         .select(
           `
-        *,
-        buildings(name),
-        societies(name)
-      `
+          *,
+          buildings(name),
+          societies(name)
+        `,
         )
-        .eq("socity_id", societyId)
+        .in("socity_id", societyIds)
         .order("created_at", { ascending: false });
 
-      if (error) {
-        console.error("Supabase error fetching broadcasts:", error);
-        throw error;
-      }
+      if (error) throw error;
 
       setBroadcasts(data || []);
     } catch (error) {
@@ -253,55 +363,6 @@ const PMBroadCast = () => {
       setBroadcasts([]);
     } finally {
       setLoadingBroadcasts(false);
-    }
-  };
-
-  // Fetch buildings for the society
-  const fetchBuildings = async (societyId) => {
-    if (!societyId) {
-      setSnackbar({
-        open: true,
-        message: "Society ID is required. Please login again.",
-        severity: "error",
-      });
-      return;
-    }
-
-    setLoadingBuildings(true);
-    try {
-      const { data, error } = await supabase
-        .from("buildings")
-        .select("id, name")
-        .eq("society_id", societyId)
-        .order("name");
-
-      if (error) {
-        console.error("Supabase error fetching buildings:", error);
-        throw error;
-      }
-
-      setBuildings(data || []);
-
-      if (
-        data &&
-        data.length > 0 &&
-        formData.broadcastType === "building" &&
-        !formData.buildingId
-      ) {
-        setFormData((prev) => ({
-          ...prev,
-          buildingId: data[0].id,
-        }));
-      }
-    } catch (error) {
-      console.error("Error fetching buildings:", error);
-      setSnackbar({
-        open: true,
-        message: "Failed to load buildings. Please try again.",
-        severity: "error",
-      });
-    } finally {
-      setLoadingBuildings(false);
     }
   };
 
@@ -320,6 +381,30 @@ const PMBroadCast = () => {
       setLoadingBroadcasts(true);
       fetchBroadcasts();
     }
+  };
+
+  // Handle society change
+  const handleSocietyChange = (event) => {
+    const societyId = event.target.value;
+    setFormData((prev) => ({
+      ...prev,
+      societyId,
+      buildingId: null,
+    }));
+    fetchBuildingsForSociety(societyId);
+  };
+
+  // Handle broadcast type change
+  const handleBroadcastTypeChange = (event) => {
+    const broadcastType = event.target.value;
+    setFormData((prev) => ({
+      ...prev,
+      broadcastType,
+      buildingId:
+        broadcastType === "building" && buildings.length > 0
+          ? buildings[0].id
+          : null,
+    }));
   };
 
   // View broadcast details
@@ -370,7 +455,10 @@ const PMBroadCast = () => {
       minute: "2-digit",
     });
   };
+
   const resetCreateForm = useCallback(() => {
+    const defaultSocietyId =
+      assignedSocieties.length > 0 ? assignedSocieties[0].id : null;
     setFormData({
       title: "",
       description: "",
@@ -379,12 +467,14 @@ const PMBroadCast = () => {
       scheduledDate: "",
       scheduledTime: "",
       broadcastType: "society",
+      societyId: defaultSocietyId,
       buildingId: null,
     });
     setFiles([]);
     setLoading(false);
     setIsDragging(false);
-  }, []);
+  }, [assignedSocieties]);
+
   // Get file URLs from document string
   const getFileUrls = (documentString) => {
     if (!documentString) return [];
@@ -401,7 +491,7 @@ const PMBroadCast = () => {
     document.body.removeChild(link);
   };
 
-  // Form handlers (from your existing code)
+  // Form handlers
   const handleInputChange = (e) => {
     const { name, value, checked, type } = e.target;
     setFormData((prev) => ({
@@ -519,6 +609,7 @@ const PMBroadCast = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // Validation
     if (!formData.title.trim()) {
       setSnackbar({
         open: true,
@@ -537,19 +628,19 @@ const PMBroadCast = () => {
       return;
     }
 
-    if (formData.broadcastType === "building" && !formData.buildingId) {
+    if (!formData.societyId) {
       setSnackbar({
         open: true,
-        message: "Please select a building",
+        message: "Please select a society",
         severity: "error",
       });
       return;
     }
 
-    if (!societyId) {
+    if (formData.broadcastType === "building" && !formData.buildingId) {
       setSnackbar({
         open: true,
-        message: "Society ID not found. Please login again.",
+        message: "Please select a building",
         severity: "error",
       });
       return;
@@ -562,7 +653,7 @@ const PMBroadCast = () => {
       let fileUrls = [];
       if (files.length > 0) {
         const uploadPromises = files.map((file) =>
-          uploadFileToSupabase(file.file)
+          uploadFileToSupabase(file.file),
         );
         fileUrls = await Promise.all(uploadPromises);
       }
@@ -571,7 +662,7 @@ const PMBroadCast = () => {
       const broadcastData = {
         title: formData.title.trim(),
         message: formData.description.trim(),
-        socity_id: societyId,
+        socity_id: formData.societyId,
         building_id:
           formData.broadcastType === "building" ? formData.buildingId : null,
         document: fileUrls.length > 0 ? fileUrls.join(",") : null,
@@ -581,32 +672,33 @@ const PMBroadCast = () => {
       // Save to database
       await saveBroadcastToDatabase(broadcastData, fileUrls);
 
-      // Success
+      // Success message
+      const societyName =
+        assignedSocieties.find((s) => s.id === formData.societyId)?.name ||
+        "the society";
+      const buildingName =
+        formData.broadcastType === "building"
+          ? buildings.find((b) => b.id === formData.buildingId)?.name ||
+            "selected building"
+          : null;
+
+      const successMessage =
+        formData.broadcastType === "building"
+          ? `Broadcast sent successfully to ${buildingName} in ${societyName}!`
+          : `Broadcast sent successfully to entire ${societyName}!`;
+
       setSnackbar({
         open: true,
-        message: `Broadcast sent successfully to ${
-          formData.broadcastType === "society"
-            ? "entire society"
-            : "selected building"
-        }!`,
+        message: successMessage,
         severity: "success",
       });
 
       // Reset form
-      setFormData({
-        title: "",
-        description: "",
-        category: "general",
-        scheduleForLater: false,
-        scheduledDate: "",
-        scheduledTime: "",
-        broadcastType: "society",
-        buildingId: null,
-      });
-      setFiles([]);
+      resetCreateForm();
 
-      // Switch to list view
+      // Switch to list view and refresh
       setViewMode("list");
+      fetchBroadcasts();
     } catch (error) {
       console.error("Error sending broadcast:", error);
       setSnackbar({
@@ -621,6 +713,12 @@ const PMBroadCast = () => {
 
   const handleCloseSnackbar = () => {
     setSnackbar((prev) => ({ ...prev, open: false }));
+  };
+
+  // Get society name by ID
+  const getSocietyName = (societyId) => {
+    const society = assignedSocieties.find((s) => s.id === societyId);
+    return society ? society.name : "Unknown Society";
   };
 
   // Render create form
@@ -707,6 +805,66 @@ const PMBroadCast = () => {
                 />
               </motion.div>
 
+              {/* Society Selection */}
+              <motion.div variants={itemVariants}>
+                <FormControl fullWidth>
+                  <InputLabel
+                    sx={{
+                      fontFamily: "'Roboto', sans-serif",
+                      color: "#6F0B14",
+                    }}
+                  >
+                    Select Society
+                  </InputLabel>
+                  <Select
+                    name="societyId"
+                    value={formData.societyId || ""}
+                    onChange={handleSocietyChange}
+                    label="Select Society"
+                    disabled={
+                      loadingSocieties || assignedSocieties.length === 0
+                    }
+                    sx={{
+                      fontFamily: "'Roboto', sans-serif",
+                      borderRadius: "8px",
+                      "& .MuiOutlinedInput-notchedOutline": {
+                        borderColor: "rgba(111, 11, 20, 0.2)",
+                      },
+                      "&:hover .MuiOutlinedInput-notchedOutline": {
+                        borderColor: "#6F0B14",
+                      },
+                      "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                        borderColor: "#6F0B14",
+                        borderWidth: "2px",
+                      },
+                    }}
+                  >
+                    {loadingSocieties ? (
+                      <MenuItem disabled>
+                        <CircularProgress size={20} className="mr-2" />
+                        Loading societies...
+                      </MenuItem>
+                    ) : assignedSocieties.length === 0 ? (
+                      <MenuItem disabled>No societies assigned to you</MenuItem>
+                    ) : (
+                      assignedSocieties.map((society) => (
+                        <MenuItem
+                          key={society.id}
+                          value={society.id}
+                          sx={{ fontFamily: "'Roboto', sans-serif" }}
+                        >
+                          <SocietyIcon
+                            className="mr-2 text-primary"
+                            fontSize="small"
+                          />
+                          {society.name}
+                        </MenuItem>
+                      ))
+                    )}
+                  </Select>
+                </FormControl>
+              </motion.div>
+
               {/* Broadcast Type Selection */}
               <motion.div variants={itemVariants}>
                 <FormControl fullWidth>
@@ -721,8 +879,9 @@ const PMBroadCast = () => {
                   <Select
                     name="broadcastType"
                     value={formData.broadcastType}
-                    onChange={handleInputChange}
+                    onChange={handleBroadcastTypeChange}
                     label="Send To"
+                    disabled={!formData.societyId || buildings.length === 0}
                     sx={{
                       fontFamily: "'Roboto', sans-serif",
                       borderRadius: "8px",
@@ -748,6 +907,7 @@ const PMBroadCast = () => {
                     <MenuItem
                       value="building"
                       sx={{ fontFamily: "'Roboto', sans-serif" }}
+                      disabled={buildings.length === 0}
                     >
                       <BuildingIcon className="mr-2 text-primary" />
                       Specific Building
@@ -758,67 +918,68 @@ const PMBroadCast = () => {
 
               {/* Building Selection (shown only when broadcastType is 'building') */}
               <AnimatePresence>
-                {formData.broadcastType === "building" && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    variants={itemVariants}
-                  >
-                    <FormControl fullWidth>
-                      <InputLabel
-                        sx={{
-                          fontFamily: "'Roboto', sans-serif",
-                          color: "#6F0B14",
-                        }}
-                      >
-                        Select Building
-                      </InputLabel>
-                      <Select
-                        name="buildingId"
-                        value={formData.buildingId || ""}
-                        onChange={handleInputChange}
-                        label="Select Building"
-                        disabled={loadingBuildings}
-                        sx={{
-                          fontFamily: "'Roboto', sans-serif",
-                          borderRadius: "8px",
-                          "& .MuiOutlinedInput-notchedOutline": {
-                            borderColor: "rgba(111, 11, 20, 0.2)",
-                          },
-                          "&:hover .MuiOutlinedInput-notchedOutline": {
-                            borderColor: "#6F0B14",
-                          },
-                          "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                            borderColor: "#6F0B14",
-                            borderWidth: "2px",
-                          },
-                        }}
-                      >
-                        {loadingBuildings ? (
-                          <MenuItem disabled>
-                            <CircularProgress size={20} className="mr-2" />
-                            Loading buildings...
-                          </MenuItem>
-                        ) : buildings.length === 0 ? (
-                          <MenuItem disabled>
-                            No buildings found for this society
-                          </MenuItem>
-                        ) : (
-                          buildings.map((building) => (
-                            <MenuItem
-                              key={building.id}
-                              value={building.id}
-                              sx={{ fontFamily: "'Roboto', sans-serif" }}
-                            >
-                              {building.name}
+                {formData.broadcastType === "building" &&
+                  formData.societyId && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      variants={itemVariants}
+                    >
+                      <FormControl fullWidth>
+                        <InputLabel
+                          sx={{
+                            fontFamily: "'Roboto', sans-serif",
+                            color: "#6F0B14",
+                          }}
+                        >
+                          Select Building
+                        </InputLabel>
+                        <Select
+                          name="buildingId"
+                          value={formData.buildingId || ""}
+                          onChange={handleInputChange}
+                          label="Select Building"
+                          disabled={loadingBuildings || buildings.length === 0}
+                          sx={{
+                            fontFamily: "'Roboto', sans-serif",
+                            borderRadius: "8px",
+                            "& .MuiOutlinedInput-notchedOutline": {
+                              borderColor: "rgba(111, 11, 20, 0.2)",
+                            },
+                            "&:hover .MuiOutlinedInput-notchedOutline": {
+                              borderColor: "#6F0B14",
+                            },
+                            "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                              borderColor: "#6F0B14",
+                              borderWidth: "2px",
+                            },
+                          }}
+                        >
+                          {loadingBuildings ? (
+                            <MenuItem disabled>
+                              <CircularProgress size={20} className="mr-2" />
+                              Loading buildings...
                             </MenuItem>
-                          ))
-                        )}
-                      </Select>
-                    </FormControl>
-                  </motion.div>
-                )}
+                          ) : buildings.length === 0 ? (
+                            <MenuItem disabled>
+                              No buildings found in this society
+                            </MenuItem>
+                          ) : (
+                            buildings.map((building) => (
+                              <MenuItem
+                                key={building.id}
+                                value={building.id}
+                                sx={{ fontFamily: "'Roboto', sans-serif" }}
+                              >
+                                {building.name}
+                              </MenuItem>
+                            ))
+                          )}
+                        </Select>
+                      </FormControl>
+                    </motion.div>
+                  )}
               </AnimatePresence>
             </CardContent>
           </StyledCard>
@@ -968,53 +1129,52 @@ const PMBroadCast = () => {
                     className="text-hintText"
                     sx={{ fontFamily: "'Roboto', sans-serif" }}
                   >
-                    Description Preview
+                    Society
                   </Typography>
                   <Typography
                     variant="body2"
-                    className="mt-1 line-clamp-4 text-black"
+                    className="mt-1 font-medium text-primary"
                     sx={{ fontFamily: "'Roboto', sans-serif" }}
                   >
-                    {formData.description || "No description entered"}
+                    {formData.societyId
+                      ? getSocietyName(formData.societyId)
+                      : "No society selected"}
                   </Typography>
                 </div>
 
                 <Divider className="bg-lightBackground" />
 
-                <div className="flex justify-between">
-                  <div>
-                    <Typography
-                      variant="caption"
-                      className="text-hintText"
-                      sx={{ fontFamily: "'Roboto', sans-serif" }}
-                    >
-                      Send To
-                    </Typography>
-                    <div className="mt-1">
-                      <Chip
-                        label={
-                          formData.broadcastType === "society"
-                            ? "Entire Society"
-                            : buildings.find(
-                                (b) => b.id === formData.buildingId
-                              )?.name || "Select Building"
-                        }
-                        size="small"
-                        sx={{
-                          backgroundColor: "rgba(111, 11, 20, 0.1)",
-                          color: "#6F0B14",
-                          fontFamily: "'Roboto', sans-serif",
-                          fontWeight: 500,
-                        }}
-                        icon={
-                          formData.broadcastType === "society" ? (
-                            <ApartmentIcon fontSize="small" />
-                          ) : (
-                            <BuildingIcon fontSize="small" />
-                          )
-                        }
-                      />
-                    </div>
+                <div>
+                  <Typography
+                    variant="caption"
+                    className="text-hintText"
+                    sx={{ fontFamily: "'Roboto', sans-serif" }}
+                  >
+                    Send To
+                  </Typography>
+                  <div className="mt-1">
+                    <Chip
+                      label={
+                        formData.broadcastType === "society"
+                          ? "Entire Society"
+                          : buildings.find((b) => b.id === formData.buildingId)
+                              ?.name || "Select Building"
+                      }
+                      size="small"
+                      sx={{
+                        backgroundColor: "rgba(111, 11, 20, 0.1)",
+                        color: "#6F0B14",
+                        fontFamily: "'Roboto', sans-serif",
+                        fontWeight: 500,
+                      }}
+                      icon={
+                        formData.broadcastType === "society" ? (
+                          <ApartmentIcon fontSize="small" />
+                        ) : (
+                          <BuildingIcon fontSize="small" />
+                        )
+                      }
+                    />
                   </div>
                 </div>
 
@@ -1053,7 +1213,11 @@ const PMBroadCast = () => {
             <GradientButton
               fullWidth
               type="submit"
-              disabled={loading || !societyId}
+              disabled={
+                loading ||
+                !formData.societyId ||
+                (formData.broadcastType === "building" && !formData.buildingId)
+              }
               startIcon={
                 loading ? (
                   <CircularProgress size={20} color="inherit" />
@@ -1078,6 +1242,22 @@ const PMBroadCast = () => {
                 Broadcast Stats
               </Typography>
               <div className="space-y-2">
+                <div className="flex justify-between">
+                  <Typography
+                    variant="body2"
+                    className="text-primary"
+                    sx={{ fontFamily: "'Roboto', sans-serif" }}
+                  >
+                    Societies Assigned
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    className="font-medium text-primary"
+                    sx={{ fontFamily: "'Roboto', sans-serif" }}
+                  >
+                    {assignedSocieties.length}
+                  </Typography>
+                </div>
                 <div className="flex justify-between">
                   <Typography
                     variant="body2"
@@ -1110,24 +1290,6 @@ const PMBroadCast = () => {
                     {files.length}/10
                   </Typography>
                 </div>
-                <div className="flex justify-between">
-                  <Typography
-                    variant="body2"
-                    className="text-primary"
-                    sx={{ fontFamily: "'Roboto', sans-serif" }}
-                  >
-                    Total Size
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    className="font-medium text-primary"
-                    sx={{ fontFamily: "'Roboto', sans-serif" }}
-                  >
-                    {formatFileSize(
-                      files.reduce((acc, file) => acc + file.size, 0)
-                    )}
-                  </Typography>
-                </div>
               </div>
             </CardContent>
           </StyledCard>
@@ -1154,13 +1316,16 @@ const PMBroadCast = () => {
               <ListIcon className="mr-3" />
               Broadcast History
             </Typography>
-            <Typography
-              variant="body2"
-              className="text-hintText"
-              sx={{ fontFamily: "'Roboto', sans-serif" }}
-            >
-              Total: {broadcasts.length} broadcasts
-            </Typography>
+            <div className="flex items-center space-x-4">
+              <Typography
+                variant="body2"
+                className="text-hintText"
+                sx={{ fontFamily: "'Roboto', sans-serif" }}
+              >
+                Societies: {assignedSocieties.length} | Broadcasts:{" "}
+                {broadcasts.length}
+              </Typography>
+            </div>
           </div>
 
           {loadingBroadcasts ? (
@@ -1204,6 +1369,15 @@ const PMBroadCast = () => {
                       }}
                     >
                       Title
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        fontFamily: "'Roboto', sans-serif",
+                        fontWeight: 600,
+                        color: "#6F0B14",
+                      }}
+                    >
+                      Society
                     </TableCell>
                     <TableCell
                       sx={{
@@ -1268,11 +1442,22 @@ const PMBroadCast = () => {
                       </TableCell>
                       <TableCell>
                         <Chip
+                          label={broadcast.societies?.name || "Unknown Society"}
+                          size="small"
+                          sx={{
+                            backgroundColor: "rgba(111, 11, 20, 0.1)",
+                            color: "#6F0B14",
+                            fontFamily: "'Roboto', sans-serif",
+                            fontWeight: 500,
+                          }}
+                          icon={<SocietyIcon fontSize="small" />}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Chip
                           label={
                             broadcast.building_id
-                              ? `Building: ${
-                                  broadcast.buildings?.name || "Unknown"
-                                }`
+                              ? `Building: ${broadcast.buildings?.name || "Unknown"}`
                               : "Entire Society"
                           }
                           size="small"
@@ -1314,7 +1499,7 @@ const PMBroadCast = () => {
                                     onClick={() =>
                                       handleDownload(
                                         url,
-                                        `attachment-${index + 1}`
+                                        `attachment-${index + 1}`,
                                       )
                                     }
                                   >
@@ -1327,7 +1512,7 @@ const PMBroadCast = () => {
                                     )}
                                   </Avatar>
                                 </Tooltip>
-                              )
+                              ),
                             )}
                           </AvatarGroup>
                         ) : (
@@ -1394,8 +1579,8 @@ const PMBroadCast = () => {
             <div>
               <Typography
                 variant="h4"
-                className="font-bold text-primary"
-                sx={{ fontFamily: "'Roboto', sans-serif", fontWeight: 700 }}
+                className="font-semibold text-primary"
+                sx={{ fontFamily: "'Roboto', sans-serif", fontWeight: 400 }}
               >
                 <AnnouncementIcon className="mr-3" />
                 {viewMode === "create"
@@ -1408,9 +1593,11 @@ const PMBroadCast = () => {
                 sx={{ fontFamily: "'Roboto', sans-serif" }}
               >
                 {viewMode === "create"
-                  ? "Send announcements to society members"
+                  ? "Send announcements to your assigned societies"
                   : "View and manage your broadcast history"}
-                {societyId && ` (Society ID: ${societyId})`}
+                {pmId && ` (PM ID: ${pmId})`}
+                {assignedSocieties.length > 0 &&
+                  ` | ${assignedSocieties.length} societies assigned`}
               </Typography>
             </div>
 
@@ -1543,14 +1730,35 @@ const PMBroadCast = () => {
                     className="text-hintText"
                     sx={{ fontFamily: "'Roboto', sans-serif" }}
                   >
+                    Society
+                  </Typography>
+                  <Chip
+                    label={
+                      selectedBroadcast.societies?.name || "Unknown Society"
+                    }
+                    size="small"
+                    sx={{
+                      backgroundColor: "rgba(111, 11, 20, 0.1)",
+                      color: "#6F0B14",
+                      fontFamily: "'Roboto', sans-serif",
+                      fontWeight: 500,
+                    }}
+                    icon={<SocietyIcon fontSize="small" />}
+                  />
+                </div>
+
+                <div>
+                  <Typography
+                    variant="subtitle2"
+                    className="text-hintText"
+                    sx={{ fontFamily: "'Roboto', sans-serif" }}
+                  >
                     Sent To
                   </Typography>
                   <Chip
                     label={
                       selectedBroadcast.building_id
-                        ? `Building: ${
-                            selectedBroadcast.buildings?.name || "Unknown"
-                          }`
+                        ? `Building: ${selectedBroadcast.buildings?.name || "Unknown"}`
                         : "Entire Society"
                     }
                     size="small"
@@ -1633,7 +1841,7 @@ const PMBroadCast = () => {
                               <DownloadIcon fontSize="small" />
                             </IconButton>
                           </div>
-                        )
+                        ),
                       )}
                     </div>
                   </div>
@@ -1721,6 +1929,9 @@ const PMBroadCast = () => {
             },
             "&.MuiAlert-filledWarning": {
               backgroundColor: "#DBA400",
+            },
+            "&.MuiAlert-filledInfo": {
+              backgroundColor: "#6F0B14",
             },
           }}
         >

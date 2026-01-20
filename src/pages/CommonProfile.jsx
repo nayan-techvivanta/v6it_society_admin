@@ -19,6 +19,8 @@ import {
   CardContent,
   Grid,
 } from "@mui/material";
+import { useNavigate } from "react-router-dom";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import EditIcon from "@mui/icons-material/Edit";
 import CloudUploadIcon from "@mui/icons-material/CloudUpload";
 import LockResetIcon from "@mui/icons-material/LockReset";
@@ -38,7 +40,10 @@ import InputAdornment from "@mui/material/InputAdornment";
 
 import { styled } from "@mui/material/styles";
 
-const VisuallyHiddenInput = styled("input")({
+const VisuallyHiddenInput = styled("input", {
+  shouldForwardProp: (prop) =>
+    prop !== "is_active" && prop !== "is_delete" && !prop.startsWith("aria-"),
+})({
   clip: "rect(0 0 0 0)",
   clipPath: "inset(50%)",
   height: 1,
@@ -68,6 +73,7 @@ export default function CommonProfile() {
     newPassword: false,
     confirmPassword: false,
   });
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchProfile();
@@ -92,7 +98,7 @@ export default function CommonProfile() {
           society:society_id (name),
           building:building_id (name),
           flat:flat_id (flat_number)
-        `
+        `,
         )
         .eq("registed_user_id", userId)
         .single();
@@ -155,11 +161,16 @@ export default function CommonProfile() {
           localStorage.setItem("profileImage", userData.profile_url);
         }
 
+        // Normalize role before saving (SAME AS LOGIN)
+        let role = (userData.role_type || "").toLowerCase();
+        if (role === "super") role = "superadmin";
+        if (role === "manager") role = "propertymanager";
+
         // Update local storage with fresh data
         localStorage.setItem("email", userData.email || "");
         localStorage.setItem("name", userData.name || "");
         localStorage.setItem("profileId", userData.id || "");
-        localStorage.setItem("role", userData.role_type || "");
+        localStorage.setItem("role", role);
         localStorage.setItem("societyId", userData.society_id || "");
       }
     } catch (error) {
@@ -352,14 +363,14 @@ export default function CommonProfile() {
             registed_user_id: registedUserId,
             new_password: newPassword,
           }),
-        }
+        },
       );
 
       const data = await res.json();
 
       if (!res.ok) {
         throw new Error(
-          data.message || data.error || "Failed to change password"
+          data.message || data.error || "Failed to change password",
         );
       }
 
@@ -425,7 +436,7 @@ export default function CommonProfile() {
   return (
     <Box className="max-w-6xl mx-auto p-4 md:p-6 space-y-6 font-roboto">
       {/* HEADER */}
-      <Box className="flex justify-between items-center">
+      {/* <Box className="flex justify-between items-center">
         <Typography
           variant="h4"
           className="font-bold"
@@ -433,6 +444,61 @@ export default function CommonProfile() {
         >
           My Profile
         </Typography>
+        {!isEditing ? (
+          <Button
+            variant="outlined"
+            startIcon={<EditIcon />}
+            onClick={() => setIsEditing(true)}
+            sx={{
+              borderColor: "#6F0B14",
+              color: "#6F0B14",
+              "&:hover": {
+                borderColor: "#5A0910",
+                backgroundColor: "rgba(111, 11, 20, 0.04)",
+              },
+            }}
+          >
+            Edit Profile
+          </Button>
+        ) : (
+          <Button
+            variant="contained"
+            startIcon={<SaveIcon />}
+            onClick={handleSaveProfile}
+            disabled={loading}
+            sx={{
+              backgroundColor: "#6F0B14",
+              "&:hover": { backgroundColor: "#5A0910" },
+            }}
+          >
+            Save Changes
+          </Button>
+        )}
+      </Box> */}
+      <Box className="flex justify-between items-center gap-3">
+        <Box className="flex items-center gap-2">
+          <IconButton
+            onClick={() => navigate(-1)}
+            sx={{
+              border: "1px solid #6F0B14",
+              color: "#6F0B14",
+              "&:hover": {
+                backgroundColor: "rgba(111, 11, 20, 0.08)",
+              },
+            }}
+          >
+            <ArrowBackIcon />
+          </IconButton>
+
+          <Typography
+            variant="h4"
+            className="font-bold"
+            sx={{ color: "#6F0B14" }}
+          >
+            My Profile
+          </Typography>
+        </Box>
+
         {!isEditing ? (
           <Button
             variant="outlined"

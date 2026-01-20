@@ -28,11 +28,11 @@ import {
   Phone,
   Email,
   Home,
+  Apartment as ApartmentIcon,
   CalendarToday,
 } from "@mui/icons-material";
 import { styled } from "@mui/material/styles";
 
-// Styled components with your theme
 const PrimaryButton = styled(Button)(({ theme }) => ({
   backgroundColor: "#6F0B14",
   color: "#FFFFFF",
@@ -131,11 +131,7 @@ function Row({ row, index }) {
         </TableCell>
         <TableCell>
           <StatusChip
-            label={
-              row.status
-                ? row.status.charAt(0).toUpperCase() + row.status.slice(1)
-                : "N/A"
-            }
+            label={row.pincode ? row.pincode : "N/A"}
             status={row.status}
             size="small"
           />
@@ -628,7 +624,7 @@ export default function PMSociety() {
   return (
     <Box px={"20px"} sx={{ minHeight: "80vh" }}>
       {/* Header */}
-      <Box sx={{ mb: 4 }}>
+      {/* <Box sx={{ mb: 4 }}>
         <Box
           display="flex"
           justifyContent="space-between"
@@ -667,8 +663,23 @@ export default function PMSociety() {
           Showing {societies.length} society{societies.length !== 1 ? "s" : ""}{" "}
           assigned to you
         </Typography>
+      </Box> */}
+      <Box className="mb-8">
+        <Typography
+          variant="h4"
+          className="font-semibold text-gray-900 mb-2"
+          sx={{ color: "#6F0B14" }}
+        >
+          <ApartmentIcon
+            sx={{ mr: 2, verticalAlign: "middle", fontSize: "35px" }}
+          />
+          My Societies
+        </Typography>
+        <Typography variant="body1" color="text.secondary">
+          Showing {societies.length} society
+          {societies.length !== 1 ? "s" : ""}{" "}
+        </Typography>
       </Box>
-
       {/* Table */}
       <Paper sx={{ width: "100%", overflow: "hidden" }}>
         <TableContainer sx={{ maxHeight: 600 }}>
@@ -719,7 +730,7 @@ export default function PMSociety() {
                     color: "#6F0B14",
                   }}
                 >
-                  Status
+                  Pincode
                 </TableCell>
               </TableRow>
             </TableHead>
