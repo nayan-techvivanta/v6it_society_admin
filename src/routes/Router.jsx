@@ -37,6 +37,7 @@ import CommonProfile from "../pages/CommonProfile";
 import SAdminpage from "../pages/SuperAdmin/SAdminpage";
 import PmVisitors from "../pages/PropertyManager/PmVisitors";
 import PMUsers from "../pages/PropertyManager/PMUsers";
+import AdminUsers from "../pages/Admin/AdminUsers";
 // import AdminComplaints from "../pages/Admin/Complaints";
 
 export default function Router() {
@@ -136,6 +137,8 @@ export default function Router() {
           <Route path="/admin/security" element={<Security />} />
           <Route path="/admin/visitors" element={<VisiterLog />} />
           <Route path="/admin/broadcast" element={<AdminBroadcast />} />
+          <Route path="/admin/users" element={<AdminUsers />} />
+
           <Route path="/admin/cards" element={<AdminCards />} />
         </Route>
 

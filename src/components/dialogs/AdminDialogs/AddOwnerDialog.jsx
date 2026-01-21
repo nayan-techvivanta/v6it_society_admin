@@ -17,11 +17,14 @@ import {
   Select,
   MenuItem,
   InputAdornment,
-  FormHelperText,
   Alert,
   Card,
   CardContent,
   Chip,
+  Autocomplete,
+  Divider,
+  Stack,
+  Paper,
 } from "@mui/material";
 import { supabase } from "../../../api/supabaseClient";
 import { toast } from "react-toastify";
@@ -40,9 +43,29 @@ import {
   Key,
   Close,
   Edit,
+  Search,
+  CheckCircle,
+  PersonAdd,
 } from "@mui/icons-material";
 import { createUser } from "../../../api/createUser";
 import { motion } from "framer-motion";
+
+// Custom hook for debouncing
+function useDebounce(value, delay) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
 
 export default function AddOwnerDialog({ open, onClose, flat }) {
   const [loading, setLoading] = useState(false);
@@ -67,25 +90,26 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
 
   const [errors, setErrors] = useState({});
 
+  // Search state
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebounce(searchQuery, 500);
+
   // Theme colors
   const theme = {
     primary: "#6F0B14",
     textAndTab: "#6F0B14",
     hintText: "#A29EB6",
     button: "#6F0B14",
-    checkbox: "#6F0B14",
     lightBackground: "rgba(111, 11, 20, 0.09)",
     trackSelect: "rgba(111, 11, 20, 0.44)",
     darkTrackSelect: "rgba(111, 11, 20, 0.61)",
     success: "#008000",
-    pending: "#DBA400",
-    reschedule: "#E86100",
     reject: "#B31B1B",
-    black: "#000000",
-    white: "#FFFFFF",
   };
 
-  // Fetch existing owner when dialog opens
   useEffect(() => {
     if (open && flat?.id) {
       checkExistingOwner();
@@ -104,6 +128,9 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
       role_type: "Tanent-O",
     });
     setErrors({});
+    setSelectedUser(null);
+    setSearchQuery("");
+    setSearchResults([]);
     setShowPassword(false);
     setIsEditMode(false);
   };
@@ -114,7 +141,7 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
       const { data, error } = await supabase
         .from("users")
         .select(
-          "id, name, email, number, whatsapp_number, profile_url, role_type"
+          "id, name, email, number, whatsapp_number, profile_url, role_type",
         )
         .eq("flat_id", flat.id)
         .eq("role_type", "Tanent-O")
@@ -159,9 +186,9 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
       newErrors.email = "Enter a valid email address";
     }
 
-    if (!isEditMode && !formData.password.trim()) {
+    if (!isEditMode && !selectedUser && !formData.password.trim()) {
       newErrors.password = "Password is required";
-    } else if (!isEditMode && formData.password.length < 6) {
+    } else if (!isEditMode && !selectedUser && formData.password.length < 6) {
       newErrors.password = "Password must be at least 6 characters";
     }
 
@@ -194,6 +221,15 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
       // Clear error for this field when user types
       if (errors[field]) {
         setErrors({ ...errors, [field]: "" });
+      }
+    } else if (field === "role_type") {
+      // Reset form when role type changes to Tanent-M
+      if (value === "Tanent-M" && selectedUser) {
+        setSelectedUser(null);
+        resetForm();
+        setFormData((prev) => ({ ...prev, role_type: value }));
+      } else {
+        setFormData({ ...formData, [field]: value });
       }
     } else {
       setFormData({ ...formData, [field]: value });
@@ -276,6 +312,88 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
       profile_url: "",
     }));
   };
+
+  // useEffect(() => {
+  //   const fetchUsers = async () => {
+  //     if (!debouncedSearchQuery || debouncedSearchQuery.length < 2) {
+  //       setSearchResults([]);
+  //       return;
+  //     }
+
+  //     setSearchLoading(true);
+  //     try {
+  //       let queryBuilder = supabase
+  //         .from("users")
+  //         .select("*, flats!inner(society_id)")
+  //         .eq("flats.society_id", flat.society_id)
+  //         .or(
+  //           `name.ilike.%${debouncedSearchQuery}%,number.ilike.%${debouncedSearchQuery}%`,
+  //         )
+  //         .limit(20);
+
+  //       const { data, error } = await queryBuilder;
+
+  //       if (error) throw error;
+  //       setSearchResults(data || []);
+  //     } catch (error) {
+  //       console.error("Error searching users:", error);
+  //     } finally {
+  //       setSearchLoading(false);
+  //     }
+  //   };
+
+  //   fetchUsers();
+  // }, [debouncedSearchQuery, flat?.society_id]);
+  useEffect(() => {
+    const fetchUsers = async () => {
+      if (!debouncedSearchQuery || debouncedSearchQuery.length < 2) {
+        setSearchResults([]);
+        return;
+      }
+
+      setSearchLoading(true);
+      try {
+        // Fetch users with role_type Tanent-O or Tanent-M
+        const { data, error } = await supabase
+          .from("users")
+          .select("*")
+          .or(`role_type.eq.Tanent-O,role_type.eq.Tanent-M`)
+          .ilike("name", `%${debouncedSearchQuery}%`)
+          .or(
+            `email.ilike.%${debouncedSearchQuery}%,number.ilike.%${debouncedSearchQuery}%`,
+          )
+          .limit(20);
+
+        if (error) throw error;
+        setSearchResults(data || []);
+      } catch (error) {
+        console.error("Error searching users:", error);
+      } finally {
+        setSearchLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, [debouncedSearchQuery]);
+
+  const handleUserSelect = (event, newValue) => {
+    setSelectedUser(newValue);
+    if (newValue) {
+      setFormData({
+        name: newValue.name || "",
+        email: newValue.email || "",
+        password: "",
+        phone: newValue.number || "",
+        whatsapp_number: newValue.whatsapp_number || "",
+        profile_url: newValue.profile_url || "",
+        role_type: formData.role_type,
+      });
+      setErrors({});
+    } else {
+      resetForm();
+    }
+  };
+
   const updateMemberUser = async ({ registedUserId }) => {
     const {
       data: { user },
@@ -306,6 +424,7 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
   const handleEditOwner = () => {
     if (existingOwner) {
       setIsEditMode(true);
+      setSelectedUser(existingOwner);
       setFormData({
         name: existingOwner.name,
         email: existingOwner.email,
@@ -331,6 +450,79 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
     }
   };
 
+  // const handleAddUser = async () => {
+  //   try {
+  //     setLoading(true);
+
+  //     if (!flat?.id || !flat?.building_id || !flat?.society_id) {
+  //       throw new Error("Flat data missing");
+  //     }
+
+  //     let registeredUserId;
+  //     if (selectedUser) {
+  //       registeredUserId = selectedUser.id;
+  //     } else {
+  //       const apiResult = await createUser({
+  //         name: formData.name.trim(),
+  //         email: formData.email.trim(),
+  //         password: formData.password || "123456",
+  //         contact: formData.phone,
+  //         whatsapp: formData.whatsapp_number || formData.phone,
+  //         role_type: formData.role_type,
+  //       });
+  //       registeredUserId = apiResult.user?.id || apiResult.id;
+  //     }
+
+  //     if (!registeredUserId) {
+  //       throw new Error("User ID not returned from API");
+  //     }
+
+  //     console.log("✅ Registered User ID:", registeredUserId);
+
+  //     // Link user to flat
+  //     const { error: userFlatError } = await supabase
+  //       .from("user_flats")
+  //       .insert({
+  //         user_id: registeredUserId,
+  //         society_id: flat.society_id,
+  //         building_id: flat.building_id,
+  //         flat_id: flat.id,
+  //       });
+
+  //     if (userFlatError) {
+  //       console.error("Error linking user to flat:", userFlatError);
+  //       toast.warning("User linked but flat assignment failed");
+  //     }
+
+  //     // Update users table with flat + image
+  //     await updateMemberUser({ registedUserId: registeredUserId });
+
+  //     // Update flat occupancy if owner
+  //     if (formData.role_type === "Tanent-O") {
+  //       await supabase
+  //         .from("flats")
+  //         .update({
+  //           occupancy_status: "Occupied",
+  //           updated_at: new Date().toISOString(),
+  //         })
+  //         .eq("id", flat.id);
+  //     }
+
+  //     toast.success(
+  //       formData.role_type === "Tanent-O"
+  //         ? "Primary owner added successfully"
+  //         : "Family member added successfully",
+  //     );
+
+  //     resetForm();
+  //     onClose();
+  //   } catch (error) {
+  //     console.error("❌ Add user error:", error);
+  //     toast.error(error.message || "Failed to add user");
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
   const handleAddUser = async () => {
     try {
       setLoading(true);
@@ -339,43 +531,87 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
         throw new Error("Flat data missing");
       }
 
-      const apiResult = await createUser({
-        name: formData.name.trim(),
-        email: formData.email.trim(),
-        password: formData.password,
-        contact: formData.phone,
-        whatsapp: formData.whatsapp_number || formData.phone,
-        role_type: formData.role_type,
-      });
+      let registeredUserId;
 
-      const registeredUserId =
-        apiResult.user_id || apiResult.user?.id || apiResult.id;
+      if (selectedUser) {
+        // ✅ Existing user selected
+        registeredUserId = selectedUser.id;
 
-      if (!registeredUserId) {
-        throw new Error("User ID not returned from API");
+        // Only link user to flat and update profile if needed
+        const { error: userFlatError } = await supabase
+          .from("user_flats")
+          .insert({
+            user_id: registeredUserId,
+            society_id: flat.society_id,
+            building_id: flat.building_id,
+            flat_id: flat.id,
+          });
+
+        if (userFlatError) {
+          console.error("Error linking user to flat:", userFlatError);
+          toast.warning("User linked but flat assignment failed");
+        }
+
+        // Update profile only if any changes
+        await updateMemberUser({ registedUserId: registeredUserId });
+
+        toast.success(
+          formData.role_type === "Tanent-O"
+            ? "Primary owner assigned successfully"
+            : "Family member assigned successfully",
+        );
+      } else {
+        // ❌ No user selected → create a new user
+        const apiResult = await createUser({
+          name: formData.name.trim(),
+          email: formData.email.trim(),
+          password: formData.password || "123456",
+          contact: formData.phone,
+          whatsapp: formData.whatsapp_number || formData.phone,
+          role_type: formData.role_type,
+        });
+
+        registeredUserId = apiResult.user?.id || apiResult.id;
+
+        if (!registeredUserId) {
+          throw new Error("User ID not returned from API");
+        }
+
+        // Link user to flat
+        const { error: userFlatError } = await supabase
+          .from("user_flats")
+          .insert({
+            user_id: registeredUserId,
+            society_id: flat.society_id,
+            building_id: flat.building_id,
+            flat_id: flat.id,
+          });
+
+        if (userFlatError) {
+          console.error("Error linking user to flat:", userFlatError);
+          toast.warning("User linked but flat assignment failed");
+        }
+
+        // Update users table with flat + image
+        await updateMemberUser({ registedUserId: registeredUserId });
+
+        // Update flat occupancy if owner
+        if (formData.role_type === "Tanent-O") {
+          await supabase
+            .from("flats")
+            .update({
+              occupancy_status: "Occupied",
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", flat.id);
+        }
+
+        toast.success(
+          formData.role_type === "Tanent-O"
+            ? "Primary owner added successfully"
+            : "Family member added successfully",
+        );
       }
-
-      console.log("✅ Registered User ID:", registeredUserId);
-
-      // 2️⃣ Update users table with flat + image
-      await updateMemberUser({ registedUserId: registeredUserId });
-
-      // 3️⃣ Update flat occupancy if owner
-      if (formData.role_type === "Tanent-O") {
-        await supabase
-          .from("flats")
-          .update({
-            occupancy_status: "Occupied",
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", flat.id);
-      }
-
-      toast.success(
-        formData.role_type === "Tanent-O"
-          ? "Primary owner added successfully"
-          : "Family member added successfully"
-      );
 
       resetForm();
       onClose();
@@ -426,17 +662,23 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
     }
   };
 
+  const handleClearSelection = () => {
+    setSelectedUser(null);
+    resetForm();
+  };
+
   return (
     <Dialog
       open={open}
       onClose={onClose}
-      maxWidth="md"
+      maxWidth="lg"
       fullWidth
       PaperProps={{
         sx: {
           borderRadius: 3,
           overflow: "hidden",
           boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3)",
+          minHeight: "600px",
         },
       }}
     >
@@ -492,8 +734,8 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
               {isEditMode
                 ? "Edit Owner Details"
                 : formData.role_type === "Tanent-O"
-                ? "Add Primary Owner"
-                : "Add Family Member"}
+                  ? "Add Primary Owner"
+                  : "Add Family Member"}
             </Typography>
             <Box display="flex" alignItems="center" gap={2} mt={0.5}>
               <Chip
@@ -519,6 +761,19 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
                   height: 24,
                 }}
               />
+              {selectedUser && (
+                <Chip
+                  label="Existing User Selected"
+                  size="small"
+                  color="success"
+                  icon={<CheckCircle sx={{ fontSize: 14 }} />}
+                  sx={{
+                    fontWeight: 500,
+                    fontFamily: "'Roboto', sans-serif",
+                    height: 24,
+                  }}
+                />
+              )}
             </Box>
           </Box>
         </Box>
@@ -555,7 +810,6 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
                   color: theme.textAndTab,
                   border: `1px solid ${theme.trackSelect}`,
                   borderRadius: 2,
-                  boxShadow: `0 4px 12px ${theme.trackSelect}20`,
                   "& .MuiAlert-icon": {
                     color: theme.textAndTab,
                   },
@@ -641,16 +895,15 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
               transition={{ duration: 0.3 }}
             >
               <Alert
-                severity="success"
+                severity="info"
                 sx={{
                   mb: 3,
-                  bgcolor: `${theme.success}15`,
-                  color: theme.success,
-                  border: `1px solid ${theme.success}40`,
+                  bgcolor: `${theme.primary}08`,
+                  color: theme.textAndTab,
+                  border: `1px solid ${theme.primary}40`,
                   borderRadius: 2,
-                  boxShadow: `0 4px 12px ${theme.success}20`,
                   "& .MuiAlert-icon": {
-                    color: theme.success,
+                    color: theme.primary,
                   },
                 }}
               >
@@ -663,32 +916,228 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
                 >
                   {isEditMode
                     ? "Editing primary owner details"
-                    : "You're adding the primary owner for this flat."}
+                    : formData.role_type === "Tanent-O"
+                      ? "Select an existing user or create a new one for Primary Owner"
+                      : "Add a new family member for this flat"}
                 </Typography>
               </Alert>
             </motion.div>
           )}
 
           <Grid container spacing={3}>
-            {/* Left Column - Profile Image & Role */}
-            <Grid item xs={12} md={5}>
+            {/* Left Column - User Selection & Role */}
+            <Grid item xs={12} md={4}>
               <motion.div
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.4, delay: 0.1 }}
               >
-                <Card
-                  sx={{
-                    border: `2px solid ${theme.trackSelect}`,
-                    borderRadius: 3,
-                    overflow: "hidden",
-                    height: "100%",
-                    boxShadow: `0 8px 32px ${theme.trackSelect}20`,
-                  }}
-                >
-                  <CardContent sx={{ p: 3 }}>
-                    {/* Profile Image Upload */}
-                    <Box mb={3}>
+                <Stack spacing={3}>
+                  {/* User Selection (Only for Tanent-O) */}
+                  {!isEditMode && formData.role_type === "Tanent-O" && (
+                    <Card
+                      sx={{
+                        border: `2px solid ${theme.trackSelect}`,
+                        borderRadius: 3,
+                        overflow: "hidden",
+                        boxShadow: `0 4px 20px ${theme.trackSelect}15`,
+                      }}
+                    >
+                      <CardContent sx={{ p: 3 }}>
+                        <Typography
+                          variant="subtitle1"
+                          sx={{
+                            mb: 2,
+                            color: theme.textAndTab,
+                            fontWeight: 600,
+                            fontFamily: "'Roboto', sans-serif",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1,
+                          }}
+                        >
+                          <Box
+                            component="span"
+                            sx={{
+                              width: 24,
+                              height: 24,
+                              borderRadius: "50%",
+                              bgcolor: theme.primary,
+                              color: "white",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontSize: 14,
+                            }}
+                          >
+                            1
+                          </Box>
+                          Select User
+                        </Typography>
+
+                        {selectedUser ? (
+                          <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            transition={{ duration: 0.2 }}
+                          >
+                            <Paper
+                              elevation={0}
+                              sx={{
+                                p: 2,
+                                border: `2px solid ${theme.success}40`,
+                                borderRadius: 2,
+                                bgcolor: `${theme.success}08`,
+                              }}
+                            >
+                              <Box display="flex" alignItems="center" gap={2}>
+                                <Avatar
+                                  src={selectedUser.profile_url}
+                                  sx={{ width: 48, height: 48 }}
+                                >
+                                  {selectedUser.name?.charAt(0)}
+                                </Avatar>
+                                <Box flex={1}>
+                                  <Typography
+                                    variant="subtitle2"
+                                    fontWeight={600}
+                                  >
+                                    {selectedUser.name}
+                                  </Typography>
+                                  <Typography
+                                    variant="caption"
+                                    color="text.secondary"
+                                  >
+                                    {selectedUser.number} • {selectedUser.email}
+                                  </Typography>
+                                </Box>
+                                <IconButton
+                                  size="small"
+                                  onClick={handleClearSelection}
+                                  sx={{
+                                    color: theme.reject,
+                                    "&:hover": {
+                                      backgroundColor: `${theme.reject}15`,
+                                    },
+                                  }}
+                                >
+                                  <Close />
+                                </IconButton>
+                              </Box>
+                              <Button
+                                fullWidth
+                                variant="outlined"
+                                size="small"
+                                onClick={handleClearSelection}
+                                sx={{
+                                  mt: 2,
+                                  borderColor: theme.trackSelect,
+                                  color: theme.textAndTab,
+                                  textTransform: "none",
+                                }}
+                              >
+                                Select Different User
+                              </Button>
+                            </Paper>
+                          </motion.div>
+                        ) : (
+                          <Autocomplete
+                            options={searchResults}
+                            loading={searchLoading}
+                            getOptionLabel={(option) =>
+                              `${option.name} (${option.number})`
+                            }
+                            onInputChange={(e, query) => setSearchQuery(query)}
+                            onChange={handleUserSelect}
+                            renderOption={(props, option) => (
+                              <li {...props} style={{ padding: "10px 16px" }}>
+                                <Box display="flex" alignItems="center" gap={2}>
+                                  <Avatar
+                                    src={option.profile_url}
+                                    sx={{ width: 36, height: 36 }}
+                                  >
+                                    {option.name?.charAt(0)}
+                                  </Avatar>
+                                  <Box>
+                                    <Typography
+                                      variant="body2"
+                                      fontWeight={500}
+                                    >
+                                      {option.name}
+                                    </Typography>
+                                    <Typography
+                                      variant="caption"
+                                      color="text.secondary"
+                                    >
+                                      {option.email} • {option.number}
+                                    </Typography>
+                                  </Box>
+                                </Box>
+                              </li>
+                            )}
+                            renderInput={(params) => (
+                              <TextField
+                                {...params}
+                                placeholder="Search existing users..."
+                                variant="outlined"
+                                size="small"
+                                InputProps={{
+                                  ...params.InputProps,
+                                  startAdornment: (
+                                    <InputAdornment position="start">
+                                      <Search sx={{ color: theme.hintText }} />
+                                    </InputAdornment>
+                                  ),
+                                }}
+                                sx={{
+                                  "& .MuiOutlinedInput-root": {
+                                    borderRadius: 2,
+                                    backgroundColor: theme.lightBackground,
+                                  },
+                                }}
+                              />
+                            )}
+                            noOptionsText={
+                              <Box sx={{ p: 2, textAlign: "center" }}>
+                                <Typography
+                                  variant="body2"
+                                  color="text.secondary"
+                                >
+                                  {searchQuery.length < 2
+                                    ? "Type at least 2 characters"
+                                    : "No users found"}
+                                </Typography>
+                              </Box>
+                            }
+                          />
+                        )}
+
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            mt: 2,
+                            display: "block",
+                            color: theme.hintText,
+                            fontFamily: "'Roboto', sans-serif",
+                          }}
+                        >
+                          Search for existing users in the society or create a
+                          new user below
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Role Selection */}
+                  <Card
+                    sx={{
+                      border: `2px solid ${theme.trackSelect}`,
+                      borderRadius: 3,
+                      overflow: "hidden",
+                      boxShadow: `0 4px 20px ${theme.trackSelect}15`,
+                    }}
+                  >
+                    <CardContent sx={{ p: 3 }}>
                       <Typography
                         variant="subtitle1"
                         sx={{
@@ -715,188 +1164,13 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
                             fontSize: 14,
                           }}
                         >
-                          1
-                        </Box>
-                        Profile Image
-                      </Typography>
-
-                      <Box
-                        sx={{
-                          border: `2px dashed ${
-                            dragging ? theme.primary : theme.trackSelect
-                          }`,
-                          borderRadius: 2,
-                          p: 3,
-                          textAlign: "center",
-                          backgroundColor: dragging
-                            ? theme.lightBackground
-                            : "transparent",
-                          cursor: "pointer",
-                          transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                          position: "relative",
-                          overflow: "hidden",
-                          "&:hover": {
-                            borderColor: theme.primary,
-                            backgroundColor: theme.lightBackground,
-                            transform: "translateY(-2px)",
-                            boxShadow: `0 8px 24px ${theme.trackSelect}30`,
-                          },
-                        }}
-                        onDragEnter={handleDragEnter}
-                        onDragLeave={handleDragLeave}
-                        onDragOver={handleDragOver}
-                        onDrop={handleDrop}
-                        onClick={() => fileInputRef.current.click()}
-                      >
-                        <input
-                          type="file"
-                          ref={fileInputRef}
-                          onChange={handleFileInput}
-                          accept="image/*"
-                          style={{ display: "none" }}
-                        />
-
-                        {formData.profile_url ? (
-                          <motion.div
-                            initial={{ scale: 0.8, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            transition={{ duration: 0.3 }}
-                          >
-                            <Box position="relative">
-                              <Avatar
-                                src={formData.profile_url}
-                                sx={{
-                                  width: 140,
-                                  height: 140,
-                                  mx: "auto",
-                                  mb: 2,
-                                  border: `4px solid ${theme.primary}30`,
-                                  boxShadow: `0 8px 24px ${theme.trackSelect}40`,
-                                }}
-                              />
-                              <IconButton
-                                size="small"
-                                sx={{
-                                  position: "absolute",
-                                  top: 8,
-                                  right: "calc(50% - 70px)",
-                                  backgroundColor: theme.reject,
-                                  color: "white",
-                                  "&:hover": {
-                                    backgroundColor: theme.reject,
-                                    opacity: 0.9,
-                                    transform: "scale(1.1)",
-                                  },
-                                  transition: "all 0.2s",
-                                }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleRemoveImage();
-                                }}
-                              >
-                                <Delete fontSize="small" />
-                              </IconButton>
-                            </Box>
-                          </motion.div>
-                        ) : (
-                          <motion.div
-                            initial={{ opacity: 0.5 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ duration: 0.3 }}
-                          >
-                            <Box>
-                              <CloudUpload
-                                sx={{
-                                  fontSize: 56,
-                                  color: uploadingImage
-                                    ? theme.trackSelect
-                                    : theme.hintText,
-                                  mb: 1.5,
-                                  opacity: uploadingImage ? 0.5 : 1,
-                                }}
-                              />
-                              <Typography
-                                variant="body2"
-                                sx={{
-                                  color: theme.hintText,
-                                  fontFamily: "'Roboto', sans-serif",
-                                }}
-                              >
-                                {uploadingImage ? (
-                                  <Box
-                                    display="flex"
-                                    alignItems="center"
-                                    gap={1}
-                                  >
-                                    <CircularProgress
-                                      size={20}
-                                      sx={{ color: theme.primary }}
-                                    />
-                                    Uploading...
-                                  </Box>
-                                ) : (
-                                  <>
-                                    <Box
-                                      component="span"
-                                      sx={{
-                                        fontWeight: 500,
-                                        color: theme.textAndTab,
-                                      }}
-                                    >
-                                      Drag & drop or click to upload
-                                    </Box>
-                                    <Typography
-                                      variant="caption"
-                                      display="block"
-                                      mt={1}
-                                      sx={{
-                                        color: theme.hintText,
-                                        fontFamily: "'Roboto', sans-serif",
-                                      }}
-                                    >
-                                      JPG, PNG up to 5MB
-                                    </Typography>
-                                  </>
-                                )}
-                              </Typography>
-                            </Box>
-                          </motion.div>
-                        )}
-                      </Box>
-                    </Box>
-
-                    {/* Role Type Selection */}
-                    <Box>
-                      <Typography
-                        variant="subtitle1"
-                        sx={{
-                          mb: 1.5,
-                          color: theme.textAndTab,
-                          fontWeight: 600,
-                          fontFamily: "'Roboto', sans-serif",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 1,
-                        }}
-                      >
-                        <Box
-                          component="span"
-                          sx={{
-                            width: 24,
-                            height: 24,
-                            borderRadius: "50%",
-                            bgcolor: theme.primary,
-                            color: "white",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontSize: 14,
-                          }}
-                        >
-                          2
+                          {formData.role_type === "Tanent-O" && !selectedUser
+                            ? 2
+                            : 1}
                         </Box>
                         Role Type
                       </Typography>
+
                       <FormControl fullWidth>
                         <InputLabel
                           sx={{
@@ -962,39 +1236,174 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
                         </Select>
                       </FormControl>
 
-                      {(existingOwner || isEditMode) && (
-                        <Typography
-                          variant="caption"
+                      <Alert
+                        severity="info"
+                        sx={{
+                          mt: 2,
+                          py: 0.5,
+                          bgcolor: `${theme.primary}08`,
+                          "& .MuiAlert-icon": { fontSize: 16 },
+                        }}
+                      >
+                        <Typography variant="caption">
+                          {formData.role_type === "Tanent-O"
+                            ? "Primary owner can be an existing user or new user"
+                            : "Family members must be created as new users"}
+                        </Typography>
+                      </Alert>
+                    </CardContent>
+                  </Card>
+
+                  {/* Profile Image */}
+                  <Card
+                    sx={{
+                      border: `2px solid ${theme.trackSelect}`,
+                      borderRadius: 3,
+                      overflow: "hidden",
+                      boxShadow: `0 4px 20px ${theme.trackSelect}15`,
+                    }}
+                  >
+                    <CardContent sx={{ p: 3 }}>
+                      <Typography
+                        variant="subtitle1"
+                        sx={{
+                          mb: 2,
+                          color: theme.textAndTab,
+                          fontWeight: 600,
+                          fontFamily: "'Roboto', sans-serif",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1,
+                        }}
+                      >
+                        <Box
+                          component="span"
                           sx={{
-                            color: theme.primary,
-                            mt: 1,
-                            display: "block",
-                            fontFamily: "'Roboto', sans-serif",
-                            fontWeight: 500,
+                            width: 24,
+                            height: 24,
+                            borderRadius: "50%",
+                            bgcolor: theme.primary,
+                            color: "white",
                             display: "flex",
                             alignItems: "center",
-                            gap: 0.5,
+                            justifyContent: "center",
+                            fontSize: 14,
                           }}
                         >
-                          <Box
-                            component="span"
-                            sx={{
-                              fontSize: 16,
-                            }}
+                          {formData.role_type === "Tanent-O" && !selectedUser
+                            ? 3
+                            : 2}
+                        </Box>
+                        Profile Image
+                      </Typography>
+
+                      <Box
+                        sx={{
+                          border: `2px dashed ${
+                            dragging ? theme.primary : theme.trackSelect
+                          }`,
+                          borderRadius: 2,
+                          p: 3,
+                          textAlign: "center",
+                          backgroundColor: dragging
+                            ? theme.lightBackground
+                            : "transparent",
+                          cursor: "pointer",
+                          position: "relative",
+                          "&:hover": {
+                            borderColor: theme.primary,
+                            backgroundColor: theme.lightBackground,
+                          },
+                        }}
+                        onDragEnter={handleDragEnter}
+                        onDragLeave={handleDragLeave}
+                        onDragOver={handleDragOver}
+                        onDrop={handleDrop}
+                        onClick={() => fileInputRef.current.click()}
+                      >
+                        <input
+                          type="file"
+                          ref={fileInputRef}
+                          onChange={handleFileInput}
+                          accept="image/*"
+                          style={{ display: "none" }}
+                        />
+
+                        {formData.profile_url ? (
+                          <motion.div
+                            initial={{ scale: 0.8, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            transition={{ duration: 0.3 }}
                           >
-                            ⓘ
+                            <Box position="relative" display="inline-block">
+                              <Avatar
+                                src={formData.profile_url}
+                                sx={{
+                                  width: 100,
+                                  height: 100,
+                                  border: `3px solid ${theme.primary}30`,
+                                }}
+                              />
+                              <IconButton
+                                size="small"
+                                sx={{
+                                  position: "absolute",
+                                  top: 0,
+                                  right: 0,
+                                  backgroundColor: theme.reject,
+                                  color: "white",
+                                  "&:hover": {
+                                    backgroundColor: theme.reject,
+                                  },
+                                }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRemoveImage();
+                                }}
+                              >
+                                <Delete fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </motion.div>
+                        ) : (
+                          <Box>
+                            <CloudUpload
+                              sx={{
+                                fontSize: 40,
+                                color: theme.hintText,
+                                mb: 1,
+                              }}
+                            />
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                color: theme.hintText,
+                                fontFamily: "'Roboto', sans-serif",
+                              }}
+                            >
+                              {uploadingImage ? (
+                                <Box display="flex" alignItems="center" gap={1}>
+                                  <CircularProgress
+                                    size={20}
+                                    sx={{ color: theme.primary }}
+                                  />
+                                  Uploading...
+                                </Box>
+                              ) : (
+                                "Click or drag to upload"
+                              )}
+                            </Typography>
                           </Box>
-                          Role cannot be changed for existing owner
-                        </Typography>
-                      )}
-                    </Box>
-                  </CardContent>
-                </Card>
+                        )}
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Stack>
               </motion.div>
             </Grid>
 
             {/* Right Column - Form Fields */}
-            <Grid item xs={12} md={7}>
+            <Grid item xs={12} md={8}>
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -1006,7 +1415,7 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
                     borderRadius: 3,
                     overflow: "hidden",
                     height: "100%",
-                    boxShadow: `0 8px 32px ${theme.trackSelect}20`,
+                    boxShadow: `0 4px 20px ${theme.trackSelect}15`,
                   }}
                 >
                   <CardContent sx={{ p: 3 }}>
@@ -1036,13 +1445,14 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
                           fontSize: 14,
                         }}
                       >
-                        3
+                        {formData.role_type === "Tanent-O" && !selectedUser
+                          ? 4
+                          : 2}
                       </Box>
                       Personal Information
                     </Typography>
 
                     <Grid container spacing={2.5}>
-                      {/* Name Field */}
                       <Grid item xs={12}>
                         <TextField
                           label="Full Name"
@@ -1052,6 +1462,7 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
                           error={!!errors.name}
                           helperText={errors.name}
                           required
+                          disabled={!!selectedUser}
                           InputProps={{
                             startAdornment: (
                               <InputAdornment position="start">
@@ -1060,33 +1471,17 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
                             ),
                           }}
                           sx={{
-                            "& .MuiInputLabel-root": {
-                              fontFamily: "'Roboto', sans-serif",
-                              color: theme.hintText,
-                            },
-                            "& .MuiInputLabel-root.Mui-focused": {
-                              color: theme.primary,
-                            },
                             "& .MuiOutlinedInput-root": {
-                              fontFamily: "'Roboto', sans-serif",
+                              borderRadius: 2,
                               "& fieldset": {
                                 borderColor: theme.trackSelect,
                                 borderWidth: 2,
                               },
-                              "&:hover fieldset": {
-                                borderColor: theme.primary,
-                              },
-                              "&.Mui-focused fieldset": {
-                                borderColor: theme.primary,
-                                borderWidth: 2,
-                              },
-                              borderRadius: 2,
                             },
                           }}
                         />
                       </Grid>
 
-                      {/* Email Field */}
                       <Grid item xs={12}>
                         <TextField
                           label="Email Address"
@@ -1097,6 +1492,7 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
                           error={!!errors.email}
                           helperText={errors.email}
                           required
+                          disabled={!!selectedUser}
                           InputProps={{
                             startAdornment: (
                               <InputAdornment position="start">
@@ -1105,34 +1501,19 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
                             ),
                           }}
                           sx={{
-                            "& .MuiInputLabel-root": {
-                              fontFamily: "'Roboto', sans-serif",
-                              color: theme.hintText,
-                            },
-                            "& .MuiInputLabel-root.Mui-focused": {
-                              color: theme.primary,
-                            },
                             "& .MuiOutlinedInput-root": {
-                              fontFamily: "'Roboto', sans-serif",
+                              borderRadius: 2,
                               "& fieldset": {
                                 borderColor: theme.trackSelect,
                                 borderWidth: 2,
                               },
-                              "&:hover fieldset": {
-                                borderColor: theme.primary,
-                              },
-                              "&.Mui-focused fieldset": {
-                                borderColor: theme.primary,
-                                borderWidth: 2,
-                              },
-                              borderRadius: 2,
                             },
                           }}
                         />
                       </Grid>
 
                       {/* Password Field (only for new users) */}
-                      {!isEditMode && (
+                      {!isEditMode && !selectedUser && (
                         <Grid item xs={12}>
                           <TextField
                             label="Password"
@@ -1169,34 +1550,18 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
                               ),
                             }}
                             sx={{
-                              "& .MuiInputLabel-root": {
-                                fontFamily: "'Roboto', sans-serif",
-                                color: theme.hintText,
-                              },
-                              "& .MuiInputLabel-root.Mui-focused": {
-                                color: theme.primary,
-                              },
                               "& .MuiOutlinedInput-root": {
-                                fontFamily: "'Roboto', sans-serif",
+                                borderRadius: 2,
                                 "& fieldset": {
                                   borderColor: theme.trackSelect,
                                   borderWidth: 2,
                                 },
-                                "&:hover fieldset": {
-                                  borderColor: theme.primary,
-                                },
-                                "&.Mui-focused fieldset": {
-                                  borderColor: theme.primary,
-                                  borderWidth: 2,
-                                },
-                                borderRadius: 2,
                               },
                             }}
                           />
                         </Grid>
                       )}
 
-                      {/* Phone Field */}
                       <Grid item xs={12} sm={6}>
                         <TextField
                           label="Phone Number"
@@ -1206,44 +1571,27 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
                           error={!!errors.phone}
                           helperText={errors.phone || "10 digits"}
                           required
+                          disabled={!!selectedUser}
                           InputProps={{
                             startAdornment: (
                               <InputAdornment position="start">
                                 <Phone sx={{ color: theme.primary }} />
                               </InputAdornment>
                             ),
-                            inputProps: {
-                              maxLength: 10,
-                            },
+                            inputProps: { maxLength: 10 },
                           }}
                           sx={{
-                            "& .MuiInputLabel-root": {
-                              fontFamily: "'Roboto', sans-serif",
-                              color: theme.hintText,
-                            },
-                            "& .MuiInputLabel-root.Mui-focused": {
-                              color: theme.primary,
-                            },
                             "& .MuiOutlinedInput-root": {
-                              fontFamily: "'Roboto', sans-serif",
+                              borderRadius: 2,
                               "& fieldset": {
                                 borderColor: theme.trackSelect,
                                 borderWidth: 2,
                               },
-                              "&:hover fieldset": {
-                                borderColor: theme.primary,
-                              },
-                              "&.Mui-focused fieldset": {
-                                borderColor: theme.primary,
-                                borderWidth: 2,
-                              },
-                              borderRadius: 2,
                             },
                           }}
                         />
                       </Grid>
 
-                      {/* WhatsApp Number Field */}
                       <Grid item xs={12} sm={6}>
                         <TextField
                           label="WhatsApp Number"
@@ -1254,57 +1602,41 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
                           helperText={
                             errors.whatsapp_number || "Optional - 10 digits"
                           }
+                          disabled={!!selectedUser}
                           InputProps={{
                             startAdornment: (
                               <InputAdornment position="start">
                                 <WhatsApp sx={{ color: "#25D366" }} />
                               </InputAdornment>
                             ),
-                            inputProps: {
-                              maxLength: 10,
-                            },
+                            inputProps: { maxLength: 10 },
                           }}
                           sx={{
-                            "& .MuiInputLabel-root": {
-                              fontFamily: "'Roboto', sans-serif",
-                              color: theme.hintText,
-                            },
-                            "& .MuiInputLabel-root.Mui-focused": {
-                              color: theme.primary,
-                            },
                             "& .MuiOutlinedInput-root": {
-                              fontFamily: "'Roboto', sans-serif",
+                              borderRadius: 2,
                               "& fieldset": {
                                 borderColor: theme.trackSelect,
                                 borderWidth: 2,
                               },
-                              "&:hover fieldset": {
-                                borderColor: theme.primary,
-                              },
-                              "&.Mui-focused fieldset": {
-                                borderColor: theme.primary,
-                                borderWidth: 2,
-                              },
-                              borderRadius: 2,
                             },
                           }}
                         />
                       </Grid>
 
-                      {/* Info Box */}
+                      {/* Status Display */}
                       <Grid item xs={12}>
                         <motion.div
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: 0.3, delay: 0.3 }}
                         >
-                          <Box
+                          <Paper
+                            variant="outlined"
                             sx={{
                               p: 2.5,
                               bgcolor: theme.lightBackground,
                               borderRadius: 2,
-                              border: `2px solid ${theme.trackSelect}`,
-                              mt: 1,
+                              borderColor: theme.trackSelect,
                             }}
                           >
                             <Typography
@@ -1312,7 +1644,6 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
                               sx={{
                                 color: theme.textAndTab,
                                 fontWeight: 600,
-                                fontFamily: "'Roboto', sans-serif",
                                 mb: 1,
                                 display: "flex",
                                 alignItems: "center",
@@ -1321,46 +1652,64 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
                             >
                               <Box
                                 component="span"
-                                sx={{
-                                  color: theme.primary,
-                                  fontSize: 18,
-                                }}
+                                sx={{ color: theme.primary, fontSize: 18 }}
                               >
                                 ⓘ
                               </Box>
-                              Important Information
+                              Current Status
                             </Typography>
+                            <Box display="flex" alignItems="center" gap={2}>
+                              <Chip
+                                label={
+                                  formData.role_type === "Tanent-O"
+                                    ? "Primary Owner"
+                                    : "Family Member"
+                                }
+                                size="small"
+                                sx={{
+                                  bgcolor:
+                                    formData.role_type === "Tanent-O"
+                                      ? `${theme.primary}15`
+                                      : `${theme.trackSelect}15`,
+                                  color:
+                                    formData.role_type === "Tanent-O"
+                                      ? theme.primary
+                                      : theme.textAndTab,
+                                  fontWeight: 500,
+                                }}
+                              />
+                              {selectedUser ? (
+                                <Chip
+                                  label="Using Existing User"
+                                  size="small"
+                                  color="success"
+                                  variant="outlined"
+                                  icon={<Person sx={{ fontSize: 14 }} />}
+                                />
+                              ) : (
+                                <Chip
+                                  label="Creating New User"
+                                  size="small"
+                                  color="primary"
+                                  variant="outlined"
+                                  icon={<PersonAdd sx={{ fontSize: 14 }} />}
+                                />
+                              )}
+                            </Box>
                             <Typography
                               variant="caption"
                               sx={{
                                 color: theme.hintText,
-                                fontFamily: "'Roboto', sans-serif",
-                                lineHeight: 1.6,
                                 display: "block",
-                                mb: 1,
-                              }}
-                            >
-                              • <strong>Email and Password</strong> are required
-                              for user account creation
-                              <br />• Email will be used for login and
-                              notifications
-                              <br />• Password must be at least 6 characters
-                              long
-                            </Typography>
-                            <Typography
-                              variant="caption"
-                              sx={{
-                                color: theme.hintText,
-                                fontFamily: "'Roboto', sans-serif",
+                                mt: 1.5,
                                 lineHeight: 1.6,
                               }}
                             >
-                              • <strong>Tanent-O:</strong> Primary
-                              owner/resident (can only be one per flat)
-                              <br />• <strong>Tanent-M:</strong> Family member
-                              (additional residents, can be multiple)
+                              {formData.role_type === "Tanent-O"
+                                ? "Primary owner has full access and management rights for this flat."
+                                : "Family members have limited access and are linked to the primary owner."}
                             </Typography>
-                          </Box>
+                          </Paper>
                         </motion.div>
                       </Grid>
                     </Grid>
@@ -1396,10 +1745,7 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
             "&:hover": {
               borderColor: theme.primary,
               bgcolor: `${theme.primary}08`,
-              transform: "translateY(-1px)",
-              boxShadow: `0 4px 12px ${theme.trackSelect}20`,
             },
-            transition: "all 0.2s",
           }}
         >
           Cancel
@@ -1423,22 +1769,18 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
             py: 1,
             "&:hover": {
               bgcolor: theme.darkTrackSelect,
-              transform: "translateY(-1px)",
-              boxShadow: `0 8px 24px ${theme.primary}40`,
             },
-            "&:disabled": {
-              bgcolor: `${theme.button}80`,
-            },
-            transition: "all 0.2s",
           }}
         >
           {loading
             ? "Processing..."
             : isEditMode
-            ? "Update Owner"
-            : formData.role_type === "Tanent-O"
-            ? "Add Primary Owner"
-            : "Add Family Member"}
+              ? "Update Owner"
+              : formData.role_type === "Tanent-O"
+                ? selectedUser
+                  ? "Assign as Owner"
+                  : "Create New Owner"
+                : "Add Family Member"}
         </Button>
       </DialogActions>
     </Dialog>
