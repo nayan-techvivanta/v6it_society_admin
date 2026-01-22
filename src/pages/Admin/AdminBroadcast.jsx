@@ -584,11 +584,10 @@ const AdminBroadcast = () => {
       // Success
       setSnackbar({
         open: true,
-        message: `Broadcast sent successfully to ${
-          formData.broadcastType === "society"
-            ? "entire society"
-            : "selected building"
-        }!`,
+        message: `Broadcast sent successfully to ${formData.broadcastType === "society"
+          ? "entire society"
+          : "selected building"
+          }!`,
         severity: "success",
       });
 
@@ -625,206 +624,314 @@ const AdminBroadcast = () => {
 
   // Render create form
   const renderCreateForm = () => (
-    <form onSubmit={handleSubmit}>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column - Form */}
-        <motion.div variants={itemVariants} className="lg:col-span-2 space-y-6">
-          <StyledCard>
-            <CardContent className="p-6 space-y-6">
-              {/* Title */}
-              <motion.div variants={itemVariants}>
-                <TextField
-                  fullWidth
-                  label="Broadcast Title"
-                  name="title"
-                  value={formData.title}
-                  onChange={handleInputChange}
-                  variant="outlined"
-                  required
-                  placeholder="Enter announcement title..."
-                  InputProps={{
-                    sx: {
-                      borderRadius: "8px",
-                      backgroundColor: "rgba(255, 255, 255, 0.8)",
-                      fontFamily: "'Roboto', sans-serif",
-                      "& .MuiOutlinedInput-notchedOutline": {
-                        borderColor: "rgba(111, 11, 20, 0.2)",
-                      },
-                      "&:hover .MuiOutlinedInput-notchedOutline": {
-                        borderColor: "#6F0B14",
-                      },
-                      "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                        borderColor: "#6F0B14",
-                        borderWidth: "2px",
-                      },
-                    },
-                  }}
-                  InputLabelProps={{
-                    sx: {
-                      fontFamily: "'Roboto', sans-serif",
-                      color: "#6F0B14",
-                    },
-                  }}
-                />
-              </motion.div>
-
-              {/* Description */}
-              <motion.div variants={itemVariants}>
-                <TextField
-                  fullWidth
-                  label="Description"
-                  name="description"
-                  value={formData.description}
-                  onChange={handleInputChange}
-                  variant="outlined"
-                  required
-                  multiline
-                  rows={6}
-                  placeholder="Write your announcement details here..."
-                  InputProps={{
-                    sx: {
-                      borderRadius: "8px",
-                      backgroundColor: "rgba(255, 255, 255, 0.8)",
-                      fontFamily: "'Roboto', sans-serif",
-                      "& .MuiOutlinedInput-notchedOutline": {
-                        borderColor: "rgba(111, 11, 20, 0.2)",
-                      },
-                      "&:hover .MuiOutlinedInput-notchedOutline": {
-                        borderColor: "#6F0B14",
-                      },
-                      "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                        borderColor: "#6F0B14",
-                        borderWidth: "2px",
-                      },
-                    },
-                  }}
-                  InputLabelProps={{
-                    sx: {
-                      fontFamily: "'Roboto', sans-serif",
-                      color: "#6F0B14",
-                    },
-                  }}
-                />
-              </motion.div>
-
-              {/* Broadcast Type Selection */}
-              <motion.div variants={itemVariants}>
-                <FormControl fullWidth>
-                  <InputLabel
-                    sx={{
-                      fontFamily: "'Roboto', sans-serif",
-                      color: "#6F0B14",
-                    }}
-                  >
-                    Send To
-                  </InputLabel>
-                  <Select
-                    name="broadcastType"
-                    value={formData.broadcastType}
+    <div>
+      <form onSubmit={handleSubmit}>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column - Form */}
+          <motion.div variants={itemVariants} className="lg:col-span-2 space-y-6">
+            <StyledCard>
+              <CardContent className="p-6 space-y-6">
+                {/* Title */}
+                <motion.div variants={itemVariants}>
+                  <TextField
+                    fullWidth
+                    label="Broadcast Title"
+                    name="title"
+                    value={formData.title}
                     onChange={handleInputChange}
-                    label="Send To"
-                    sx={{
-                      fontFamily: "'Roboto', sans-serif",
-                      borderRadius: "8px",
-                      "& .MuiOutlinedInput-notchedOutline": {
-                        borderColor: "rgba(111, 11, 20, 0.2)",
-                      },
-                      "&:hover .MuiOutlinedInput-notchedOutline": {
-                        borderColor: "#6F0B14",
-                      },
-                      "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                        borderColor: "#6F0B14",
-                        borderWidth: "2px",
+                    variant="outlined"
+                    required
+                    placeholder="Enter announcement title..."
+                    InputProps={{
+                      sx: {
+                        borderRadius: "8px",
+                        backgroundColor: "rgba(255, 255, 255, 0.8)",
+                        fontFamily: "'Roboto', sans-serif",
+                        "& .MuiOutlinedInput-notchedOutline": {
+                          borderColor: "rgba(111, 11, 20, 0.2)",
+                        },
+                        "&:hover .MuiOutlinedInput-notchedOutline": {
+                          borderColor: "#6F0B14",
+                        },
+                        "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                          borderColor: "#6F0B14",
+                          borderWidth: "2px",
+                        },
                       },
                     }}
-                  >
-                    <MenuItem
-                      value="society"
-                      sx={{ fontFamily: "'Roboto', sans-serif" }}
-                    >
-                      <ApartmentIcon className="mr-2 text-primary" />
-                      Entire Society
-                    </MenuItem>
-                    <MenuItem
-                      value="building"
-                      sx={{ fontFamily: "'Roboto', sans-serif" }}
-                    >
-                      <BuildingIcon className="mr-2 text-primary" />
-                      Specific Building
-                    </MenuItem>
-                  </Select>
-                </FormControl>
-              </motion.div>
+                    InputLabelProps={{
+                      sx: {
+                        fontFamily: "'Roboto', sans-serif",
+                        color: "#6F0B14",
+                      },
+                    }}
+                  />
+                </motion.div>
 
-              {/* Building Selection (shown only when broadcastType is 'building') */}
-              <AnimatePresence>
-                {formData.broadcastType === "building" && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    variants={itemVariants}
-                  >
-                    <FormControl fullWidth>
-                      <InputLabel
-                        sx={{
-                          fontFamily: "'Roboto', sans-serif",
-                          color: "#6F0B14",
-                        }}
+                {/* Description */}
+                <motion.div variants={itemVariants}>
+                  <TextField
+                    fullWidth
+                    label="Description"
+                    name="description"
+                    value={formData.description}
+                    onChange={handleInputChange}
+                    variant="outlined"
+                    required
+                    multiline
+                    rows={6}
+                    placeholder="Write your announcement details here..."
+                    InputProps={{
+                      sx: {
+                        borderRadius: "8px",
+                        backgroundColor: "rgba(255, 255, 255, 0.8)",
+                        fontFamily: "'Roboto', sans-serif",
+                        "& .MuiOutlinedInput-notchedOutline": {
+                          borderColor: "rgba(111, 11, 20, 0.2)",
+                        },
+                        "&:hover .MuiOutlinedInput-notchedOutline": {
+                          borderColor: "#6F0B14",
+                        },
+                        "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                          borderColor: "#6F0B14",
+                          borderWidth: "2px",
+                        },
+                      },
+                    }}
+                    InputLabelProps={{
+                      sx: {
+                        fontFamily: "'Roboto', sans-serif",
+                        color: "#6F0B14",
+                      },
+                    }}
+                  />
+                </motion.div>
+
+                {/* Broadcast Type Selection */}
+                <motion.div variants={itemVariants}>
+                  <FormControl fullWidth>
+                    <InputLabel
+                      sx={{
+                        fontFamily: "'Roboto', sans-serif",
+                        color: "#6F0B14",
+                      }}
+                    >
+                      Send To
+                    </InputLabel>
+                    <Select
+                      name="broadcastType"
+                      value={formData.broadcastType}
+                      onChange={handleInputChange}
+                      label="Send To"
+                      sx={{
+                        fontFamily: "'Roboto', sans-serif",
+                        borderRadius: "8px",
+                        "& .MuiOutlinedInput-notchedOutline": {
+                          borderColor: "rgba(111, 11, 20, 0.2)",
+                        },
+                        "&:hover .MuiOutlinedInput-notchedOutline": {
+                          borderColor: "#6F0B14",
+                        },
+                        "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                          borderColor: "#6F0B14",
+                          borderWidth: "2px",
+                        },
+                      }}
+                    >
+                      <MenuItem
+                        value="society"
+                        sx={{ fontFamily: "'Roboto', sans-serif" }}
                       >
-                        Select Building
-                      </InputLabel>
-                      <Select
-                        name="buildingId"
-                        value={formData.buildingId || ""}
-                        onChange={handleInputChange}
-                        label="Select Building"
-                        disabled={loadingBuildings}
-                        sx={{
-                          fontFamily: "'Roboto', sans-serif",
-                          borderRadius: "8px",
-                          "& .MuiOutlinedInput-notchedOutline": {
-                            borderColor: "rgba(111, 11, 20, 0.2)",
-                          },
-                          "&:hover .MuiOutlinedInput-notchedOutline": {
-                            borderColor: "#6F0B14",
-                          },
-                          "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                            borderColor: "#6F0B14",
-                            borderWidth: "2px",
-                          },
-                        }}
+                        <ApartmentIcon className="mr-2 text-primary" />
+                        Entire Society
+                      </MenuItem>
+                      <MenuItem
+                        value="building"
+                        sx={{ fontFamily: "'Roboto', sans-serif" }}
                       >
-                        {loadingBuildings ? (
-                          <MenuItem disabled>
-                            <CircularProgress size={20} className="mr-2" />
-                            Loading buildings...
-                          </MenuItem>
-                        ) : buildings.length === 0 ? (
-                          <MenuItem disabled>
-                            No buildings found for this society
-                          </MenuItem>
-                        ) : (
-                          buildings.map((building) => (
-                            <MenuItem
-                              key={building.id}
-                              value={building.id}
-                              sx={{ fontFamily: "'Roboto', sans-serif" }}
-                            >
-                              {building.name}
+                        <BuildingIcon className="mr-2 text-primary" />
+                        Specific Building
+                      </MenuItem>
+                    </Select>
+                  </FormControl>
+                </motion.div>
+
+                {/* Building Selection (shown only when broadcastType is 'building') */}
+                <AnimatePresence>
+                  {formData.broadcastType === "building" && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      variants={itemVariants}
+                    >
+                      <FormControl fullWidth>
+                        <InputLabel
+                          sx={{
+                            fontFamily: "'Roboto', sans-serif",
+                            color: "#6F0B14",
+                          }}
+                        >
+                          Select Building
+                        </InputLabel>
+                        <Select
+                          name="buildingId"
+                          value={formData.buildingId || ""}
+                          onChange={handleInputChange}
+                          label="Select Building"
+                          disabled={loadingBuildings}
+                          sx={{
+                            fontFamily: "'Roboto', sans-serif",
+                            borderRadius: "8px",
+                            "& .MuiOutlinedInput-notchedOutline": {
+                              borderColor: "rgba(111, 11, 20, 0.2)",
+                            },
+                            "&:hover .MuiOutlinedInput-notchedOutline": {
+                              borderColor: "#6F0B14",
+                            },
+                            "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                              borderColor: "#6F0B14",
+                              borderWidth: "2px",
+                            },
+                          }}
+                        >
+                          {loadingBuildings ? (
+                            <MenuItem disabled>
+                              <CircularProgress size={20} className="mr-2" />
+                              Loading buildings...
                             </MenuItem>
-                          ))
-                        )}
-                      </Select>
-                    </FormControl>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </CardContent>
-          </StyledCard>
+                          ) : buildings.length === 0 ? (
+                            <MenuItem disabled>
+                              No buildings found for this society
+                            </MenuItem>
+                          ) : (
+                            buildings.map((building) => (
+                              <MenuItem
+                                key={building.id}
+                                value={building.id}
+                                sx={{ fontFamily: "'Roboto', sans-serif" }}
+                              >
+                                {building.name}
+                              </MenuItem>
+                            ))
+                          )}
+                        </Select>
+                      </FormControl>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </CardContent>
+            </StyledCard>
 
-          {/* File Upload Section */}
-          <motion.div variants={itemVariants}>
+            {/* File Upload Section */}
+            <motion.div variants={itemVariants}>
+              <StyledCard>
+                <CardContent className="p-6">
+                  <Typography
+                    variant="h6"
+                    className="mb-4 font-semibold text-primary"
+                    sx={{ fontFamily: "'Roboto', sans-serif" }}
+                  >
+                    Attachments (Optional)
+                  </Typography>
+
+                  <FileUploadArea
+                    isdragging={isDragging.toString()}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    onClick={() => fileInputRef.current.click()}
+                  >
+                    <CloudUploadIcon className="text-4xl text-primary mb-4" />
+                    <Typography
+                      variant="body1"
+                      className="mb-2 text-primary"
+                      sx={{ fontFamily: "'Roboto', sans-serif" }}
+                    >
+                      {isDragging
+                        ? "Drop files here"
+                        : "Drag & drop files or click to browse"}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      className="text-hintText"
+                      sx={{ fontFamily: "'Roboto', sans-serif" }}
+                    >
+                      Supports images, PDF, DOC (Max 10MB per file)
+                    </Typography>
+                    <VisuallyHiddenInput
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      onChange={handleFileChange}
+                      accept=".jpg,.jpeg,.png,.gif,.pdf,.doc,.docx"
+                    />
+                  </FileUploadArea>
+
+                  {/* File List */}
+                  <AnimatePresence>
+                    {files.length > 0 && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mt-6 space-y-3"
+                      >
+                        <Typography
+                          variant="subtitle2"
+                          className="font-medium text-primary"
+                          sx={{ fontFamily: "'Roboto', sans-serif" }}
+                        >
+                          Selected Files ({files.length})
+                        </Typography>
+                        {files.map((file) => (
+                          <motion.div
+                            key={file.id}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 20 }}
+                            className="flex items-center justify-between p-3 bg-lightBackground rounded-lg"
+                          >
+                            <div className="flex items-center space-x-3">
+                              <div className="text-primary">
+                                {getFileIcon(file.type)}
+                              </div>
+                              <div>
+                                <Typography
+                                  variant="body2"
+                                  className="font-medium"
+                                  sx={{ fontFamily: "'Roboto', sans-serif" }}
+                                >
+                                  {file.name}
+                                </Typography>
+                                <Typography
+                                  variant="caption"
+                                  className="text-hintText"
+                                  sx={{ fontFamily: "'Roboto', sans-serif" }}
+                                >
+                                  {formatFileSize(file.size)}
+                                </Typography>
+                              </div>
+                            </div>
+                            <IconButton
+                              size="small"
+                              onClick={() => removeFile(file.id)}
+                              className="text-reject hover:bg-red-50"
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </motion.div>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </CardContent>
+              </StyledCard>
+            </motion.div>
+          </motion.div>
+
+          {/* Right Column - Preview & Send */}
+          <motion.div variants={itemVariants} className="space-y-6">
+            {/* Preview Card */}
             <StyledCard>
               <CardContent className="p-6">
                 <Typography
@@ -832,308 +939,202 @@ const AdminBroadcast = () => {
                   className="mb-4 font-semibold text-primary"
                   sx={{ fontFamily: "'Roboto', sans-serif" }}
                 >
-                  Attachments (Optional)
+                  Preview
                 </Typography>
 
-                <FileUploadArea
-                  isdragging={isDragging.toString()}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                  onClick={() => fileInputRef.current.click()}
-                >
-                  <CloudUploadIcon className="text-4xl text-primary mb-4" />
-                  <Typography
-                    variant="body1"
-                    className="mb-2 text-primary"
-                    sx={{ fontFamily: "'Roboto', sans-serif" }}
-                  >
-                    {isDragging
-                      ? "Drop files here"
-                      : "Drag & drop files or click to browse"}
-                  </Typography>
-                  <Typography
-                    variant="caption"
-                    className="text-hintText"
-                    sx={{ fontFamily: "'Roboto', sans-serif" }}
-                  >
-                    Supports images, PDF, DOC (Max 10MB per file)
-                  </Typography>
-                  <VisuallyHiddenInput
-                    ref={fileInputRef}
-                    type="file"
-                    multiple
-                    onChange={handleFileChange}
-                    accept=".jpg,.jpeg,.png,.gif,.pdf,.doc,.docx"
-                  />
-                </FileUploadArea>
-
-                {/* File List */}
-                <AnimatePresence>
-                  {files.length > 0 && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="mt-6 space-y-3"
-                    >
-                      <Typography
-                        variant="subtitle2"
-                        className="font-medium text-primary"
-                        sx={{ fontFamily: "'Roboto', sans-serif" }}
-                      >
-                        Selected Files ({files.length})
-                      </Typography>
-                      {files.map((file) => (
-                        <motion.div
-                          key={file.id}
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: 20 }}
-                          className="flex items-center justify-between p-3 bg-lightBackground rounded-lg"
-                        >
-                          <div className="flex items-center space-x-3">
-                            <div className="text-primary">
-                              {getFileIcon(file.type)}
-                            </div>
-                            <div>
-                              <Typography
-                                variant="body2"
-                                className="font-medium"
-                                sx={{ fontFamily: "'Roboto', sans-serif" }}
-                              >
-                                {file.name}
-                              </Typography>
-                              <Typography
-                                variant="caption"
-                                className="text-hintText"
-                                sx={{ fontFamily: "'Roboto', sans-serif" }}
-                              >
-                                {formatFileSize(file.size)}
-                              </Typography>
-                            </div>
-                          </div>
-                          <IconButton
-                            size="small"
-                            onClick={() => removeFile(file.id)}
-                            className="text-reject hover:bg-red-50"
-                          >
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </motion.div>
-                      ))}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </CardContent>
-            </StyledCard>
-          </motion.div>
-        </motion.div>
-
-        {/* Right Column - Preview & Send */}
-        <motion.div variants={itemVariants} className="space-y-6">
-          {/* Preview Card */}
-          <StyledCard>
-            <CardContent className="p-6">
-              <Typography
-                variant="h6"
-                className="mb-4 font-semibold text-primary"
-                sx={{ fontFamily: "'Roboto', sans-serif" }}
-              >
-                Preview
-              </Typography>
-
-              <div className="space-y-4">
-                <div>
-                  <Typography
-                    variant="caption"
-                    className="text-hintText"
-                    sx={{ fontFamily: "'Roboto', sans-serif" }}
-                  >
-                    Title
-                  </Typography>
-                  <Typography
-                    variant="body1"
-                    className="font-medium text-primary"
-                    sx={{ fontFamily: "'Roboto', sans-serif" }}
-                  >
-                    {formData.title || "No title entered"}
-                  </Typography>
-                </div>
-
-                <Divider className="bg-lightBackground" />
-
-                <div>
-                  <Typography
-                    variant="caption"
-                    className="text-hintText"
-                    sx={{ fontFamily: "'Roboto', sans-serif" }}
-                  >
-                    Description Preview
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    className="mt-1 line-clamp-4 text-black"
-                    sx={{ fontFamily: "'Roboto', sans-serif" }}
-                  >
-                    {formData.description || "No description entered"}
-                  </Typography>
-                </div>
-
-                <Divider className="bg-lightBackground" />
-
-                <div className="flex justify-between">
+                <div className="space-y-4">
                   <div>
                     <Typography
                       variant="caption"
                       className="text-hintText"
                       sx={{ fontFamily: "'Roboto', sans-serif" }}
                     >
-                      Send To
+                      Title
                     </Typography>
-                    <div className="mt-1">
-                      <Chip
-                        label={
-                          formData.broadcastType === "society"
-                            ? "Entire Society"
-                            : buildings.find(
-                                (b) => b.id === formData.buildingId
-                              )?.name || "Select Building"
-                        }
-                        size="small"
-                        sx={{
-                          backgroundColor: "rgba(111, 11, 20, 0.1)",
-                          color: "#6F0B14",
-                          fontFamily: "'Roboto', sans-serif",
-                          fontWeight: 500,
-                        }}
-                        icon={
-                          formData.broadcastType === "society" ? (
-                            <ApartmentIcon fontSize="small" />
-                          ) : (
-                            <BuildingIcon fontSize="small" />
-                          )
-                        }
-                      />
-                    </div>
+                    <Typography
+                      variant="body1"
+                      className="font-medium text-primary"
+                      sx={{ fontFamily: "'Roboto', sans-serif" }}
+                    >
+                      {formData.title || "No title entered"}
+                    </Typography>
                   </div>
-                </div>
 
-                {files.length > 0 && (
-                  <>
-                    <Divider className="bg-lightBackground" />
+                  <Divider className="bg-lightBackground" />
+
+                  <div>
+                    <Typography
+                      variant="caption"
+                      className="text-hintText"
+                      sx={{ fontFamily: "'Roboto', sans-serif" }}
+                    >
+                      Description Preview
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      className="mt-1 line-clamp-4 text-black"
+                      sx={{ fontFamily: "'Roboto', sans-serif" }}
+                    >
+                      {formData.description || "No description entered"}
+                    </Typography>
+                  </div>
+
+                  <Divider className="bg-lightBackground" />
+
+                  <div className="flex justify-between">
                     <div>
                       <Typography
                         variant="caption"
                         className="text-hintText"
                         sx={{ fontFamily: "'Roboto', sans-serif" }}
                       >
-                        Attachments
+                        Send To
                       </Typography>
-                      <Typography
-                        variant="body2"
-                        className="mt-1 text-primary"
-                        sx={{ fontFamily: "'Roboto', sans-serif" }}
-                      >
-                        {files.length} file{files.length !== 1 ? "s" : ""}{" "}
-                        attached
-                      </Typography>
+                      <div className="mt-1">
+                        <Chip
+                          label={
+                            formData.broadcastType === "society"
+                              ? "Entire Society"
+                              : buildings.find(
+                                (b) => b.id === formData.buildingId
+                              )?.name || "Select Building"
+                          }
+                          size="small"
+                          sx={{
+                            backgroundColor: "rgba(111, 11, 20, 0.1)",
+                            color: "#6F0B14",
+                            fontFamily: "'Roboto', sans-serif",
+                            fontWeight: 500,
+                          }}
+                          icon={
+                            formData.broadcastType === "society" ? (
+                              <ApartmentIcon fontSize="small" />
+                            ) : (
+                              <BuildingIcon fontSize="small" />
+                            )
+                          }
+                        />
+                      </div>
                     </div>
-                  </>
-                )}
-              </div>
-            </CardContent>
-          </StyledCard>
+                  </div>
 
-          {/* Send Button */}
-          <motion.div
-            variants={itemVariants}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            <GradientButton
-              fullWidth
-              type="submit"
-              disabled={loading || !societyId}
-              startIcon={
-                loading ? (
-                  <CircularProgress size={20} color="inherit" />
-                ) : (
-                  <SendIcon />
-                )
-              }
-              size="large"
+                  {files.length > 0 && (
+                    <>
+                      <Divider className="bg-lightBackground" />
+                      <div>
+                        <Typography
+                          variant="caption"
+                          className="text-hintText"
+                          sx={{ fontFamily: "'Roboto', sans-serif" }}
+                        >
+                          Attachments
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          className="mt-1 text-primary"
+                          sx={{ fontFamily: "'Roboto', sans-serif" }}
+                        >
+                          {files.length} file{files.length !== 1 ? "s" : ""}{" "}
+                          attached
+                        </Typography>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </CardContent>
+            </StyledCard>
+
+            {/* Send Button */}
+            <motion.div
+              variants={itemVariants}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
             >
-              {loading ? "Sending..." : "Send Broadcast"}
-            </GradientButton>
-          </motion.div>
-
-          {/* Quick Stats */}
-          <StyledCard>
-            <CardContent className="p-6">
-              <Typography
-                variant="subtitle2"
-                className="mb-3 text-hintText"
-                sx={{ fontFamily: "'Roboto', sans-serif" }}
+              <GradientButton
+                fullWidth
+                type="submit"
+                disabled={loading || !societyId}
+                startIcon={
+                  loading ? (
+                    <CircularProgress size={20} color="inherit" />
+                  ) : (
+                    <SendIcon />
+                  )
+                }
+                size="large"
               >
-                Broadcast Stats
-              </Typography>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <Typography
-                    variant="body2"
-                    className="text-primary"
-                    sx={{ fontFamily: "'Roboto', sans-serif" }}
-                  >
-                    Characters
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    className="font-medium text-primary"
-                    sx={{ fontFamily: "'Roboto', sans-serif" }}
-                  >
-                    {formData.description.length}/5000
-                  </Typography>
+                {loading ? "Sending..." : "Send Broadcast"}
+              </GradientButton>
+            </motion.div>
+
+            {/* Quick Stats */}
+            <StyledCard>
+              <CardContent className="p-6">
+                <Typography
+                  variant="subtitle2"
+                  className="mb-3 text-hintText"
+                  sx={{ fontFamily: "'Roboto', sans-serif" }}
+                >
+                  Broadcast Stats
+                </Typography>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <Typography
+                      variant="body2"
+                      className="text-primary"
+                      sx={{ fontFamily: "'Roboto', sans-serif" }}
+                    >
+                      Characters
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      className="font-medium text-primary"
+                      sx={{ fontFamily: "'Roboto', sans-serif" }}
+                    >
+                      {formData.description.length}/5000
+                    </Typography>
+                  </div>
+                  <div className="flex justify-between">
+                    <Typography
+                      variant="body2"
+                      className="text-primary"
+                      sx={{ fontFamily: "'Roboto', sans-serif" }}
+                    >
+                      Attachments
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      className="font-medium text-primary"
+                      sx={{ fontFamily: "'Roboto', sans-serif" }}
+                    >
+                      {files.length}/10
+                    </Typography>
+                  </div>
+                  <div className="flex justify-between">
+                    <Typography
+                      variant="body2"
+                      className="text-primary"
+                      sx={{ fontFamily: "'Roboto', sans-serif" }}
+                    >
+                      Total Size
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      className="font-medium text-primary"
+                      sx={{ fontFamily: "'Roboto', sans-serif" }}
+                    >
+                      {formatFileSize(
+                        files.reduce((acc, file) => acc + file.size, 0)
+                      )}
+                    </Typography>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <Typography
-                    variant="body2"
-                    className="text-primary"
-                    sx={{ fontFamily: "'Roboto', sans-serif" }}
-                  >
-                    Attachments
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    className="font-medium text-primary"
-                    sx={{ fontFamily: "'Roboto', sans-serif" }}
-                  >
-                    {files.length}/10
-                  </Typography>
-                </div>
-                <div className="flex justify-between">
-                  <Typography
-                    variant="body2"
-                    className="text-primary"
-                    sx={{ fontFamily: "'Roboto', sans-serif" }}
-                  >
-                    Total Size
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    className="font-medium text-primary"
-                    sx={{ fontFamily: "'Roboto', sans-serif" }}
-                  >
-                    {formatFileSize(
-                      files.reduce((acc, file) => acc + file.size, 0)
-                    )}
-                  </Typography>
-                </div>
-              </div>
-            </CardContent>
-          </StyledCard>
-        </motion.div>
-      </div>
-    </form>
+              </CardContent>
+            </StyledCard>
+          </motion.div>
+        </div>
+      </form>
+    </div>
   );
 
   // Render broadcast list
@@ -1270,9 +1271,8 @@ const AdminBroadcast = () => {
                         <Chip
                           label={
                             broadcast.building_id
-                              ? `Building: ${
-                                  broadcast.buildings?.name || "Unknown"
-                                }`
+                              ? `Building: ${broadcast.buildings?.name || "Unknown"
+                              }`
                               : "Entire Society"
                           }
                           size="small"
@@ -1548,9 +1548,8 @@ const AdminBroadcast = () => {
                   <Chip
                     label={
                       selectedBroadcast.building_id
-                        ? `Building: ${
-                            selectedBroadcast.buildings?.name || "Unknown"
-                          }`
+                        ? `Building: ${selectedBroadcast.buildings?.name || "Unknown"
+                        }`
                         : "Entire Society"
                     }
                     size="small"

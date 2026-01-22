@@ -39,6 +39,19 @@ import SaveIcon from "@mui/icons-material/Save";
 import InputAdornment from "@mui/material/InputAdornment";
 
 import { styled } from "@mui/material/styles";
+import { motion } from "framer-motion";
+
+// Match project theme from tailwind.config.js
+const themeColors = {
+  primary: "#6F0B14",
+  secondary: "#6F0B14", // using primary as textAndTab
+  hint: "#A29EB6",
+  lightBg: "rgba(111, 11, 20, 0.09)",
+  trackSelect: "rgba(111, 11, 20, 0.44)",
+  white: "#FFFFFF",
+  error: "#B31B1B",
+  success: "#008000",
+};
 
 const VisuallyHiddenInput = styled("input", {
   shouldForwardProp: (prop) =>
@@ -54,6 +67,59 @@ const VisuallyHiddenInput = styled("input", {
   whiteSpace: "nowrap",
   width: 1,
 });
+
+
+const InputField = ({ icon, label, name, value, isEditing, onChange, profileValue, type = "text" }) => (
+  <Box className="space-y-2">
+    <Box className="flex items-center gap-2 mb-1">
+      {React.cloneElement(icon, { sx: { color: themeColors.hint, fontSize: 18 } })}
+      <Typography variant="caption" className="font-semibold text-gray-500 uppercase tracking-wider">
+        {label}
+      </Typography>
+    </Box>
+    {isEditing ? (
+      <TextField
+        fullWidth
+        name={name}
+        type={type}
+        value={value}
+        onChange={onChange}
+        variant="outlined"
+        size="small"
+        sx={{
+          "& .MuiOutlinedInput-root": {
+            backgroundColor: "white",
+            "& fieldset": { borderColor: "rgba(0,0,0,0.1)" },
+            "&:hover fieldset": { borderColor: themeColors.primary },
+            "&.Mui-focused fieldset": { borderColor: themeColors.primary, borderWidth: 1.5 },
+          },
+        }}
+      />
+    ) : (
+      <Paper elevation={0} className="p-3.5 border border-dashed border-gray-300 rounded-lg bg-gray-50/50">
+        <Typography className="font-medium text-gray-800 break-all">
+          {profileValue || <span className="text-gray-400 italic">Not provided</span>}
+        </Typography>
+      </Paper>
+    )}
+  </Box>
+);
+
+const ReadOnlyField = ({ icon, label, value, bg = "bg-white" }) => (
+  <Box className="space-y-2">
+    <Box className="flex items-center gap-2 mb-1">
+      {React.cloneElement(icon, { sx: { color: themeColors.hint, fontSize: 18 } })}
+      <Typography variant="caption" className="font-semibold text-gray-500 uppercase tracking-wider">
+        {label}
+      </Typography>
+    </Box>
+    <Paper elevation={0} className={`p-3.5 border border-gray-200 rounded-lg ${bg}`}>
+      <Typography className="font-medium text-gray-800">
+        {value}
+      </Typography>
+    </Paper>
+  </Box>
+);
 
 export default function CommonProfile() {
   const [profile, setProfile] = useState(null);
@@ -159,6 +225,7 @@ export default function CommonProfile() {
         if (userData.profile_url) {
           setImagePreview(userData.profile_url);
           localStorage.setItem("profileImage", userData.profile_url);
+          window.dispatchEvent(new Event("profileImageUpdated"));
         }
 
         // Normalize role before saving (SAME AS LOGIN)
@@ -234,6 +301,7 @@ export default function CommonProfile() {
       setProfile(updatedProfile);
       setEditableProfile(updatedProfile);
       localStorage.setItem("profileImage", result.url);
+      window.dispatchEvent(new Event("profileImageUpdated"));
 
       setSelectedFile(null);
       toast.success("Profile image updated successfully!");
@@ -404,99 +472,80 @@ export default function CommonProfile() {
 
   if (isLoading) {
     return (
-      <Box className="flex justify-center items-center min-h-screen">
-        <CircularProgress sx={{ color: "#6F0B14" }} />
+      <Box className="flex justify-center items-center min-h-[80vh]">
+        <CircularProgress size={60} thickness={4} sx={{ color: themeColors.primary }} />
       </Box>
     );
   }
 
   if (!profile) {
     return (
-      <Box className="flex justify-center items-center min-h-screen">
-        <Card className="p-6 text-center">
-          <Typography color="error">
-            No profile data found. Please login again.
-          </Typography>
-          <Button
-            href="/login"
-            sx={{
-              mt: 2,
-              backgroundColor: "#6F0B14",
-              "&:hover": { backgroundColor: "#5A0910" },
-            }}
-            variant="contained"
-          >
-            Go to Login
-          </Button>
-        </Card>
+      <Box className="flex justify-center items-center min-h-[80vh] p-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+        >
+          <Card className="max-w-md w-full shadow-xl rounded-2xl overflow-hidden">
+            <Box className="h-2" sx={{ background: `linear-gradient(to right, ${themeColors.primary}, #4A040A)` }} />
+            <CardContent className="p-8 text-center space-y-6">
+              <Typography variant="h5" className="font-bold text-gray-800">
+                Session Expired
+              </Typography>
+              <Typography color="textSecondary">
+                We couldn't load your profile. Please log in again to continue.
+              </Typography>
+              <Button
+                variant="contained"
+                href="/login"
+                fullWidth
+                size="large"
+                sx={{
+                  bgcolor: themeColors.primary,
+                  "&:hover": { bgcolor: themeColors.secondary },
+                  borderRadius: "12px",
+                  textTransform: "none",
+                  fontSize: "1rem"
+                }}
+              >
+                Back to Login
+              </Button>
+            </CardContent>
+          </Card>
+        </motion.div>
       </Box>
     );
   }
 
   return (
-    <Box className="max-w-6xl mx-auto p-4 md:p-6 space-y-6 font-roboto">
-      {/* HEADER */}
-      {/* <Box className="flex justify-between items-center">
-        <Typography
-          variant="h4"
-          className="font-bold"
-          sx={{ color: "#6F0B14" }}
-        >
-          My Profile
-        </Typography>
-        {!isEditing ? (
-          <Button
-            variant="outlined"
-            startIcon={<EditIcon />}
-            onClick={() => setIsEditing(true)}
-            sx={{
-              borderColor: "#6F0B14",
-              color: "#6F0B14",
-              "&:hover": {
-                borderColor: "#5A0910",
-                backgroundColor: "rgba(111, 11, 20, 0.04)",
-              },
-            }}
-          >
-            Edit Profile
-          </Button>
-        ) : (
-          <Button
-            variant="contained"
-            startIcon={<SaveIcon />}
-            onClick={handleSaveProfile}
-            disabled={loading}
-            sx={{
-              backgroundColor: "#6F0B14",
-              "&:hover": { backgroundColor: "#5A0910" },
-            }}
-          >
-            Save Changes
-          </Button>
-        )}
-      </Box> */}
-      <Box className="flex justify-between items-center gap-3">
-        <Box className="flex items-center gap-2">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.5 }}
+      className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 font-roboto"
+    >
+      {/* HEADER SECTION */}
+      <Box className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+        <Box className="flex items-center gap-4">
           <IconButton
             onClick={() => navigate(-1)}
             sx={{
-              border: "1px solid #6F0B14",
-              color: "#6F0B14",
-              "&:hover": {
-                backgroundColor: "rgba(111, 11, 20, 0.08)",
-              },
+              bgcolor: themeColors.lightBg,
+              color: themeColors.primary,
+              "&:hover": { bgcolor: "rgba(111, 11, 20, 0.15)" },
+              transition: "all 0.2s"
             }}
           >
             <ArrowBackIcon />
           </IconButton>
-
-          <Typography
-            variant="h4"
-            className="font-bold"
-            sx={{ color: "#6F0B14" }}
-          >
-            My Profile
-          </Typography>
+          <Box>
+            <Typography variant="h4" className="font-bold text-gray-900">
+              Profile Settings
+            </Typography>
+            <Typography variant="body2" color="textSecondary" className="mt-1">
+              Manage your personal information and account security
+            </Typography>
+          </Box>
         </Box>
 
         {!isEditing ? (
@@ -505,483 +554,323 @@ export default function CommonProfile() {
             startIcon={<EditIcon />}
             onClick={() => setIsEditing(true)}
             sx={{
-              borderColor: "#6F0B14",
-              color: "#6F0B14",
+              color: themeColors.primary,
+              borderColor: themeColors.primary,
+              borderWidth: 2,
+              borderRadius: "10px",
+              padding: "8px 24px",
+              textTransform: "none",
+              fontWeight: 600,
               "&:hover": {
+                borderWidth: 2,
                 borderColor: "#5A0910",
-                backgroundColor: "rgba(111, 11, 20, 0.04)",
-              },
+                bgcolor: themeColors.lightBg
+              }
             }}
           >
             Edit Profile
           </Button>
         ) : (
-          <Button
-            variant="contained"
-            startIcon={<SaveIcon />}
-            onClick={handleSaveProfile}
-            disabled={loading}
-            sx={{
-              backgroundColor: "#6F0B14",
-              "&:hover": { backgroundColor: "#5A0910" },
-            }}
-          >
-            Save Changes
-          </Button>
+          <Box className="flex gap-3">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setIsEditing(false);
+                setEditableProfile(profile);
+              }}
+              sx={{
+                color: themeColors.hint,
+                textTransform: "none",
+                fontWeight: 500
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
+              onClick={handleSaveProfile}
+              disabled={loading}
+              sx={{
+                bgcolor: themeColors.primary,
+                borderRadius: "10px",
+                padding: "8px 32px",
+                textTransform: "none",
+                boxShadow: "0 4px 14px 0 rgba(111, 11, 20, 0.39)",
+                "&:hover": {
+                  bgcolor: themeColors.secondary,
+                  boxShadow: "0 6px 20px 0 rgba(111, 11, 20, 0.23)"
+                }
+              }}
+            >
+              Save Changes
+            </Button>
+          </Box>
         )}
       </Box>
 
-      {/* MAIN CONTENT */}
-      <Grid container spacing={3}>
-        {/* LEFT SIDE - PROFILE IMAGE CARD */}
-        <Grid item xs={12} md={4}>
-          <Card className="rounded-lg shadow-lg h-full">
-            <CardContent className="flex flex-col items-center p-6 space-y-6">
-              {/* AVATAR SECTION */}
-              <Box className="relative">
-                <Avatar
-                  src={imagePreview}
-                  sx={{
-                    width: 180,
-                    height: 180,
-                    border: "4px solid #6F0B14",
-                    fontSize: "3rem",
-                  }}
-                  className="bg-[#6F0B14]"
-                >
-                  {profile.name?.charAt(0).toUpperCase() ||
-                    profile.email?.charAt(0).toUpperCase() ||
-                    "U"}
-                </Avatar>
-
-                <IconButton
-                  component="label"
-                  className="absolute bottom-0 right-0 bg-[#6F0B14] hover:bg-[#5A0910] text-white shadow-lg"
-                  size="medium"
-                >
-                  <EditIcon />
-                  <VisuallyHiddenInput
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileSelect}
-                  />
-                </IconButton>
-              </Box>
-
-              {/* UPLOAD BUTTONS */}
-              <Box className="w-full space-y-3">
-                <Button
-                  component="label"
-                  variant="outlined"
-                  startIcon={<CloudUploadIcon />}
-                  sx={{
-                    borderColor: "#6F0B14",
-                    color: "#6F0B14",
-                    "&:hover": {
-                      borderColor: "#5A0910",
-                      backgroundColor: "rgba(111, 11, 20, 0.04)",
-                    },
-                  }}
-                  fullWidth
-                >
-                  Choose New Photo
-                  <VisuallyHiddenInput
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileSelect}
-                  />
-                </Button>
-
-                {selectedFile && (
-                  <Box className="space-y-3 p-3 border rounded-lg bg-[rgba(111,11,20,0.09)]">
-                    <Typography variant="body2" className="text-gray-600">
-                      Selected:{" "}
-                      <span className="font-medium">{selectedFile.name}</span>
-                    </Typography>
-                    <Button
-                      variant="contained"
-                      onClick={handleImageUpload}
-                      disabled={uploadingImage}
+      <Grid container spacing={4}>
+        {/* LEFT COLUMN - Avatar & Quick Actions */}
+        <Grid item xs={12} lg={4}>
+          <Box className="space-y-6">
+            {/* Profile Card */}
+            <Card className="rounded-2xl shadow-sm border border-gray-100 overflow-visible">
+              <Box className="h-32 bg-gradient-to-r from-gray-100 to-gray-50 rounded-t-2xl relative">
+                <Box className="absolute -bottom-16 left-1/2 transform -translate-x-1/2">
+                  <Box className="relative group">
+                    <Avatar
+                      src={imagePreview}
                       sx={{
-                        backgroundColor: "#6F0B14",
-                        "&:hover": { backgroundColor: "#5A0910" },
+                        width: 128,
+                        height: 128,
+                        border: `4px solid ${themeColors.white}`,
+                        boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                        fontSize: "3rem",
+                        bgcolor: themeColors.primary
                       }}
-                      fullWidth
                     >
-                      {uploadingImage ? (
-                        <CircularProgress size={24} color="inherit" />
-                      ) : (
-                        "Upload & Save"
-                      )}
-                    </Button>
-                    <Button
-                      variant="text"
-                      onClick={() => {
-                        setSelectedFile(null);
-                        setImagePreview(profile.profile_url || "");
+                      {profile.name?.charAt(0).toUpperCase() || "U"}
+                    </Avatar>
+                    <IconButton
+                      component="label"
+                      className="absolute bottom-0 right-0 shadow-lg transform translate-x-1/4 translate-y-1/4 transition-transform hover:scale-110"
+                      sx={{
+                        bgcolor: themeColors.primary,
+                        color: "white",
+                        "&:hover": { bgcolor: themeColors.secondary },
+                        width: 42,
+                        height: 42
                       }}
-                      size="small"
-                      sx={{ color: "#6F0B14" }}
-                      fullWidth
                     >
-                      Cancel
-                    </Button>
+                      <EditIcon fontSize="small" />
+                      <VisuallyHiddenInput
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileSelect}
+                      />
+                    </IconButton>
                   </Box>
-                )}
+                </Box>
               </Box>
+              <CardContent className="pt-20 pb-8 px-6 text-center">
+                <Typography variant="h5" className="font-bold text-gray-900 mb-1">
+                  {profile.name || "User"}
+                </Typography>
+                <Typography variant="body2" className="text-gray-500 mb-6 font-medium bg-gray-100 py-1 px-3 rounded-full inline-block uppercase tracking-wider text-xs">
+                  {profile.role_type || profile.role || "Role"}
+                </Typography>
 
-              {/* CHANGE PASSWORD BUTTON */}
-              <Button
-                variant="contained"
-                onClick={handleOpenDialog}
-                startIcon={<LockResetIcon />}
-                sx={{
-                  backgroundColor: "#6F0B14",
-                  "&:hover": { backgroundColor: "#5A0910" },
-                  padding: "10px 24px",
-                }}
-                fullWidth
-              >
-                Change Password
-              </Button>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* RIGHT SIDE - PROFILE INFO CARD */}
-        <Grid item xs={12} md={8}>
-          <Card className="rounded-lg shadow-lg h-full">
-            <CardContent className="p-6 space-y-6">
-              <Typography
-                variant="h5"
-                className="font-semibold"
-                sx={{ color: "#6F0B14" }}
-              >
-                Personal Information
-              </Typography>
-
-              {/* PROFILE DETAILS GRID */}
-              <Grid container spacing={3}>
-                {/* NAME */}
-                <Grid item xs={12} md={6}>
-                  <Box className="space-y-2">
-                    <Box className="flex items-center gap-2">
-                      <PersonIcon sx={{ color: "#A29EB6", fontSize: 20 }} />
-                      <Typography
-                        variant="caption"
-                        className="text-[#A29EB6] uppercase tracking-wider"
-                      >
-                        Full Name
-                      </Typography>
-                    </Box>
-                    {isEditing ? (
-                      <TextField
-                        fullWidth
-                        name="name"
-                        value={editableProfile?.name || ""}
-                        onChange={handleProfileChange}
-                        variant="outlined"
-                        size="small"
-                      />
-                    ) : (
-                      <Paper
-                        elevation={0}
-                        className="p-4 border rounded-lg bg-[rgba(111,11,20,0.09)]"
-                      >
-                        <Typography className="font-medium">
-                          {profile.name || "Not provided"}
-                        </Typography>
-                      </Paper>
-                    )}
-                  </Box>
-                </Grid>
-
-                {/* EMAIL */}
-                <Grid item xs={12} md={6}>
-                  <Box className="space-y-2">
-                    <Box className="flex items-center gap-2">
-                      <EmailIcon sx={{ color: "#A29EB6", fontSize: 20 }} />
-                      <Typography
-                        variant="caption"
-                        className="text-[#A29EB6] uppercase tracking-wider"
-                      >
-                        Email Address
-                      </Typography>
-                    </Box>
-                    {isEditing ? (
-                      <TextField
-                        fullWidth
-                        name="email"
-                        type="email"
-                        value={editableProfile?.email || ""}
-                        onChange={handleProfileChange}
-                        variant="outlined"
-                        size="small"
-                      />
-                    ) : (
-                      <Paper
-                        elevation={0}
-                        className="p-4 border rounded-lg bg-[rgba(111,11,20,0.09)]"
-                      >
-                        <Typography className="font-medium">
-                          {profile.email || "Not provided"}
-                        </Typography>
-                      </Paper>
-                    )}
-                  </Box>
-                </Grid>
-
-                {/* PHONE NUMBER */}
-                <Grid item xs={12} md={6}>
-                  <Box className="space-y-2">
-                    <Box className="flex items-center gap-2">
-                      <PhoneIcon sx={{ color: "#A29EB6", fontSize: 20 }} />
-                      <Typography
-                        variant="caption"
-                        className="text-[#A29EB6] uppercase tracking-wider"
-                      >
-                        Phone Number
-                      </Typography>
-                    </Box>
-                    {isEditing ? (
-                      <TextField
-                        fullWidth
-                        name="number"
-                        value={editableProfile?.number || ""}
-                        onChange={handleProfileChange}
-                        variant="outlined"
-                        size="small"
-                      />
-                    ) : (
-                      <Paper
-                        elevation={0}
-                        className="p-4 border rounded-lg bg-[rgba(111,11,20,0.09)]"
-                      >
-                        <Typography className="font-medium">
-                          {profile.number || "Not provided"}
-                        </Typography>
-                      </Paper>
-                    )}
-                  </Box>
-                </Grid>
-
-                {/* WHATSAPP NUMBER */}
-                <Grid item xs={12} md={6}>
-                  <Box className="space-y-2">
-                    <Box className="flex items-center gap-2">
-                      <WhatsAppIcon sx={{ color: "#A29EB6", fontSize: 20 }} />
-                      <Typography
-                        variant="caption"
-                        className="text-[#A29EB6] uppercase tracking-wider"
-                      >
-                        WhatsApp Number
-                      </Typography>
-                    </Box>
-                    {isEditing ? (
-                      <TextField
-                        fullWidth
-                        name="whatsapp_number"
-                        value={editableProfile?.whatsapp_number || ""}
-                        onChange={handleProfileChange}
-                        variant="outlined"
-                        size="small"
-                      />
-                    ) : (
-                      <Paper
-                        elevation={0}
-                        className="p-4 border rounded-lg bg-[rgba(111,11,20,0.09)]"
-                      >
-                        <Typography className="font-medium">
-                          {profile.whatsapp_number || "Not provided"}
-                        </Typography>
-                      </Paper>
-                    )}
-                  </Box>
-                </Grid>
-
-                {/* ROLE */}
-                <Grid item xs={12} md={6}>
-                  <Box className="space-y-2">
-                    <Box className="flex items-center gap-2">
-                      <BadgeIcon sx={{ color: "#A29EB6", fontSize: 20 }} />
-                      <Typography
-                        variant="caption"
-                        className="text-[#A29EB6] uppercase tracking-wider"
-                      >
-                        Role
-                      </Typography>
-                    </Box>
-                    <Paper
-                      elevation={0}
-                      className="p-4 border rounded-lg bg-[rgba(111,11,20,0.09)]"
+                <Box className="space-y-3 mt-4">
+                  {selectedFile && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      className="bg-red-50 p-4 rounded-xl border border-red-100 mb-4"
                     >
-                      <Typography className="font-medium capitalize">
-                        {profile.role_type || profile.role || "Not provided"}
+                      <Typography variant="caption" className="block text-gray-600 mb-3 truncate">
+                        Selected: {selectedFile.name}
                       </Typography>
-                    </Paper>
-                  </Box>
-                </Grid>
-
-                {/* SOCIETY */}
-                {profile.society_name && (
-                  <Grid item xs={12} md={6}>
-                    <Box className="space-y-2">
-                      <Box className="flex items-center gap-2">
-                        <BusinessIcon sx={{ color: "#A29EB6", fontSize: 20 }} />
-                        <Typography
-                          variant="caption"
-                          className="text-[#A29EB6] uppercase tracking-wider"
+                      <Box className="flex gap-2">
+                        <Button
+                          fullWidth
+                          variant="contained"
+                          onClick={handleImageUpload}
+                          disabled={uploadingImage}
+                          size="small"
+                          sx={{
+                            bgcolor: themeColors.primary,
+                            textTransform: "none",
+                            "&:hover": { bgcolor: themeColors.secondary }
+                          }}
                         >
+                          {uploadingImage ? "Uploading..." : "Confirm Upload"}
+                        </Button>
+                        <Button
+                          fullWidth
+                          variant="outlined"
+                          onClick={() => {
+                            setSelectedFile(null);
+                            setImagePreview(profile.profile_url || "");
+                          }}
+                          size="small"
+                          sx={{
+                            color: themeColors.primary,
+                            borderColor: themeColors.primary,
+                            textTransform: "none"
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </Box>
+                    </motion.div>
+                  )}
+
+                  <Button
+                    variant="outlined"
+                    fullWidth
+                    startIcon={<LockResetIcon />}
+                    onClick={handleOpenDialog}
+                    sx={{
+                      color: themeColors.primary,
+                      borderColor: "rgba(111, 11, 20, 0.3)",
+                      borderRadius: "10px",
+                      py: 1.5,
+                      textTransform: "none",
+                      "&:hover": {
+                        borderColor: themeColors.primary,
+                        bgcolor: themeColors.lightBg
+                      }
+                    }}
+                  >
+                    Change Password
+                  </Button>
+                </Box>
+              </CardContent>
+            </Card>
+
+            {/* Society Info Card (If applicable) */}
+            {(profile.society_name || profile.building_name) && (
+              <Card className="rounded-2xl shadow-sm border border-gray-100 p-2">
+                <CardContent className="p-4 space-y-4">
+                  <Typography variant="subtitle1" className="font-bold mb-4 flex items-center gap-2">
+                    <BusinessIcon sx={{ color: themeColors.primary }} />
+                    Residence Details
+                  </Typography>
+
+                  {profile.society_name && (
+                    <Box className="flex items-start gap-3 p-3 rounded-lg bg-gray-50">
+                      <ApartmentIcon sx={{ color: themeColors.hint, fontSize: 22, mt: 0.3 }} />
+                      <Box>
+                        <Typography variant="caption" className="text-gray-500 font-medium uppercase tracking-wide">
                           Society
                         </Typography>
-                      </Box>
-                      <Paper
-                        elevation={0}
-                        className="p-4 border rounded-lg bg-[rgba(111,11,20,0.09)]"
-                      >
-                        <Typography className="font-medium">
+                        <Typography variant="body2" className="font-semibold text-gray-800">
                           {profile.society_name}
                         </Typography>
-                      </Paper>
-                    </Box>
-                  </Grid>
-                )}
-
-                {/* BUILDING */}
-                {profile.building_name && (
-                  <Grid item xs={12} md={6}>
-                    <Box className="space-y-2">
-                      <Box className="flex items-center gap-2">
-                        <ApartmentIcon
-                          sx={{ color: "#A29EB6", fontSize: 20 }}
-                        />
-                        <Typography
-                          variant="caption"
-                          className="text-[#A29EB6] uppercase tracking-wider"
-                        >
-                          Building
-                        </Typography>
                       </Box>
-                      <Paper
-                        elevation={0}
-                        className="p-4 border rounded-lg bg-[rgba(111,11,20,0.09)]"
-                      >
-                        <Typography className="font-medium">
-                          {profile.building_name}
-                        </Typography>
-                      </Paper>
                     </Box>
-                  </Grid>
-                )}
+                  )}
 
-                {/* FLAT NUMBER */}
-                {profile.flat_number && (
-                  <Grid item xs={12} md={6}>
-                    <Box className="space-y-2">
-                      <Box className="flex items-center gap-2">
-                        <HomeIcon sx={{ color: "#A29EB6", fontSize: 20 }} />
-                        <Typography
-                          variant="caption"
-                          className="text-[#A29EB6] uppercase tracking-wider"
-                        >
-                          Flat Number
-                        </Typography>
+                  <Box className="grid grid-cols-2 gap-3">
+                    {profile.building_name && (
+                      <Box className="p-3 rounded-lg bg-gray-50">
+                        <Typography variant="caption" className="text-gray-500 font-medium block mb-1">Building</Typography>
+                        <Typography variant="body2" className="font-bold text-gray-800">{profile.building_name}</Typography>
                       </Box>
-                      <Paper
-                        elevation={0}
-                        className="p-4 border rounded-lg bg-[rgba(111,11,20,0.09)]"
-                      >
-                        <Typography className="font-medium">
-                          {profile.flat_number}
-                        </Typography>
-                      </Paper>
-                    </Box>
-                  </Grid>
-                )}
+                    )}
+                    {profile.flat_number && (
+                      <Box className="p-3 rounded-lg bg-gray-50">
+                        <Typography variant="caption" className="text-gray-500 font-medium block mb-1">Flat No</Typography>
+                        <Typography variant="body2" className="font-bold text-gray-800">{profile.flat_number}</Typography>
+                      </Box>
+                    )}
+                  </Box>
+                </CardContent>
+              </Card>
+            )}
+          </Box>
+        </Grid>
 
-                {/* MOVE IN DATE */}
+        {/* RIGHT COLUMN - Personal & Contact Info */}
+        <Grid item xs={12} lg={8}>
+          <Card className="rounded-2xl shadow-sm border border-gray-100 h-full">
+            <CardContent className="p-6 md:p-8">
+              <Box className="flex items-center gap-3 mb-8 pb-4 border-b border-gray-100">
+                <Box className="p-2 rounded-lg bg-red-50">
+                  <PersonIcon sx={{ color: themeColors.primary }} />
+                </Box>
+                <Typography variant="h6" className="font-bold text-gray-900">
+                  Personal Information
+                </Typography>
+              </Box>
+
+              <Grid container spacing={4}>
+                <Grid item xs={12} md={6}>
+                  <InputField
+                    icon={<PersonIcon />}
+                    label="Full Name"
+                    name="name"
+                    value={editableProfile?.name || ""}
+                    isEditing={isEditing}
+                    onChange={handleProfileChange}
+                    profileValue={profile.name}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <InputField
+                    icon={<EmailIcon />}
+                    label="Email Address"
+                    name="email"
+                    value={editableProfile?.email || ""}
+                    isEditing={isEditing}
+                    onChange={handleProfileChange}
+                    profileValue={profile.email}
+                    type="email"
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <InputField
+                    icon={<PhoneIcon />}
+                    label="Phone Number"
+                    name="number"
+                    value={editableProfile?.number || ""}
+                    isEditing={isEditing}
+                    onChange={handleProfileChange}
+                    profileValue={profile.number}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <InputField
+                    icon={<WhatsAppIcon />}
+                    label="WhatsApp Number"
+                    name="whatsapp_number"
+                    value={editableProfile?.whatsapp_number || ""}
+                    isEditing={isEditing}
+                    onChange={handleProfileChange}
+                    profileValue={profile.whatsapp_number}
+                  />
+                </Grid>
+
+                <Grid item xs={12}>
+                  <Typography variant="subtitle2" className="text-gray-400 font-medium uppercase tracking-wider mb-4 mt-2">
+                    Additional Details
+                  </Typography>
+                </Grid>
+
                 {profile.move_in_date && (
                   <Grid item xs={12} md={6}>
-                    <Box className="space-y-2">
-                      <Box className="flex items-center gap-2">
-                        <CalendarTodayIcon
-                          sx={{ color: "#A29EB6", fontSize: 20 }}
-                        />
-                        <Typography
-                          variant="caption"
-                          className="text-[#A29EB6] uppercase tracking-wider"
-                        >
-                          Move In Date
-                        </Typography>
-                      </Box>
-                      <Paper
-                        elevation={0}
-                        className="p-4 border rounded-lg bg-[rgba(111,11,20,0.09)]"
-                      >
-                        <Typography className="font-medium">
-                          {profile.move_in_date}
-                        </Typography>
-                      </Paper>
-                    </Box>
+                    <ReadOnlyField
+                      icon={<CalendarTodayIcon />}
+                      label="Move In Date"
+                      value={profile.move_in_date}
+                    />
                   </Grid>
                 )}
-
-                {/* MOVE OUT DATE */}
                 {profile.move_out_date && (
                   <Grid item xs={12} md={6}>
-                    <Box className="space-y-2">
-                      <Box className="flex items-center gap-2">
-                        <CalendarTodayIcon
-                          sx={{ color: "#A29EB6", fontSize: 20 }}
-                        />
-                        <Typography
-                          variant="caption"
-                          className="text-[#A29EB6] uppercase tracking-wider"
-                        >
-                          Move Out Date
-                        </Typography>
-                      </Box>
-                      <Paper
-                        elevation={0}
-                        className="p-4 border rounded-lg bg-[rgba(111,11,20,0.09)]"
-                      >
-                        <Typography className="font-medium">
-                          {profile.move_out_date}
-                        </Typography>
-                      </Paper>
-                    </Box>
+                    <ReadOnlyField
+                      icon={<CalendarTodayIcon />}
+                      label="Move Out Date"
+                      value={profile.move_out_date}
+                    />
                   </Grid>
                 )}
-
-                {/* USER ID */}
                 <Grid item xs={12}>
-                  <Box className="space-y-2">
-                    <Box className="flex items-center gap-2">
-                      <BadgeIcon sx={{ color: "#A29EB6", fontSize: 20 }} />
-                      <Typography
-                        variant="caption"
-                        className="text-[#A29EB6] uppercase tracking-wider"
-                      >
-                        Registered User ID
-                      </Typography>
-                    </Box>
-                    <Paper
-                      elevation={0}
-                      className="p-4 border rounded-lg bg-[rgba(111,11,20,0.09)]"
-                    >
-                      <Typography className="font-medium text-sm break-all">
-                        {profile.registed_user_id || profile.userId}
-                      </Typography>
-                    </Paper>
-                  </Box>
+                  <ReadOnlyField
+                    icon={<BadgeIcon />}
+                    label="Registered User ID"
+                    value={profile.registed_user_id || profile.userId}
+                    bg="bg-gray-50"
+                  />
                 </Grid>
+
               </Grid>
             </CardContent>
           </Card>
         </Grid>
       </Grid>
 
-      {/* PASSWORD CHANGE DIALOG */}
+      {/* DIALOG REMAINS SIMILAR BUT STYLED - Include it in the replacement */}
       <Dialog
         open={openDialog}
         onClose={handleCloseDialog}
@@ -989,25 +878,28 @@ export default function CommonProfile() {
         fullWidth
         PaperProps={{
           sx: {
-            borderRadius: 3,
-            background: "linear-gradient(145deg, #ffffff, #f5f5f5)",
-            boxShadow: "0 10px 30px rgba(111, 11, 20, 0.2)",
+            borderRadius: "16px",
+            boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
           },
         }}
+        BackdropProps={{
+          sx: {
+            backgroundColor: "rgba(0, 0, 0, 0.6)",
+            backdropFilter: "blur(4px)"
+          }
+        }}
       >
-        <DialogTitle
-          className="text-center"
-          sx={{ color: "#6F0B14", fontWeight: 600 }}
-        >
-          <LockResetIcon sx={{ mr: 1, verticalAlign: "middle" }} />
-          Change Password
+        <DialogTitle className="flex items-center gap-3 p-6 border-b border-gray-100">
+          <Box className="p-2 bg-red-50 rounded-lg">
+            <LockResetIcon sx={{ color: themeColors.primary }} />
+          </Box>
+          <Typography variant="h6" className="font-bold text-gray-900">Change Password</Typography>
         </DialogTitle>
 
         <form onSubmit={handleChangePassword}>
-          <DialogContent className="space-y-4">
+          <DialogContent className="p-6 space-y-5">
             <Typography variant="body2" color="textSecondary" className="mb-2">
-              Enter your new password. You will be logged out after successful
-              change.
+              Enter your new password. You will be logged out after successful change.
             </Typography>
 
             <TextField
@@ -1019,8 +911,19 @@ export default function CommonProfile() {
               onChange={handlePasswordChange}
               required
               variant="outlined"
-              size="medium"
               helperText="Minimum 6 characters"
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "12px",
+                  "&.Mui-focused fieldset": {
+                    borderColor: themeColors.primary,
+                    borderWidth: 2
+                  }
+                },
+                "& .MuiInputLabel-root.Mui-focused": {
+                  color: themeColors.primary
+                }
+              }}
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
@@ -1028,67 +931,56 @@ export default function CommonProfile() {
                       onClick={() => togglePasswordVisibility("newPassword")}
                       edge="end"
                     >
-                      {showPassword.newPassword ? (
-                        <VisibilityOff />
-                      ) : (
-                        <Visibility />
-                      )}
+                      {showPassword.newPassword ? <VisibilityOff /> : <Visibility />}
                     </IconButton>
                   </InputAdornment>
                 ),
               }}
-              sx={{
-                "& .MuiOutlinedInput-root": {
-                  "&:hover fieldset": { borderColor: "#6F0B14" },
-                  "&.Mui-focused fieldset": { borderColor: "#6F0B14" },
-                },
-              }}
             />
-
             <TextField
               fullWidth
               type={showPassword.confirmPassword ? "text" : "password"}
-              label="Confirm New Password"
+              label="Confirm Password"
               name="confirmPassword"
               value={passwordData.confirmPassword}
               onChange={handlePasswordChange}
               required
               variant="outlined"
-              size="medium"
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "12px",
+                  "&.Mui-focused fieldset": {
+                    borderColor: themeColors.primary,
+                    borderWidth: 2
+                  }
+                },
+                "& .MuiInputLabel-root.Mui-focused": {
+                  color: themeColors.primary
+                }
+              }}
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
                     <IconButton
-                      onClick={() =>
-                        togglePasswordVisibility("confirmPassword")
-                      }
+                      onClick={() => togglePasswordVisibility("confirmPassword")}
                       edge="end"
                     >
-                      {showPassword.confirmPassword ? (
-                        <VisibilityOff />
-                      ) : (
-                        <Visibility />
-                      )}
+                      {showPassword.confirmPassword ? <VisibilityOff /> : <Visibility />}
                     </IconButton>
                   </InputAdornment>
                 ),
               }}
-              sx={{
-                "& .MuiOutlinedInput-root": {
-                  "&:hover fieldset": { borderColor: "#6F0B14" },
-                  "&.Mui-focused fieldset": { borderColor: "#6F0B14" },
-                },
-              }}
             />
           </DialogContent>
 
-          <DialogActions className="p-4 pt-2">
+          <DialogActions className="p-6 pt-2 gap-3">
             <Button
               onClick={handleCloseDialog}
+              variant="text"
               sx={{
-                color: "#6F0B14",
-                fontWeight: 500,
-                "&:hover": { backgroundColor: "rgba(111, 11, 20, 0.08)" },
+                color: "gray",
+                textTransform: "none",
+                fontWeight: 600
               }}
               disabled={loading}
             >
@@ -1099,22 +991,19 @@ export default function CommonProfile() {
               variant="contained"
               disabled={loading}
               sx={{
-                backgroundColor: "#6F0B14",
-                fontWeight: 500,
+                bgcolor: themeColors.primary,
+                borderRadius: "8px",
+                textTransform: "none",
                 padding: "8px 24px",
-                "&:hover": { backgroundColor: "#5A0910" },
-                "&.Mui-disabled": { backgroundColor: "rgba(111, 11, 20, 0.5)" },
+                fontWeight: 600,
+                "&:hover": { bgcolor: themeColors.secondary }
               }}
             >
-              {loading ? (
-                <CircularProgress size={24} color="inherit" />
-              ) : (
-                "Update Password"
-              )}
+              {loading ? <CircularProgress size={20} color="inherit" /> : "Update Password"}
             </Button>
           </DialogActions>
         </form>
       </Dialog>
-    </Box>
+    </motion.div>
   );
 }

@@ -1,1085 +1,1354 @@
-// import React, { useState, useEffect, useCallback } from "react";
-// import {
-//   Box,
-//   Typography,
-//   TextField,
-//   Table,
-//   TableBody,
-//   TableCell,
-//   TableContainer,
-//   TableHead,
-//   TableRow,
-//   Paper,
-//   Chip,
-//   IconButton,
-//   Menu,
-//   MenuItem,
-//   Select,
-//   FormControl,
-//   InputLabel,
-//   Avatar,
-//   Stack,
-//   TablePagination,
-//   useTheme,
-//   useMediaQuery,
-//   Card,
-//   CardContent,
-//   Grid,
-//   CircularProgress,
-//   Tooltip,
-// } from "@mui/material";
-// import { toast } from "react-toastify";
-// import supabase from "../../api/supabaseClient";
-
-// // Import React Icons
-// import {
-//   FiSearch,
-//   FiFilter,
-//   FiMoreVertical,
-//   FiUser,
-//   FiMail,
-//   FiPhone,
-//   FiHome,
-//   FiBuilding,
-//   FiCalendar,
-//   FiEye,
-//   FiEdit,
-//   FiTrash2,
-//   FiRefreshCw,
-//   FiDownload,
-// } from "react-icons/fi";
-// import {
-//   MdApartment,
-//   MdLocationOn,
-//   MdOutlinePerson,
-//   MdOutlineEmail,
-//   MdOutlinePhone,
-//   MdOutlineHome,
-//   MdOutlineBusiness,
-//   MdOutlineDateRange,
-// } from "react-icons/md";
-// import {
-//   RiUserLine,
-//   RiBuildingLine,
-//   RiHomeLine,
-//   RiFileListLine,
-// } from "react-icons/ri";
-
-// export default function AdminUsers() {
-//   const [users, setUsers] = useState([]);
-//   const [filteredUsers, setFilteredUsers] = useState([]);
-//   const theme = useTheme();
-//   const isMobile = useMediaQuery(theme.breakpoints.down("md"));
-//   const [loading, setLoading] = useState(false);
-//   const [refreshing, setRefreshing] = useState(false);
-//   const [page, setPage] = useState(0);
-//   const [rowsPerPage, setRowsPerPage] = useState(10);
-//   const [searchTerm, setSearchTerm] = useState("");
-//   const [filterAnchorEl, setFilterAnchorEl] = useState(null);
-//   const [statusFilter, setStatusFilter] = useState("all");
-//   const [roleFilter, setRoleFilter] = useState("all");
-
-//   const [adminSocietyId, setAdminSocietyId] = useState(null);
-//   const [adminSocietyName, setAdminSocietyName] = useState("");
-
-//   // State for user details dialog
-//   const [selectedUser, setSelectedUser] = useState(null);
-//   const [openUserDialog, setOpenUserDialog] = useState(false);
-//   const [actionAnchorEl, setActionAnchorEl] = useState(null);
-//   const [selectedUserId, setSelectedUserId] = useState(null);
-
-//   // Get admin's society ID
-//   const getAdminSocietyId = useCallback(async () => {
-//     try {
-//       const storedSocietyId = localStorage.getItem("societyId");
-//       if (storedSocietyId) {
-//         return storedSocietyId;
-//       }
-
-//       const storedProfile = localStorage.getItem("profile");
-//       if (!storedProfile) {
-//         console.error("No profile found in localStorage");
-//         return null;
-//       }
-
-//       const profile = JSON.parse(storedProfile);
-//       const userId = profile.id;
-
-//       const { data: societyData, error } = await supabase
-//         .from("societies")
-//         .select("id, name")
-//         .eq("user_id", userId)
-//         .single();
-
-//       if (error) {
-//         console.error("Error fetching society:", error);
-//         toast.error("Unable to fetch society information");
-//         return null;
-//       }
-
-//       if (societyData) {
-//         localStorage.setItem("societyId", societyData.id);
-//         localStorage.setItem("societyName", societyData.name);
-//         return societyData.id;
-//       }
-
-//       return null;
-//     } catch (error) {
-//       console.error("Error in getAdminSocietyId:", error);
-//       return null;
-//     }
-//   }, []);
-
-//   // Initialize admin data
-//   useEffect(() => {
-//     const initializeAdminData = async () => {
-//       const societyId = await getAdminSocietyId();
-
-//       if (societyId) {
-//         setAdminSocietyId(societyId);
-
-//         const storedSocietyName = localStorage.getItem("societyName");
-//         if (storedSocietyName) {
-//           setAdminSocietyName(storedSocietyName);
-//         } else {
-//           const { data: societyData, error } = await supabase
-//             .from("societies")
-//             .select("name")
-//             .eq("id", societyId)
-//             .single();
-
-//           if (!error && societyData) {
-//             setAdminSocietyName(societyData.name);
-//             localStorage.setItem("societyName", societyData.name);
-//           }
-//         }
-//       } else {
-//         toast.error(
-//           "No society assigned to your account. Please contact administrator.",
-//         );
-//       }
-//     };
-
-//     initializeAdminData();
-//   }, [getAdminSocietyId]);
-
-//   // Fetch users/tenants
-//   const fetchUsers = useCallback(async () => {
-//     setLoading(true);
-//     setRefreshing(true);
-
-//     try {
-//       const societyId = await getAdminSocietyId();
-
-//       if (!societyId) {
-//         toast.error("No society assigned. Cannot fetch users.");
-//         setLoading(false);
-//         setRefreshing(false);
-//         return;
-//       }
-
-//       // Get all buildings in this society
-//       const { data: buildingsData, error: buildingsError } = await supabase
-//         .from("buildings")
-//         .select("id")
-//         .eq("society_id", societyId)
-//         .eq("is_delete", false);
-
-//       if (buildingsError) {
-//         console.error("Error fetching buildings:", buildingsError);
-//         toast.error("Failed to fetch buildings");
-//         setLoading(false);
-//         setRefreshing(false);
-//         return;
-//       }
-
-//       const buildingIds = buildingsData.map((b) => b.id);
-
-//       if (buildingIds.length === 0) {
-//         setUsers([]);
-//         setFilteredUsers([]);
-//         setLoading(false);
-//         setRefreshing(false);
-//         return;
-//       }
-
-//       // Get all flats in these buildings
-//       const { data: flatsData, error: flatsError } = await supabase
-//         .from("flats")
-//         .select(
-//           `
-//           id,
-//           flat_number,
-//           building_id,
-//           owner_id,
-//           tenant_id,
-//           flat_type,
-//           status,
-//           buildings (
-//             id,
-//             name,
-//             societies (
-//               id,
-//               name
-//             )
-//           )
-//         `,
-//         )
-//         .in("building_id", buildingIds)
-//         .eq("is_delete", false);
-
-//       if (flatsError) {
-//         console.error("Error fetching flats:", flatsError);
-//         toast.error("Failed to fetch flats");
-//         setLoading(false);
-//         setRefreshing(false);
-//         return;
-//       }
-
-//       // Collect all user IDs
-//       const userIds = new Set();
-//       flatsData.forEach((flat) => {
-//         if (flat.owner_id) userIds.add(flat.owner_id);
-//         if (flat.tenant_id) userIds.add(flat.tenant_id);
-//       });
-
-//       const uniqueUserIds = Array.from(userIds);
-
-//       if (uniqueUserIds.length === 0) {
-//         setUsers([]);
-//         setFilteredUsers([]);
-//         setLoading(false);
-//         setRefreshing(false);
-//         return;
-//       }
-
-//       // Get user details
-//       const { data: usersData, error: usersError } = await supabase
-//         .from("users")
-//         .select(
-//           `
-//           id,
-//           email,
-//           first_name,
-//           last_name,
-//           phone,
-//           role,
-//           is_active,
-//           created_at,
-//           profile_picture,
-//           address
-//         `,
-//         )
-//         .in("id", uniqueUserIds);
-
-//       if (usersError) {
-//         console.error("Error fetching users:", usersError);
-//         toast.error("Failed to fetch users");
-//         setLoading(false);
-//         setRefreshing(false);
-//         return;
-//       }
-
-//       // Map users with their flat and building information
-//       const mappedUsers = usersData.map((user) => {
-//         const userFlats = flatsData.filter(
-//           (flat) => flat.owner_id === user.id || flat.tenant_id === user.id,
-//         );
-
-//         const firstFlat = userFlats[0];
-//         const building = firstFlat?.buildings;
-//         const society = building?.societies;
-
-//         const userRolesInSociety = new Set();
-//         userFlats.forEach((flat) => {
-//           if (flat.owner_id === user.id) userRolesInSociety.add("Owner");
-//           if (flat.tenant_id === user.id) userRolesInSociety.add("Tenant");
-//         });
-
-//         return {
-//           id: user.id,
-//           email: user.email,
-//           firstName: user.first_name || "",
-//           lastName: user.last_name || "",
-//           fullName: `${user.first_name || ""} ${user.last_name || ""}`.trim(),
-//           phone: user.phone || "N/A",
-//           address: user.address || "N/A",
-//           userRole: user.role,
-//           societyRole: Array.from(userRolesInSociety).join(", ") || "Resident",
-//           isActive: user.is_active,
-//           profilePicture: user.profile_picture,
-//           buildingId: building?.id,
-//           buildingName: building?.name || "N/A",
-//           societyId: society?.id,
-//           societyName: society?.name || "N/A",
-//           flatsCount: userFlats.length,
-//           flatNumbers: userFlats.map((f) => f.flat_number).join(", "),
-//           flatTypes: userFlats
-//             .map((f) => f.flat_type)
-//             .filter(Boolean)
-//             .join(", "),
-//           joinDate: user.created_at
-//             ? new Date(user.created_at).toLocaleDateString()
-//             : "—",
-//           joinDateTime: user.created_at ? new Date(user.created_at) : null,
-//           status: user.is_active ? "active" : "inactive",
-//           avatar:
-//             user.first_name?.[0]?.toUpperCase() ||
-//             user.email?.[0]?.toUpperCase() ||
-//             "U",
-//         };
-//       });
-
-//       // Sort by join date (newest first)
-//       mappedUsers.sort((a, b) => {
-//         if (!a.joinDateTime) return 1;
-//         if (!b.joinDateTime) return -1;
-//         return b.joinDateTime - a.joinDateTime;
-//       });
-
-//       setUsers(mappedUsers);
-//       setFilteredUsers(mappedUsers);
-//       toast.success(`Loaded ${mappedUsers.length} users`);
-//     } catch (error) {
-//       console.error("Error in fetchUsers:", error);
-//       toast.error("Error fetching users");
-//     } finally {
-//       setLoading(false);
-//       setRefreshing(false);
-//     }
-//   }, [getAdminSocietyId]);
-
-//   useEffect(() => {
-//     if (adminSocietyId) {
-//       fetchUsers();
-//     }
-//   }, [fetchUsers, adminSocietyId]);
-
-//   // Apply filters
-//   useEffect(() => {
-//     let filtered = users;
-
-//     if (searchTerm) {
-//       const searchLower = searchTerm.toLowerCase();
-//       filtered = filtered.filter(
-//         (user) =>
-//           user.fullName.toLowerCase().includes(searchLower) ||
-//           user.email.toLowerCase().includes(searchLower) ||
-//           user.phone.toLowerCase().includes(searchLower) ||
-//           user.buildingName.toLowerCase().includes(searchLower) ||
-//           user.flatNumbers.toLowerCase().includes(searchLower),
-//       );
-//     }
-
-//     if (statusFilter !== "all") {
-//       filtered = filtered.filter((user) => user.status === statusFilter);
-//     }
-
-//     if (roleFilter !== "all") {
-//       filtered = filtered.filter((user) =>
-//         user.societyRole.toLowerCase().includes(roleFilter.toLowerCase()),
-//       );
-//     }
-
-//     setFilteredUsers(filtered);
-//     setPage(0);
-//   }, [users, searchTerm, statusFilter, roleFilter]);
-
-//   // Handle filter menu
-//   const handleFilterClick = (event) => {
-//     setFilterAnchorEl(event.currentTarget);
-//   };
-
-//   const handleFilterClose = () => {
-//     setFilterAnchorEl(null);
-//   };
-
-//   // Handle action menu
-//   const handleActionClick = (event, userId) => {
-//     setActionAnchorEl(event.currentTarget);
-//     setSelectedUserId(userId);
-//   };
-
-//   const handleActionClose = () => {
-//     setActionAnchorEl(null);
-//     setSelectedUserId(null);
-//   };
-
-//   // Handle user actions
-//   const handleViewUser = (userId) => {
-//     const user = users.find((u) => u.id === userId);
-//     setSelectedUser(user);
-//     setOpenUserDialog(true);
-//     handleActionClose();
-//   };
-
-//   const handleEditUser = (userId) => {
-//     const user = users.find((u) => u.id === userId);
-//     toast.info(`Edit user: ${user?.fullName}`);
-//     handleActionClose();
-//   };
-
-//   const handleDeleteUser = (userId) => {
-//     const user = users.find((u) => u.id === userId);
-//     if (window.confirm(`Are you sure you want to delete ${user?.fullName}?`)) {
-//       toast.success(`User ${user?.fullName} deleted successfully`);
-//       // Here you would typically call an API to delete the user
-//       handleActionClose();
-//     }
-//   };
-
-//   const handleExportUsers = () => {
-//     toast.info("Exporting users to CSV...");
-//     // Implement CSV export logic here
-//   };
-
-//   // Handle pagination
-//   const handleChangePage = (event, newPage) => {
-//     setPage(newPage);
-//   };
-
-//   const handleChangeRowsPerPage = (event) => {
-//     setRowsPerPage(parseInt(event.target.value, 10));
-//     setPage(0);
-//   };
-
-//   // Get status chip color
-//   const getStatusColor = (status) => {
-//     switch (status) {
-//       case "active":
-//         return "success";
-//       case "inactive":
-//         return "error";
-//       default:
-//         return "default";
-//     }
-//   };
-
-//   // Get role chip color
-//   const getRoleColor = (role) => {
-//     if (role.includes("Owner")) return "primary";
-//     if (role.includes("Tenant")) return "secondary";
-//     return "default";
-//   };
-
-//   // Get user avatar background color
-//   const getAvatarColor = (name) => {
-//     const colors = [
-//       theme.palette.primary.main,
-//       theme.palette.secondary.main,
-//       theme.palette.success.main,
-//       theme.palette.warning.main,
-//       theme.palette.info.main,
-//     ];
-//     const index = name.charCodeAt(0) % colors.length;
-//     return colors[index];
-//   };
-
-//   // Mobile card view for users
-//   const MobileUserCard = ({ user }) => (
-//     <Card sx={{ mb: 2, borderRadius: 2, boxShadow: 1 }}>
-//       <CardContent>
-//         <Stack direction="row" spacing={2} alignItems="flex-start" mb={2}>
-//           <Avatar
-//             src={user.profilePicture}
-//             sx={{
-//               bgcolor: getAvatarColor(user.fullName),
-//               width: 48,
-//               height: 48,
-//             }}
-//           >
-//             {user.avatar}
-//           </Avatar>
-//           <Box sx={{ flex: 1 }}>
-//             <Stack
-//               direction="row"
-//               justifyContent="space-between"
-//               alignItems="flex-start"
-//             >
-//               <Box>
-//                 <Typography variant="h6" fontWeight="600">
-//                   {user.fullName}
-//                 </Typography>
-//                 <Typography variant="body2" color="text.secondary">
-//                   {user.email}
-//                 </Typography>
-//               </Box>
-//               <Chip
-//                 label={user.status}
-//                 size="small"
-//                 color={getStatusColor(user.status)}
-//                 sx={{ height: 24 }}
-//               />
-//             </Stack>
-//           </Box>
-//         </Stack>
-
-//         <Grid container spacing={1.5}>
-//           <Grid item xs={12}>
-//             <Stack direction="row" alignItems="center" spacing={1}>
-//               <MdOutlinePhone size={16} color={theme.palette.text.secondary} />
-//               <Typography variant="body2">{user.phone}</Typography>
-//             </Stack>
-//           </Grid>
-//           <Grid item xs={12}>
-//             <Stack direction="row" alignItems="center" spacing={1}>
-//               <RiBuildingLine size={16} color={theme.palette.text.secondary} />
-//               <Typography variant="body2" fontWeight="500">
-//                 {user.buildingName}
-//               </Typography>
-//             </Stack>
-//           </Grid>
-//           <Grid item xs={12}>
-//             <Stack direction="row" alignItems="center" spacing={1}>
-//               <RiHomeLine size={16} color={theme.palette.text.secondary} />
-//               <Typography variant="body2">
-//                 Flat{user.flatsCount > 1 ? "s" : ""}:{" "}
-//                 {user.flatNumbers || "N/A"}
-//               </Typography>
-//             </Stack>
-//           </Grid>
-//           <Grid item xs={12}>
-//             <Stack direction="row" alignItems="center" spacing={1}>
-//               <MdOutlineDateRange
-//                 size={16}
-//                 color={theme.palette.text.secondary}
-//               />
-//               <Typography variant="body2" color="text.secondary">
-//                 Joined: {user.joinDate}
-//               </Typography>
-//             </Stack>
-//           </Grid>
-//           <Grid item xs={12} sx={{ mt: 1 }}>
-//             <Stack direction="row" spacing={1} alignItems="center">
-//               <Chip
-//                 label={user.societyRole}
-//                 size="small"
-//                 color={getRoleColor(user.societyRole)}
-//                 sx={{ height: 24 }}
-//               />
-//               <IconButton
-//                 size="small"
-//                 onClick={(e) => handleActionClick(e, user.id)}
-//                 sx={{ ml: "auto" }}
-//               >
-//                 <FiMoreVertical size={18} />
-//               </IconButton>
-//             </Stack>
-//           </Grid>
-//         </Grid>
-//       </CardContent>
-//     </Card>
-//   );
-
-//   // Paginated data
-//   const paginatedUsers = filteredUsers.slice(
-//     page * rowsPerPage,
-//     page * rowsPerPage + rowsPerPage,
-//   );
-
-//   return (
-//     <Box sx={{ p: { xs: 2, md: 3 } }}>
-//       {/* Header Section */}
-//       <Box sx={{ mb: 4 }}>
-//         <Stack
-//           direction="row"
-//           justifyContent="space-between"
-//           alignItems="center"
-//           mb={2}
-//         >
-//           <Box>
-//             <Typography variant="h4" fontWeight="700" gutterBottom>
-//               Society Users
-//             </Typography>
-//             <Typography variant="body1" color="text.secondary">
-//               {adminSocietyName
-//                 ? `Managing users in ${adminSocietyName}`
-//                 : "Loading society information..."}
-//             </Typography>
-//           </Box>
-//           <Stack direction="row" spacing={1}>
-//             <IconButton
-//               onClick={fetchUsers}
-//               disabled={refreshing}
-//               sx={{
-//                 border: `1px solid ${theme.palette.divider}`,
-//                 borderRadius: 2,
-//               }}
-//             >
-//               <FiRefreshCw size={20} className={refreshing ? "spin" : ""} />
-//             </IconButton>
-//             <IconButton
-//               onClick={handleExportUsers}
-//               sx={{
-//                 border: `1px solid ${theme.palette.divider}`,
-//                 borderRadius: 2,
-//               }}
-//             >
-//               <FiDownload size={20} />
-//             </IconButton>
-//           </Stack>
-//         </Stack>
-//       </Box>
-
-//       {/* Filters and Search */}
-//       <Box
-//         sx={{
-//           mb: 3,
-//           p: 3,
-//           bgcolor: "background.paper",
-//           borderRadius: 2,
-//           boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-//         }}
-//       >
-//         <Grid container spacing={2} alignItems="center">
-//           <Grid item xs={12} md={6}>
-//             <TextField
-//               fullWidth
-//               variant="outlined"
-//               placeholder="Search users..."
-//               value={searchTerm}
-//               onChange={(e) => setSearchTerm(e.target.value)}
-//               InputProps={{
-//                 startAdornment: (
-//                   <FiSearch
-//                     style={{
-//                       marginRight: 8,
-//                       color: theme.palette.text.secondary,
-//                     }}
-//                   />
-//                 ),
-//               }}
-//               size="small"
-//               sx={{
-//                 "& .MuiOutlinedInput-root": {
-//                   borderRadius: 2,
-//                 },
-//               }}
-//             />
-//           </Grid>
-
-//           <Grid item xs={6} md={2}>
-//             <FormControl fullWidth size="small">
-//               <InputLabel>Status</InputLabel>
-//               <Select
-//                 value={statusFilter}
-//                 label="Status"
-//                 onChange={(e) => setStatusFilter(e.target.value)}
-//                 sx={{ borderRadius: 2 }}
-//               >
-//                 <MenuItem value="all">All Status</MenuItem>
-//                 <MenuItem value="active">Active</MenuItem>
-//                 <MenuItem value="inactive">Inactive</MenuItem>
-//               </Select>
-//             </FormControl>
-//           </Grid>
-
-//           <Grid item xs={6} md={2}>
-//             <FormControl fullWidth size="small">
-//               <InputLabel>Role</InputLabel>
-//               <Select
-//                 value={roleFilter}
-//                 label="Role"
-//                 onChange={(e) => setRoleFilter(e.target.value)}
-//                 sx={{ borderRadius: 2 }}
-//               >
-//                 <MenuItem value="all">All Roles</MenuItem>
-//                 <MenuItem value="Owner">Owners</MenuItem>
-//                 <MenuItem value="Tenant">Tenants</MenuItem>
-//                 <MenuItem value="Resident">Residents</MenuItem>
-//               </Select>
-//             </FormControl>
-//           </Grid>
-
-//           <Grid item xs={12} md={2}>
-//             <IconButton
-//               onClick={handleFilterClick}
-//               sx={{
-//                 border: `1px solid ${theme.palette.divider}`,
-//                 borderRadius: 2,
-//                 width: "100%",
-//                 height: 40,
-//               }}
-//             >
-//               <FiFilter size={18} />
-//               <Typography variant="body2" sx={{ ml: 1 }}>
-//                 More Filters
-//               </Typography>
-//             </IconButton>
-//           </Grid>
-//         </Grid>
-//       </Box>
-
-//       {/* User Count and Stats */}
-//       <Box
-//         sx={{
-//           mb: 2,
-//           p: 2,
-//           bgcolor: "background.default",
-//           borderRadius: 2,
-//           display: "flex",
-//           alignItems: "center",
-//           justifyContent: "space-between",
-//         }}
-//       >
-//         <Typography variant="body1" color="text.secondary">
-//           <strong>{filteredUsers.length}</strong> user
-//           {filteredUsers.length !== 1 ? "s" : ""} found
-//         </Typography>
-//         <Stack direction="row" spacing={2}>
-//           <Chip
-//             icon={<FiUser size={14} />}
-//             label={`${users.filter((u) => u.societyRole.includes("Owner")).length} Owners`}
-//             size="small"
-//             variant="outlined"
-//           />
-//           <Chip
-//             icon={<RiUserLine size={14} />}
-//             label={`${users.filter((u) => u.societyRole.includes("Tenant")).length} Tenants`}
-//             size="small"
-//             variant="outlined"
-//           />
-//         </Stack>
-//       </Box>
-
-//       {/* Loading State */}
-//       {loading ? (
-//         <Box
-//           sx={{
-//             display: "flex",
-//             flexDirection: "column",
-//             justifyContent: "center",
-//             alignItems: "center",
-//             p: 8,
-//             bgcolor: "background.paper",
-//             borderRadius: 2,
-//             boxShadow: 1,
-//           }}
-//         >
-//           <CircularProgress size={60} />
-//           <Typography variant="h6" sx={{ mt: 3 }}>
-//             Loading users...
-//           </Typography>
-//         </Box>
-//       ) : (
-//         <>
-//           {/* Mobile View */}
-//           {isMobile ? (
-//             <Box>
-//               {paginatedUsers.length === 0 ? (
-//                 <Box
-//                   sx={{
-//                     textAlign: "center",
-//                     p: 8,
-//                     bgcolor: "background.paper",
-//                     borderRadius: 2,
-//                     boxShadow: 1,
-//                   }}
-//                 >
-//                   <RiUserLine size={64} color={theme.palette.text.disabled} />
-//                   <Typography
-//                     variant="h6"
-//                     color="text.secondary"
-//                     sx={{ mt: 2 }}
-//                   >
-//                     No users found
-//                   </Typography>
-//                   <Typography variant="body2" color="text.secondary">
-//                     {searchTerm
-//                       ? "Try adjusting your search"
-//                       : "No users in your society yet"}
-//                   </Typography>
-//                 </Box>
-//               ) : (
-//                 paginatedUsers.map((user) => (
-//                   <MobileUserCard key={user.id} user={user} />
-//                 ))
-//               )}
-//             </Box>
-//           ) : (
-//             /* Desktop View */
-//             <Paper
-//               sx={{
-//                 width: "100%",
-//                 overflow: "hidden",
-//                 borderRadius: 2,
-//                 boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-//               }}
-//             >
-//               <TableContainer>
-//                 <Table>
-//                   <TableHead>
-//                     <TableRow sx={{ bgcolor: "background.default" }}>
-//                       <TableCell sx={{ fontWeight: "600" }}>User</TableCell>
-//                       <TableCell sx={{ fontWeight: "600" }}>Contact</TableCell>
-//                       <TableCell sx={{ fontWeight: "600" }}>
-//                         Building & Flats
-//                       </TableCell>
-//                       <TableCell sx={{ fontWeight: "600" }}>Role</TableCell>
-//                       <TableCell sx={{ fontWeight: "600" }}>Status</TableCell>
-//                       <TableCell sx={{ fontWeight: "600" }}>Joined</TableCell>
-//                       <TableCell sx={{ fontWeight: "600" }}>Actions</TableCell>
-//                     </TableRow>
-//                   </TableHead>
-//                   <TableBody>
-//                     {paginatedUsers.length === 0 ? (
-//                       <TableRow>
-//                         <TableCell colSpan={7} align="center" sx={{ py: 8 }}>
-//                           <RiUserLine
-//                             size={48}
-//                             color={theme.palette.text.disabled}
-//                           />
-//                           <Typography
-//                             variant="h6"
-//                             color="text.secondary"
-//                             sx={{ mt: 2 }}
-//                           >
-//                             No users found
-//                           </Typography>
-//                           <Typography variant="body2" color="text.secondary">
-//                             {searchTerm
-//                               ? "Try adjusting your search"
-//                               : "No users in your society yet"}
-//                           </Typography>
-//                         </TableCell>
-//                       </TableRow>
-//                     ) : (
-//                       paginatedUsers.map((user) => (
-//                         <TableRow
-//                           key={user.id}
-//                           hover
-//                           sx={{
-//                             "&:last-child td": { borderBottom: 0 },
-//                             transition: "background-color 0.2s",
-//                           }}
-//                         >
-//                           <TableCell>
-//                             <Stack
-//                               direction="row"
-//                               alignItems="center"
-//                               spacing={2}
-//                             >
-//                               <Avatar
-//                                 src={user.profilePicture}
-//                                 sx={{
-//                                   bgcolor: getAvatarColor(user.fullName),
-//                                   width: 40,
-//                                   height: 40,
-//                                 }}
-//                               >
-//                                 {user.avatar}
-//                               </Avatar>
-//                               <Box>
-//                                 <Typography variant="body2" fontWeight="600">
-//                                   {user.fullName}
-//                                 </Typography>
-//                                 <Typography
-//                                   variant="caption"
-//                                   color="text.secondary"
-//                                 >
-//                                   {user.email}
-//                                 </Typography>
-//                               </Box>
-//                             </Stack>
-//                           </TableCell>
-//                           <TableCell>
-//                             <Stack spacing={0.5}>
-//                               <Stack
-//                                 direction="row"
-//                                 alignItems="center"
-//                                 spacing={1}
-//                               >
-//                                 <MdOutlinePhone
-//                                   size={14}
-//                                   color={theme.palette.text.secondary}
-//                                 />
-//                                 <Typography variant="body2">
-//                                   {user.phone}
-//                                 </Typography>
-//                               </Stack>
-//                               <Typography
-//                                 variant="caption"
-//                                 color="text.secondary"
-//                               >
-//                                 {user.address}
-//                               </Typography>
-//                             </Stack>
-//                           </TableCell>
-//                           <TableCell>
-//                             <Stack spacing={1}>
-//                               <Stack
-//                                 direction="row"
-//                                 alignItems="center"
-//                                 spacing={1}
-//                               >
-//                                 <RiBuildingLine
-//                                   size={14}
-//                                   color={theme.palette.text.secondary}
-//                                 />
-//                                 <Typography variant="body2" fontWeight="500">
-//                                   {user.buildingName}
-//                                 </Typography>
-//                               </Stack>
-//                               <Tooltip
-//                                 title={user.flatNumbers || "No flats assigned"}
-//                               >
-//                                 <Chip
-//                                   icon={<RiHomeLine size={14} />}
-//                                   label={`${user.flatsCount} flat${user.flatsCount !== 1 ? "s" : ""}`}
-//                                   size="small"
-//                                   variant="outlined"
-//                                   sx={{ width: "fit-content" }}
-//                                 />
-//                               </Tooltip>
-//                             </Stack>
-//                           </TableCell>
-//                           <TableCell>
-//                             <Chip
-//                               label={user.societyRole}
-//                               size="small"
-//                               color={getRoleColor(user.societyRole)}
-//                               sx={{ fontWeight: "500" }}
-//                             />
-//                           </TableCell>
-//                           <TableCell>
-//                             <Chip
-//                               label={user.status}
-//                               size="small"
-//                               color={getStatusColor(user.status)}
-//                               sx={{
-//                                 fontWeight: "500",
-//                                 textTransform: "capitalize",
-//                               }}
-//                             />
-//                           </TableCell>
-//                           <TableCell>
-//                             <Stack
-//                               direction="row"
-//                               alignItems="center"
-//                               spacing={1}
-//                             >
-//                               <MdOutlineDateRange
-//                                 size={14}
-//                                 color={theme.palette.text.secondary}
-//                               />
-//                               <Typography variant="body2">
-//                                 {user.joinDate}
-//                               </Typography>
-//                             </Stack>
-//                           </TableCell>
-//                           <TableCell>
-//                             <IconButton
-//                               size="small"
-//                               onClick={(e) => handleActionClick(e, user.id)}
-//                               sx={{
-//                                 border: `1px solid ${theme.palette.divider}`,
-//                                 borderRadius: 1,
-//                               }}
-//                             >
-//                               <FiMoreVertical size={18} />
-//                             </IconButton>
-//                           </TableCell>
-//                         </TableRow>
-//                       ))
-//                     )}
-//                   </TableBody>
-//                 </Table>
-//               </TableContainer>
-
-//               {/* Pagination */}
-//               {filteredUsers.length > 0 && (
-//                 <TablePagination
-//                   rowsPerPageOptions={[10, 25, 50]}
-//                   component="div"
-//                   count={filteredUsers.length}
-//                   rowsPerPage={rowsPerPage}
-//                   page={page}
-//                   onPageChange={handleChangePage}
-//                   onRowsPerPageChange={handleChangeRowsPerPage}
-//                   sx={{ borderTop: `1px solid ${theme.palette.divider}` }}
-//                 />
-//               )}
-//             </Paper>
-//           )}
-//         </>
-//       )}
-
-//       {/* Filter Menu */}
-//       <Menu
-//         anchorEl={filterAnchorEl}
-//         open={Boolean(filterAnchorEl)}
-//         onClose={handleFilterClose}
-//         PaperProps={{
-//           sx: {
-//             width: 200,
-//             borderRadius: 2,
-//             boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-//           },
-//         }}
-//       >
-//         <MenuItem onClick={() => handleFilterClose()}>
-//           <FiFilter size={16} style={{ marginRight: 8 }} />
-//           Filter Options
-//         </MenuItem>
-//         <MenuItem
-//           onClick={() => {
-//             setStatusFilter("all");
-//             setRoleFilter("all");
-//             handleFilterClose();
-//           }}
-//         >
-//           Clear All Filters
-//         </MenuItem>
-//       </Menu>
-
-//       {/* Action Menu */}
-//       <Menu
-//         anchorEl={actionAnchorEl}
-//         open={Boolean(actionAnchorEl)}
-//         onClose={handleActionClose}
-//         PaperProps={{
-//           sx: {
-//             width: 180,
-//             borderRadius: 2,
-//             boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-//           },
-//         }}
-//       >
-//         <MenuItem onClick={() => handleViewUser(selectedUserId)}>
-//           <FiEye size={16} style={{ marginRight: 8 }} />
-//           View Details
-//         </MenuItem>
-//         <MenuItem onClick={() => handleEditUser(selectedUserId)}>
-//           <FiEdit size={16} style={{ marginRight: 8 }} />
-//           Edit User
-//         </MenuItem>
-//         <MenuItem
-//           onClick={() => handleDeleteUser(selectedUserId)}
-//           sx={{ color: "error.main" }}
-//         >
-//           <FiTrash2 size={16} style={{ marginRight: 8 }} />
-//           Delete
-//         </MenuItem>
-//       </Menu>
-
-//       <style jsx>{`
-//         @keyframes spin {
-//           from {
-//             transform: rotate(0deg);
-//           }
-//           to {
-//             transform: rotate(360deg);
-//           }
-//         }
-//         .spin {
-//           animation: spin 1s linear infinite;
-//         }
-//       `}</style>
-//     </Box>
-//   );
-// }
-import React from "react";
+import React, { useState, useEffect } from "react";
+import {
+  Box,
+  Typography,
+  Container,
+  Card,
+  CardContent,
+  Grid,
+  Paper,
+  Chip,
+  CircularProgress,
+  Alert,
+  Button,
+  Tabs,
+  Tab,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Avatar,
+  IconButton,
+  Dialog,
+  DialogContent,
+  DialogActions,
+  TextField,
+  InputAdornment,
+  MenuItem,
+  Select,
+  FormControl,
+  InputLabel,
+  Tooltip,
+} from "@mui/material";
+import InfoIcon from "@mui/icons-material/Info";
+import CloseIcon from "@mui/icons-material/Close";
+import BadgeIcon from "@mui/icons-material/Badge";
+import {
+  Search as SearchIcon,
+  Refresh as RefreshIcon,
+  Home as HomeIcon,
+  Business as BuildingIcon,
+  Apartment as ApartmentIcon,
+  People as PeopleIcon,
+  Person as PersonIcon,
+  FamilyRestroom as FamilyIcon,
+  Visibility as VisibilityIcon,
+  Phone as PhoneIcon,
+  Email as EmailIcon,
+  LocationOn as LocationIcon,
+  CalendarToday as CalendarIcon,
+} from "@mui/icons-material";
+import { motion } from "framer-motion";
+import { styled } from "@mui/material/styles";
+import { supabase } from "../../api/supabaseClient";
+
+// Styled components
+const StatusChip = styled(Chip)(({ status }) => ({
+  fontFamily: "'Roboto', sans-serif",
+  fontWeight: 500,
+  ...(status === "Occupied" && {
+    backgroundColor: "#E6F4E6",
+    color: "#008000",
+    border: "1px solid #C8E6C9",
+  }),
+  ...(status === "Vacant" && {
+    backgroundColor: "#FFF3E0",
+    color: "#EF6C00",
+    border: "1px solid #FFE0B2",
+  }),
+  ...(status === "Blocked" && {
+    backgroundColor: "#FFEBEE",
+    color: "#C62828",
+    border: "1px solid #FFCDD2",
+  }),
+}));
+
+const RoleChip = styled(Chip)(({ role }) => ({
+  fontFamily: "'Roboto', sans-serif",
+  fontWeight: 500,
+  ...(role === "Tanent-M" && {
+    backgroundColor: "rgba(111, 11, 20, 0.1)",
+    color: "#6F0B14",
+    border: "1px solid rgba(111, 11, 20, 0.2)",
+  }),
+  ...(role === "Tanent-O" && {
+    backgroundColor: "rgba(0, 128, 0, 0.1)",
+    color: "#008000",
+    border: "1px solid rgba(0, 128, 0, 0.2)",
+  }),
+}));
+
+// Animation
+const fadeInUp = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
+};
 
 export default function AdminUsers() {
-  return <div>AdminUsers</div>;
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [adminId, setAdminId] = useState(null);
+  const [societies, setSocieties] = useState([]);
+  const [buildings, setBuildings] = useState([]);
+  const [flats, setFlats] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [filteredMembers, setFilteredMembers] = useState([]);
+  const [stats, setStats] = useState({
+    totalSocieties: 0,
+    totalBuildings: 0,
+    totalFlats: 0,
+    totalMembers: 0,
+    tenantM: 0,
+    tenantO: 0,
+  });
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedTab, setSelectedTab] = useState(0);
+  const [societyFilter, setSocietyFilter] = useState("all");
+  const [buildingFilter, setBuildingFilter] = useState("all");
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [selectedMember, setSelectedMember] = useState(null);
+  const [memberDialogOpen, setMemberDialogOpen] = useState(false);
+
+  // Fetch data
+  useEffect(() => {
+    const fetchAdminData = async () => {
+      const profileId = localStorage.getItem("profileId");
+      if (!profileId) {
+        setError("Please login to access user data.");
+        setLoading(false);
+        return;
+      }
+      setAdminId(profileId);
+      await fetchAllData(profileId);
+    };
+    fetchAdminData();
+  }, []);
+
+  const fetchAllData = async (profileId) => {
+    setLoading(true);
+    try {
+      let societyIds = [];
+      const { data: assignedSocieties } = await supabase
+        .from("pm_society")
+        .select("society_id")
+        .eq("pm_id", profileId);
+
+      if (assignedSocieties && assignedSocieties.length > 0) {
+        societyIds = assignedSocieties.map((item) => item.society_id);
+      } else {
+        const storedSocietyId = localStorage.getItem("societyId");
+        if (storedSocietyId) {
+          societyIds = [storedSocietyId];
+        }
+      }
+
+      if (societyIds.length === 0) {
+        setError("No societies are assigned to you yet.");
+        setLoading(false);
+        return;
+      }
+
+      // Societies
+      const { data: societiesData } = await supabase
+        .from("societies")
+        .select("id, name, address, city")
+        .in("id", societyIds);
+
+      setSocieties(societiesData || []);
+
+      // Buildings
+      const { data: buildingsData } = await supabase
+        .from("buildings")
+        .select("*")
+        .eq("is_delete", false)
+        .in("society_id", societyIds);
+
+      const buildingsWithSociety = buildingsData.map((building) => ({
+        ...building,
+        society_name:
+          societiesData.find((s) => s.id === building.society_id)?.name ||
+          "Unknown",
+      }));
+      setBuildings(buildingsWithSociety || []);
+
+      // Flats
+      const buildingIds = buildingsData.map((b) => b.id);
+      if (buildingIds.length > 0) {
+        const { data: flatsData } = await supabase
+          .from("flats")
+          .select("*")
+          .eq("is_delete", false)
+          .in("building_id", buildingIds)
+          .order("building_id, flat_number");
+
+        const flatsWithDetails = flatsData.map((flat) => {
+          const building = buildingsData.find((b) => b.id === flat.building_id);
+          const society = societiesData.find((s) => s.id === flat.society_id);
+          return {
+            ...flat,
+            building_name: building?.name || "Unknown",
+            society_name: society?.name || "Unknown",
+          };
+        });
+        setFlats(flatsWithDetails || []);
+
+        // Members
+        // const flatIds = flatsData.map((f) => f.id);
+        // if (flatIds.length > 0) {
+        //   const { data: membersData } = await supabase
+        //     .from("users")
+        //     .select("*")
+        //     .eq("is_delete", false)
+        //     .in("flat_id", flatIds)
+        //     .in("role_type", ["Tanent-M", "Tanent-O"])
+        //     .order("created_at", { ascending: false });
+
+        //   const membersWithDetails = membersData.map((member) => {
+        //     const flat = flatsData.find((f) => f.id === member.flat_id);
+        //     const building = buildingsData.find(
+        //       (b) => b.id === flat?.building_id,
+        //     );
+        //     const society = societiesData.find(
+        //       (s) => s.id === flat?.society_id,
+        //     );
+        //     return {
+        //       ...member,
+        //       full_name: member.name,
+        //       phone_number: member.number,
+        //       flat_number: flat?.flat_number || "N/A",
+        //       building_name: building?.name || "N/A",
+        //       society_name: society?.name || "N/A",
+        //       floor_number: flat?.floor_number,
+        //       bhk_type: flat?.bhk_type,
+        //       area_sqft: flat?.area_sqft,
+        //       occupancy_status: flat?.occupancy_status,
+        //       building_id: flat?.building_id,
+        //       society_id: flat?.society_id,
+        //     };
+        //   });
+
+        //   setMembers(membersWithDetails || []);
+        //   setFilteredMembers(membersWithDetails || []);
+        //   updateStats(
+        //     membersWithDetails,
+        //     societiesData,
+        //     buildingsData,
+        //     flatsData,
+        //   );
+        // } else {
+        //   setMembers([]);
+        //   setFilteredMembers([]);
+        //   updateStats([], societiesData, buildingsData, flatsData);
+        // }
+        // Members
+        const flatIds = flatsData.map((f) => f.id);
+        if (flatIds.length > 0) {
+          const { data: userFlatsData, error: userFlatsError } = await supabase
+            .from("user_flats")
+            .select(
+              `
+      flat_id,
+      user_id,
+      users (
+        id,
+        name,
+        email,
+        number,
+        whatsapp_number,
+        profile_url,
+        role_type,
+        is_active,
+        created_at,
+        is_delete
+      )
+    `,
+            )
+            .in("flat_id", flatIds)
+            .eq("users.is_delete", false);
+
+          if (userFlatsError) throw userFlatsError;
+
+          const membersWithDetails = userFlatsData
+            .filter((uf) => uf.users) // ensure user exists
+            .map((uf) => {
+              const flat = flatsData.find((f) => f.id === uf.flat_id);
+              const building = buildingsData.find(
+                (b) => b.id === flat?.building_id,
+              );
+              const society = societiesData.find(
+                (s) => s.id === flat?.society_id,
+              );
+
+              return {
+                ...uf.users,
+                full_name: uf.users.name,
+                phone_number: uf.users.number,
+                flat_number: flat?.flat_number || "N/A",
+                building_name: building?.name || "N/A",
+                society_name: society?.name || "N/A",
+                floor_number: flat?.floor_number,
+                bhk_type: flat?.bhk_type,
+                area_sqft: flat?.area_sqft,
+                occupancy_status: flat?.occupancy_status,
+                building_id: flat?.building_id,
+                society_id: flat?.society_id,
+              };
+            });
+
+          setMembers(membersWithDetails || []);
+          setFilteredMembers(membersWithDetails || []);
+          updateStats(
+            membersWithDetails,
+            societiesData,
+            buildingsData,
+            flatsData,
+          );
+        } else {
+          setMembers([]);
+          setFilteredMembers([]);
+          updateStats([], societiesData, buildingsData, flatsData);
+        }
+      } else {
+        setFlats([]);
+        setMembers([]);
+        setFilteredMembers([]);
+        updateStats([], societiesData, buildingsData, []);
+      }
+
+      setError(null);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      setError("Failed to load user data. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateStats = (
+    membersData,
+    societiesData,
+    buildingsData,
+    flatsData,
+  ) => {
+    const tenantMCount = membersData.filter(
+      (m) => m.role_type === "Tanent-M",
+    ).length;
+    const tenantOCount = membersData.filter(
+      (m) => m.role_type === "Tanent-O",
+    ).length;
+
+    setStats({
+      totalSocieties: societiesData?.length || 0,
+      totalBuildings: buildingsData?.length || 0,
+      totalFlats: flatsData?.length || 0,
+      totalMembers: membersData.length,
+      tenantM: tenantMCount,
+      tenantO: tenantOCount,
+    });
+  };
+
+  // Apply filters
+  useEffect(() => {
+    let result = [...members];
+
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      result = result.filter(
+        (member) =>
+          member.full_name?.toLowerCase().includes(term) ||
+          member.email?.toLowerCase().includes(term) ||
+          member.phone_number?.toLowerCase().includes(term) ||
+          member.flat_number?.toLowerCase().includes(term) ||
+          member.building_name?.toLowerCase().includes(term) ||
+          member.society_name?.toLowerCase().includes(term),
+      );
+    }
+
+    if (roleFilter !== "all")
+      result = result.filter((member) => member.role_type === roleFilter);
+    if (societyFilter !== "all")
+      result = result.filter(
+        (member) => member.society_id?.toString() === societyFilter,
+      );
+    if (buildingFilter !== "all")
+      result = result.filter(
+        (member) => member.building_id?.toString() === buildingFilter,
+      );
+
+    if (selectedTab === 1)
+      result = result.filter((member) => member.role_type === "Tanent-M");
+    else if (selectedTab === 2)
+      result = result.filter((member) => member.role_type === "Tanent-O");
+
+    setFilteredMembers(result);
+  }, [
+    members,
+    searchTerm,
+    selectedTab,
+    roleFilter,
+    societyFilter,
+    buildingFilter,
+  ]);
+
+  const handleRefresh = async () => {
+    if (adminId) await fetchAllData(adminId);
+  };
+
+  const handleViewMember = (member) => {
+    setSelectedMember(member);
+    setMemberDialogOpen(true);
+  };
+
+  const handleTabChange = (event, newValue) => {
+    setSelectedTab(newValue);
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return "Invalid Date";
+      return date.toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+    } catch {
+      return "Invalid Date";
+    }
+  };
+
+  if (loading) {
+    return (
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight="60vh"
+      >
+        <CircularProgress sx={{ color: "#6F0B14" }} />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container maxWidth="lg" sx={{ py: 8 }}>
+        <Alert
+          severity="error"
+          sx={{ borderRadius: "12px" }}
+          action={
+            <Button color="inherit" size="small" onClick={handleRefresh}>
+              RETRY
+            </Button>
+          }
+        >
+          {error}
+        </Alert>
+      </Container>
+    );
+  }
+
+  // Dialog Helper Components
+  const SectionHeader = ({ icon, title }) => (
+    <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+      <Box
+        sx={{
+          backgroundColor: "rgba(111, 11, 20, 0.1)",
+          borderRadius: 2,
+          p: 1.2,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "#6F0B14",
+        }}
+      >
+        {icon}
+      </Box>
+      <Typography
+        variant="h6"
+        sx={{ ml: 2, fontWeight: 600, color: "#6F0B14" }}
+      >
+        {title}
+      </Typography>
+    </Box>
+  );
+
+  const InfoCard = ({ icon, label, value, breakWord }) => (
+    <Grid item xs={12} md={6}>
+      <Paper
+        sx={{
+          p: 2.5,
+          borderRadius: 2,
+          border: "1px solid #e0e0e0",
+          backgroundColor: "#fff",
+        }}
+      >
+        <Box display="flex" gap={2}>
+          <Box
+            sx={{
+              backgroundColor: "rgba(111, 11, 20, 0.1)",
+              borderRadius: 2,
+              p: 1.2,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#6F0B14",
+            }}
+          >
+            {icon}
+          </Box>
+          <Box>
+            <Typography variant="caption" color="text.secondary">
+              {label}
+            </Typography>
+            <Typography
+              fontWeight={600}
+              sx={{ wordBreak: breakWord ? "break-all" : "normal" }}
+            >
+              {value}
+            </Typography>
+          </Box>
+        </Box>
+      </Paper>
+    </Grid>
+  );
+
+  const ListItemCard = ({ icon, label, value }) => (
+    <Paper
+      sx={{
+        p: 2.5,
+        borderRadius: 2,
+        border: "1px solid #e0e0e0",
+        backgroundColor: "#fff",
+        p: 2,
+      }}
+    >
+      <Box display="flex" gap={2} alignItems="center">
+        <Box
+          sx={{
+            backgroundColor: "rgba(111, 11, 20, 0.1)",
+            borderRadius: 2,
+            p: 1.2,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#6F0B14",
+          }}
+        >
+          {icon}
+        </Box>
+        <Box>
+          <Typography variant="caption" color="text.secondary">
+            {label}
+          </Typography>
+          <Typography fontWeight={600}>{value || "N/A"}</Typography>
+        </Box>
+      </Box>
+    </Paper>
+  );
+
+  const StatCard = ({ icon, label, value }) => (
+    <Grid item xs={6}>
+      <Paper
+        sx={{
+          p: 2,
+          borderRadius: 2,
+          border: "1px solid #e0e0e0",
+          backgroundColor: "#fff",
+        }}
+      >
+        <Box textAlign="center">
+          <Box
+            sx={{
+              width: 46,
+              height: 46,
+              borderRadius: "50%",
+              backgroundColor: "#f5f5f5",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "1.5rem",
+              mb: 1,
+            }}
+          >
+            {icon}
+          </Box>
+          <Typography variant="caption" color="text.secondary">
+            {label}
+          </Typography>
+          <Typography fontWeight={600}>{value}</Typography>
+        </Box>
+      </Paper>
+    </Grid>
+  );
+
+  return (
+    <Container maxWidth="xl" sx={{ py: 4 }}>
+      {/* Header */}
+      <motion.div initial="hidden" animate="visible" variants={fadeInUp}>
+        <Box sx={{ mb: 4 }}>
+          <Box
+            display="flex"
+            justifyContent="space-between"
+            alignItems="center"
+            mb={2}
+          >
+            <Box>
+              <Typography
+                variant="h4"
+                sx={{
+                  color: "#6F0B14",
+                  fontFamily: "'Roboto', sans-serif",
+                  fontWeight: 400,
+                  mb: 1,
+                }}
+              >
+                User Management
+              </Typography>
+              <Typography
+                variant="subtitle1"
+                sx={{ color: "#A29EB6", fontFamily: "'Roboto', sans-serif" }}
+              >
+                Manage members across your assigned societies
+              </Typography>
+            </Box>
+            <Button
+              startIcon={<RefreshIcon />}
+              onClick={handleRefresh}
+              sx={{
+                color: "#6F0B14",
+                fontFamily: "'Roboto', sans-serif",
+                fontWeight: 500,
+                "&:hover": { backgroundColor: "rgba(111, 11, 20, 0.08)" },
+              }}
+            >
+              Refresh
+            </Button>
+          </Box>
+        </Box>
+      </motion.div>
+
+      {/* Filters */}
+      <motion.div
+        initial="hidden"
+        animate="visible"
+        variants={fadeInUp}
+        transition={{ delay: 0.2 }}
+        style={{ marginBottom: "50px" }}
+      >
+        <Card
+          sx={{
+            borderRadius: "12px",
+            background: "linear-gradient(135deg, #ffffff 0%, #fef2f3 100%)",
+            border: "1px solid rgba(111, 11, 20, 0.1)",
+          }}
+        >
+          <CardContent sx={{ p: 3 }}>
+            <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
+              <Tabs
+                value={selectedTab}
+                onChange={handleTabChange}
+                sx={{
+                  "& .MuiTab-root": {
+                    fontFamily: "'Roboto', sans-serif",
+                    fontWeight: 500,
+                    textTransform: "none",
+                    fontSize: "0.95rem",
+                    minHeight: "48px",
+                  },
+                  "& .Mui-selected": { color: "#6F0B14 !important" },
+                  "& .MuiTabs-indicator": { backgroundColor: "#6F0B14" },
+                }}
+              >
+                <Tab
+                  icon={<PeopleIcon />}
+                  iconPosition="start"
+                  label={`All Members (${stats.totalMembers})`}
+                />
+                <Tab
+                  icon={<PersonIcon />}
+                  iconPosition="start"
+                  label={`Tenant-M (${stats.tenantM})`}
+                />
+                <Tab
+                  icon={<FamilyIcon />}
+                  iconPosition="start"
+                  label={`Tenant-O (${stats.tenantO})`}
+                />
+              </Tabs>
+            </Box>
+
+            <Grid container spacing={2} alignItems="center">
+              <Grid item xs={12} md={4}>
+                <TextField
+                  fullWidth
+                  placeholder="Search members by name, phone, flat..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon sx={{ color: "#6F0B14" }} />
+                      </InputAdornment>
+                    ),
+                    sx: {
+                      fontFamily: "'Roboto', sans-serif",
+                      borderRadius: "8px",
+                      backgroundColor: "rgba(111, 11, 20, 0.03)",
+                    },
+                  }}
+                  size="small"
+                />
+              </Grid>
+
+              <Grid item xs={6} md={2}>
+                <FormControl fullWidth size="small">
+                  <InputLabel sx={{ fontFamily: "'Roboto', sans-serif" }}>
+                    Role Type
+                  </InputLabel>
+                  <Select
+                    value={roleFilter}
+                    onChange={(e) => setRoleFilter(e.target.value)}
+                    label="Role Type"
+                    sx={{
+                      fontFamily: "'Roboto', sans-serif",
+                      borderRadius: "8px",
+                    }}
+                  >
+                    <MenuItem value="all">All Roles</MenuItem>
+                    <MenuItem value="Tanent-M">Tenant-M</MenuItem>
+                    <MenuItem value="Tanent-O">Tenant-O</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              <Grid item xs={6} md={2}>
+                <FormControl fullWidth size="small">
+                  <InputLabel sx={{ fontFamily: "'Roboto', sans-serif" }}>
+                    Society
+                  </InputLabel>
+                  <Select
+                    value={societyFilter}
+                    onChange={(e) => setSocietyFilter(e.target.value)}
+                    label="Society"
+                    sx={{
+                      fontFamily: "'Roboto', sans-serif",
+                      borderRadius: "8px",
+                    }}
+                  >
+                    <MenuItem value="all">All Societies</MenuItem>
+                    {societies.map((society) => (
+                      <MenuItem key={society.id} value={society.id}>
+                        {society.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              <Grid item xs={6} md={2}>
+                <FormControl fullWidth size="small">
+                  <InputLabel sx={{ fontFamily: "'Roboto', sans-serif" }}>
+                    Building
+                  </InputLabel>
+                  <Select
+                    value={buildingFilter}
+                    onChange={(e) => setBuildingFilter(e.target.value)}
+                    label="Building"
+                    sx={{
+                      fontFamily: "'Roboto', sans-serif",
+                      borderRadius: "8px",
+                    }}
+                  >
+                    <MenuItem value="all">All Buildings</MenuItem>
+                    {buildings.map((building) => (
+                      <MenuItem key={building.id} value={building.id}>
+                        {building.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+
+              <Grid item xs={6} md={2}>
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  onClick={() => {
+                    setSearchTerm("");
+                    setRoleFilter("all");
+                    setSocietyFilter("all");
+                    setBuildingFilter("all");
+                  }}
+                  sx={{
+                    fontFamily: "'Roboto', sans-serif",
+                    color: "#6F0B14",
+                    borderColor: "#6F0B14",
+                    borderRadius: "8px",
+                    textTransform: "none",
+                  }}
+                >
+                  Clear Filters
+                </Button>
+              </Grid>
+            </Grid>
+
+            <Box
+              sx={{ mt: 2, display: "flex", justifyContent: "space-between" }}
+            >
+              <Typography
+                variant="caption"
+                sx={{ color: "#A29EB6", fontFamily: "'Roboto', sans-serif" }}
+              >
+                Showing {filteredMembers.length} of {members.length} members
+              </Typography>
+              <Typography
+                variant="caption"
+                sx={{
+                  color: "#6F0B14",
+                  fontFamily: "'Roboto', sans-serif",
+                  fontWeight: 500,
+                }}
+              >
+                {societies.length} societies • {buildings.length} buildings •{" "}
+                {flats.length} flats
+              </Typography>
+            </Box>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Members Table */}
+      <motion.div
+        initial="hidden"
+        animate="visible"
+        variants={fadeInUp}
+        transition={{ delay: 0.3 }}
+      >
+        <Card
+          sx={{
+            borderRadius: "12px",
+            background: "linear-gradient(135deg, #ffffff 0%, #fef2f3 100%)",
+            border: "1px solid rgba(111, 11, 20, 0.1)",
+          }}
+        >
+          <CardContent sx={{ p: 0 }}>
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow sx={{ backgroundColor: "rgba(111, 11, 20, 0.05)" }}>
+                    <TableCell
+                      sx={{
+                        fontFamily: "'Roboto', sans-serif",
+                        fontWeight: 600,
+                        color: "#6F0B14",
+                      }}
+                    >
+                      Member
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        fontFamily: "'Roboto', sans-serif",
+                        fontWeight: 600,
+                        color: "#6F0B14",
+                      }}
+                    >
+                      Contact
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        fontFamily: "'Roboto', sans-serif",
+                        fontWeight: 600,
+                        color: "#6F0B14",
+                      }}
+                    >
+                      Location
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        fontFamily: "'Roboto', sans-serif",
+                        fontWeight: 600,
+                        color: "#6F0B14",
+                      }}
+                    >
+                      Flat Details
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        fontFamily: "'Roboto', sans-serif",
+                        fontWeight: 600,
+                        color: "#6F0B14",
+                      }}
+                    >
+                      Role & Status
+                    </TableCell>
+                    <TableCell
+                      sx={{
+                        fontFamily: "'Roboto', sans-serif",
+                        fontWeight: 600,
+                        color: "#6F0B14",
+                        textAlign: "center",
+                      }}
+                    >
+                      Actions
+                    </TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filteredMembers.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
+                        <Box sx={{ textAlign: "center" }}>
+                          <PeopleIcon
+                            sx={{ fontSize: 64, color: "#A29EB6", mb: 2 }}
+                          />
+                          <Typography
+                            variant="h6"
+                            sx={{
+                              color: "#666",
+                              fontFamily: "'Roboto', sans-serif",
+                              mb: 1,
+                            }}
+                          >
+                            No members found
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              color: "#A29EB6",
+                              fontFamily: "'Roboto', sans-serif",
+                            }}
+                          >
+                            {searchTerm
+                              ? `No members match "${searchTerm}"`
+                              : "No members found for your assigned properties"}
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredMembers.map((member) => (
+                      <TableRow key={member.id} hover>
+                        <TableCell>
+                          <Box display="flex" alignItems="center" gap={2}>
+                            <Avatar
+                              src={member.profile_url}
+                              sx={{ bgcolor: "rgba(111, 11, 20, 0.1)" }}
+                            >
+                              {member.full_name?.charAt(0) || "U"}
+                            </Avatar>
+                            <Box>
+                              <Typography
+                                variant="subtitle2"
+                                sx={{
+                                  fontFamily: "'Roboto', sans-serif",
+                                  fontWeight: 600,
+                                }}
+                              >
+                                {member.full_name || "Unknown"}
+                              </Typography>
+                              <Typography
+                                variant="caption"
+                                sx={{
+                                  color: "#666",
+                                  fontFamily: "'Roboto', sans-serif",
+                                }}
+                              >
+                                ID: {member.id}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              fontFamily: "'Roboto', sans-serif",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 0.5,
+                              mb: 0.5,
+                            }}
+                          >
+                            <PhoneIcon fontSize="small" />
+                            {member.phone_number || "N/A"}
+                          </Typography>
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              color: "#666",
+                              fontFamily: "'Roboto', sans-serif",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 0.5,
+                            }}
+                          >
+                            <EmailIcon fontSize="small" />
+                            {member.email || "No email"}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              fontFamily: "'Roboto', sans-serif",
+                              fontWeight: 500,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 0.5,
+                              mb: 0.5,
+                            }}
+                          >
+                            <ApartmentIcon fontSize="small" />
+                            {member.society_name}
+                          </Typography>
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              color: "#666",
+                              fontFamily: "'Roboto', sans-serif",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 0.5,
+                            }}
+                          >
+                            <BuildingIcon fontSize="small" />
+                            {member.building_name}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              fontFamily: "'Roboto', sans-serif",
+                              fontWeight: 500,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 0.5,
+                              mb: 0.5,
+                            }}
+                          >
+                            <HomeIcon fontSize="small" />
+                            Flat {member.flat_number}
+                            {member.floor_number &&
+                              ` (Floor ${member.floor_number})`}
+                          </Typography>
+                          <Box display="flex" gap={1} alignItems="center">
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                color: "#666",
+                                fontFamily: "'Roboto', sans-serif",
+                              }}
+                            >
+                              {member.bhk_type || "N/A"} •{" "}
+                              {member.area_sqft
+                                ? `${member.area_sqft} sq.ft`
+                                : ""}
+                            </Typography>
+                            <StatusChip
+                              label={member.occupancy_status || "Vacant"}
+                              status={member.occupancy_status}
+                              size="small"
+                            />
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box display="flex" flexDirection="column" gap={1}>
+                            <RoleChip
+                              label={member.role_type || "Unknown"}
+                              role={member.role_type}
+                              size="small"
+                            />
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                color: "#666",
+                                fontFamily: "'Roboto', sans-serif",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 0.5,
+                              }}
+                            >
+                              <CalendarIcon fontSize="small" />
+                              Joined: {formatDate(member.created_at)}
+                            </Typography>
+                          </Box>
+                        </TableCell>
+                        <TableCell align="center">
+                          <Tooltip title="View Details">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleViewMember(member)}
+                              sx={{ color: "#6F0B14" }}
+                            >
+                              <VisibilityIcon />
+                            </IconButton>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Member Details Dialog */}
+      <Dialog
+        open={memberDialogOpen}
+        onClose={() => setMemberDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3, overflow: "hidden" } }}
+      >
+        {selectedMember && (
+          <>
+            <Box
+              sx={{
+                background: "linear-gradient(135deg, #6F0B14 0%, #8a1021 100%)",
+                px: 4,
+                py: 3,
+                color: "white",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 3,
+                flexWrap: "wrap",
+              }}
+            >
+              <Box sx={{ display: "flex", alignItems: "center", gap: 3 }}>
+                <Avatar
+                  src={selectedMember.profile_url}
+                  sx={{
+                    width: 70,
+                    height: 70,
+                    bgcolor: "rgba(255,255,255,0.2)",
+                    fontSize: "2rem",
+                    border: "3px solid rgba(255,255,255,0.3)",
+                  }}
+                >
+                  {selectedMember.full_name?.charAt(0).toUpperCase() || "U"}
+                </Avatar>
+                <Box>
+                  <Typography fontSize="1.2rem" fontWeight={600} noWrap>
+                    {selectedMember.full_name || "Unknown"}
+                  </Typography>
+                  <Box sx={{ display: "flex", gap: 1, mt: 0.5 }}>
+                    <RoleChip
+                      label={selectedMember.role_type || "Unknown"}
+                      role={selectedMember.role_type}
+                      sx={{
+                        color: "white",
+                        borderColor: "rgba(255,255,255,0.4)",
+                        backgroundColor: "rgba(255,255,255,0.15)",
+                        fontWeight: 600,
+                        height: 22,
+                      }}
+                    />
+                    <Chip
+                      label={selectedMember.is_active ? "ACTIVE" : "INACTIVE"}
+                      size="small"
+                      sx={{
+                        backgroundColor: selectedMember.is_active
+                          ? "rgba(46, 204, 113, 0.9)"
+                          : "rgba(231, 76, 60, 0.9)",
+                        color: "#fff",
+                        fontWeight: 700,
+                        fontSize: "0.7rem",
+                        height: 22,
+                      }}
+                    />
+                  </Box>
+                </Box>
+              </Box>
+              <Box sx={{ display: "flex", gap: 4, alignItems: "center" }}>
+                <Box>
+                  <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                    Member ID
+                  </Typography>
+                  <Typography fontWeight={600}>{selectedMember.id}</Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                    Joined Date
+                  </Typography>
+                  <Typography fontWeight={600}>
+                    {formatDate(selectedMember.created_at)}
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+
+            <DialogContent sx={{ p: 0, backgroundColor: "#fafafa" }}>
+              {/* Contact Info */}
+              <Box sx={{ p: 3, borderBottom: "1px solid #eee" }}>
+                <SectionHeader
+                  icon={<PhoneIcon />}
+                  title="Contact Information"
+                />
+                <Grid container spacing={2}>
+                  <InfoCard
+                    icon={<PhoneIcon />}
+                    label="Phone Number"
+                    value={selectedMember.phone_number || "Not provided"}
+                  />
+                  <InfoCard
+                    icon={<EmailIcon />}
+                    label="Email Address"
+                    value={selectedMember.email || "Not provided"}
+                    breakWord
+                  />
+                </Grid>
+              </Box>
+
+              {/* Location + Flat */}
+              <Box sx={{ p: 3 }}>
+                <Grid container spacing={3}>
+                  <Grid item xs={12} md={6}>
+                    <SectionHeader
+                      icon={<LocationIcon />}
+                      title="Location Details"
+                    />
+                    <Box display="flex" flexDirection="column" gap={1.5}>
+                      <ListItemCard
+                        icon={<ApartmentIcon />}
+                        label="Society"
+                        value={selectedMember.society_name}
+                      />
+                      <ListItemCard
+                        icon={<BuildingIcon />}
+                        label="Building"
+                        value={selectedMember.building_name}
+                      />
+                      <ListItemCard
+                        icon={<HomeIcon />}
+                        label="Flat Number"
+                        value={`Flat ${selectedMember.flat_number}`}
+                      />
+                    </Box>
+                  </Grid>
+
+                  <Grid item xs={12} md={6}>
+                    <SectionHeader
+                      icon={<HomeIcon />}
+                      title="Flat Information"
+                    />
+                    <Grid container spacing={2}>
+                      <StatCard
+                        label="BHK Type"
+                        value={selectedMember.bhk_type}
+                        icon="🏠"
+                      />
+                      <StatCard
+                        label="Area"
+                        value={
+                          selectedMember.area_sqft
+                            ? `${selectedMember.area_sqft} sq.ft`
+                            : "N/A"
+                        }
+                        icon="📐"
+                      />
+                      <StatCard
+                        label="Floor"
+                        value={
+                          selectedMember.floor_number
+                            ? `Floor ${selectedMember.floor_number}`
+                            : "N/A"
+                        }
+                        icon="🏢"
+                      />
+                      <Grid item xs={6}>
+                        <Paper
+                          sx={{
+                            p: 2,
+                            borderRadius: 2,
+                            border: "1px solid #e0e0e0",
+                            backgroundColor: "#fff",
+                          }}
+                        >
+                          <Box textAlign="center">
+                            <Box
+                              sx={{
+                                width: 46,
+                                height: 46,
+                                borderRadius: "50%",
+                                backgroundColor: "#f5f5f5",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: "1.5rem",
+                                mb: 1,
+                              }}
+                            >
+                              👥
+                            </Box>
+                            <Typography variant="caption">Occupancy</Typography>
+                            <StatusChip
+                              label={
+                                selectedMember.occupancy_status || "Vacant"
+                              }
+                              status={selectedMember.occupancy_status}
+                              size="small"
+                              sx={{ mt: 1 }}
+                            />
+                          </Box>
+                        </Paper>
+                      </Grid>
+                    </Grid>
+                  </Grid>
+                </Grid>
+              </Box>
+            </DialogContent>
+
+            <DialogActions
+              sx={{
+                p: 3,
+                backgroundColor: "#f8f9fa",
+                borderTop: "1px solid #eee",
+              }}
+            >
+              <Button
+                onClick={() => setMemberDialogOpen(false)}
+                variant="contained"
+                startIcon={<CloseIcon />}
+                sx={{
+                  fontFamily: "'Roboto', sans-serif",
+                  background:
+                    "linear-gradient(135deg, #6F0B14 0%, #8a1021 100%)",
+                  color: "#fff",
+                  px: 4,
+                  py: 1,
+                  borderRadius: 2,
+                  textTransform: "none",
+                  fontWeight: 600,
+                  "&:hover": {
+                    background:
+                      "linear-gradient(135deg, #5a0910 0%, #6F0B14 100%)",
+                  },
+                }}
+              >
+                Close Details
+              </Button>
+            </DialogActions>
+          </>
+        )}
+      </Dialog>
+    </Container>
+  );
 }

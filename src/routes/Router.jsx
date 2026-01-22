@@ -40,6 +40,7 @@ import PMUsers from "../pages/PropertyManager/PMUsers";
 import AdminUsers from "../pages/Admin/AdminUsers";
 import TermsAndConditions from "../pages/TermsAndConditions";
 import PrivacyPolicy from "../pages/PrivacyPolicy";
+import AdminTicket from "../pages/Admin/AdminTicket";
 // import AdminComplaints from "../pages/Admin/Complaints";
 
 export default function Router() {
@@ -141,6 +142,7 @@ export default function Router() {
           <Route path="/admin/broadcast" element={<AdminBroadcast />} />
           <Route path="/admin/users" element={<AdminUsers />} />
 
+          <Route path="/admin/tickets" element={<AdminTicket />} />
           <Route path="/admin/cards" element={<AdminCards />} />
         </Route>
 

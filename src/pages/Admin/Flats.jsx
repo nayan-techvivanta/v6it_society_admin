@@ -157,7 +157,7 @@ export default function Flats() {
         id, flat_number, floor_number, bhk_type, area_sqft, 
         occupancy_status, is_active, created_at, updated_at,
         building_id, society_id
-      `
+      `,
         )
         .eq("building_id", buildingId)
         .eq("is_delete", false)
@@ -172,8 +172,8 @@ export default function Flats() {
           flat.occupancy_status === "Occupied"
             ? theme.success
             : flat.occupancy_status === "Blocked"
-            ? theme.warning
-            : theme.secondary,
+              ? theme.warning
+              : theme.secondary,
       }));
 
       setFlats(mappedFlats);
@@ -184,20 +184,62 @@ export default function Flats() {
       setLoading(false);
     }
   }, [buildingId]);
+  // const fetchFlatMembers = async (flat) => {
+  //   setLoadingMembers(true);
+  //   try {
+  //     const { data, error } = await supabase
+  //       .from("users")
+  //       .select(
+  //         "id, name, email, number, role_type, whatsapp_number, profile_url",
+  //       )
+  //       .eq("flat_id", flat.id)
+  //       .eq("is_delete", false);
+
+  //     if (error) throw error;
+
+  //     setFlatMembers(data);
+  //     setOpenMembersDialog(true);
+  //   } catch (err) {
+  //     console.error("Error fetching flat members:", err);
+  //     toast.error("Failed to fetch flat members");
+  //   } finally {
+  //     setLoadingMembers(false);
+  //   }
+  // };
   const fetchFlatMembers = async (flat) => {
     setLoadingMembers(true);
     try {
+      // Fetch users assigned to this flat from user_flats with the users table relationship
       const { data, error } = await supabase
-        .from("users")
+        .from("user_flats")
         .select(
-          "id, name, email, number, role_type, whatsapp_number, profile_url"
+          `
+        user_id,
+        users (
+          id,
+          name,
+          email,
+          number,
+          whatsapp_number,
+          profile_url,
+          role_type,
+          is_delete
+        )
+      `,
         )
         .eq("flat_id", flat.id)
-        .eq("is_delete", false);
+        .eq("users.is_delete", false);
 
       if (error) throw error;
 
-      setFlatMembers(data);
+      const members = data
+        .filter((item) => item.users)
+        .map((item) => ({
+          ...item.users,
+          isAssignedToFlat: true,
+        }));
+
+      setFlatMembers(members);
       setOpenMembersDialog(true);
     } catch (err) {
       console.error("Error fetching flat members:", err);
@@ -270,7 +312,7 @@ export default function Flats() {
       (flat) =>
         flat.flat_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
         flat.bhk_type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        flat.floor_number?.toString().includes(searchTerm)
+        flat.floor_number?.toString().includes(searchTerm),
     )
     .sort((a, b) => {
       const aValue = a[sortConfig.key];
@@ -287,7 +329,7 @@ export default function Flats() {
 
   const paginatedFlats = filteredFlats.slice(
     page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
+    page * rowsPerPage + rowsPerPage,
   );
 
   const flatLimitReached =
@@ -434,7 +476,7 @@ export default function Flats() {
                 onClick={() => {
                   if (flatLimitReached) {
                     toast.warning(
-                      `Your building flat limit (${building.flat_limit}) is over.`
+                      `Your building flat limit (${building.flat_limit}) is over.`,
                     );
                     return;
                   }
@@ -671,6 +713,7 @@ export default function Flats() {
                                 title="View Members"
                                 onClick={(e) => {
                                   e.stopPropagation();
+                                  setSelectedFlat(flat);
                                   fetchFlatMembers(flat);
                                 }}
                               >
@@ -747,7 +790,7 @@ export default function Flats() {
                                     </Typography>
                                     <Typography variant="body1">
                                       {new Date(
-                                        flat.created_at
+                                        flat.created_at,
                                       ).toLocaleDateString()}
                                     </Typography>
                                   </div>
@@ -761,7 +804,7 @@ export default function Flats() {
                                     </Typography>
                                     <Typography variant="body1">
                                       {new Date(
-                                        flat.updated_at
+                                        flat.updated_at,
                                       ).toLocaleDateString()}
                                     </Typography>
                                   </div>
@@ -807,6 +850,10 @@ export default function Flats() {
                                     <Button
                                       size="small"
                                       variant="outlined"
+                                      onClick={() => {
+                                        setSelectedFlat(flat);
+                                        fetchFlatMembers(flat);
+                                      }}
                                       style={{
                                         borderColor: theme.primary,
                                         color: theme.primary,

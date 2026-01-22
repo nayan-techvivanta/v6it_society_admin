@@ -2,16 +2,36 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { DropdownItem } from "../../ui/dropdown/DropdownItem";
 import { Dropdown } from "../../ui/dropdown/Dropdown";
-import { useMemo } from "react";
+import { useEffect } from "react";
 import { FiLogOut } from "react-icons/fi";
 export default function UserDropdown() {
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
-  const role = useMemo(() => {
-    return localStorage.getItem("role");
-  }, []);
-  const email = useMemo(() => {
-    return localStorage.getItem("email");
+  const [role, setRole] = useState(localStorage.getItem("role") || "");
+  const [email, setEmail] = useState(localStorage.getItem("email") || "");
+  const [profileImage, setProfileImage] = useState(
+    localStorage.getItem("profileImage") ||
+    "https://png.pngtree.com/png-vector/20231019/ourmid/pngtree-user-profile-avatar-png-image_10211471.png"
+  );
+
+  useEffect(() => {
+    const handleProfileUpdate = () => {
+      setRole(localStorage.getItem("role") || "");
+      setEmail(localStorage.getItem("email") || "");
+      setProfileImage(
+        localStorage.getItem("profileImage") ||
+        "https://png.pngtree.com/png-vector/20231019/ourmid/pngtree-user-profile-avatar-png-image_10211471.png"
+      );
+    };
+
+    window.addEventListener("profileImageUpdated", handleProfileUpdate);
+    // Also listen for storage events (cross-tab)
+    window.addEventListener("storage", handleProfileUpdate);
+
+    return () => {
+      window.removeEventListener("profileImageUpdated", handleProfileUpdate);
+      window.removeEventListener("storage", handleProfileUpdate);
+    };
   }, []);
   if (!role && !email) return null;
   const toggleDropdown = () => setIsOpen((prev) => !prev);
@@ -30,7 +50,7 @@ export default function UserDropdown() {
       >
         <span className="mr-3 overflow-hidden rounded-full h-11 w-11 border-2 border-primary/30 hover:border-primary transition-colors duration-200">
           <img
-            src="https://png.pngtree.com/png-vector/20231019/ourmid/pngtree-user-profile-avatar-png-image_10211471.png"
+            src={profileImage}
             alt="User"
             className="w-full h-full object-cover"
           />
@@ -40,9 +60,8 @@ export default function UserDropdown() {
           {email}
         </span>
         <svg
-          className={`stroke-gray-500 transition-transform duration-200 ${
-            isOpen ? "rotate-180" : ""
-          }`}
+          className={`stroke-gray-500 transition-transform duration-200 ${isOpen ? "rotate-180" : ""
+            }`}
           width="18"
           height="20"
           viewBox="0 0 18 20"
@@ -69,7 +88,7 @@ export default function UserDropdown() {
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-primary/20">
               <img
-                src="https://png.pngtree.com/png-vector/20231019/ourmid/pngtree-user-profile-avatar-png-image_10211471.png"
+                src={profileImage}
                 alt="User"
                 className="w-full h-full object-cover"
               />

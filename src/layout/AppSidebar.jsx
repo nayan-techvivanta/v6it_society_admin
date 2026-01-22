@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router";
 import { FaRegIdCard, FaUsers } from "react-icons/fa";
 import { BsThreeDots, BsBuildings } from "react-icons/bs";
 import { FiLogOut } from "react-icons/fi";
+import { IoTicketSharp } from "react-icons/io5";
 import { IoMdPerson } from "react-icons/io";
 import { MdCampaign, MdDevices, MdOutlineHowToReg } from "react-icons/md";
 import { PiBuildingApartment } from "react-icons/pi";
@@ -101,6 +102,12 @@ const AppSidebar = () => {
       name: "Devices",
       path: `${basePath}/devices`,
       roles: ["superadmin"],
+    },
+    {
+      icon: <IoTicketSharp size={20} />,
+      name: "Tickets",
+      path: `${basePath}/tickets`,
+      roles: ["admin"],
     },
     {
       icon: <MdCampaign size={22} />,

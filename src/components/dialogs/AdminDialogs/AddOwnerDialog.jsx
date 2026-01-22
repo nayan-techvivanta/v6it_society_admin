@@ -124,7 +124,7 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
       password: "",
       phone: "",
       whatsapp_number: "",
-      profile_url: "",
+      profile_url: null,
       role_type: "Tanent-O",
     });
     setErrors({});
@@ -135,39 +135,94 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
     setIsEditMode(false);
   };
 
+  // const checkExistingOwner = async () => {
+  //   setOwnerLoading(true);
+  //   try {
+  //     const { data, error } = await supabase
+  //       .from("users")
+  //       .select(
+  //         "id, name, email, number, whatsapp_number, profile_url, role_type",
+  //       )
+  //       .eq("flat_id", flat.id)
+  //       .eq("role_type", "Tanent-O")
+  //       .eq("is_delete", false)
+  //       .limit(1);
+
+  //     if (error) {
+  //       console.error("Error checking owner:", error);
+  //       return;
+  //     }
+
+  //     if (data && data.length > 0) {
+  //       setExistingOwner(data[0]);
+  //       setFormData((prev) => ({
+  //         ...prev,
+  //         role_type: "Tanent-M",
+  //       }));
+  //     } else {
+  //       setExistingOwner(null);
+  //       setFormData((prev) => ({
+  //         ...prev,
+  //         role_type: "Tanent-O",
+  //       }));
+  //     }
+  //   } catch (error) {
+  //     console.error("Error checking existing owner:", error);
+  //   } finally {
+  //     setOwnerLoading(false);
+  //   }
+  // };
   const checkExistingOwner = async () => {
     setOwnerLoading(true);
+
     try {
       const { data, error } = await supabase
-        .from("users")
-        .select(
-          "id, name, email, number, whatsapp_number, profile_url, role_type",
+        .from("user_flats")
+        .select(`
+        user_id,
+        users (
+          id,
+          name,
+          email,
+          number,
+          whatsapp_number,
+          profile_url,
+          role_type,
+          is_delete
         )
+      `)
         .eq("flat_id", flat.id)
-        .eq("role_type", "Tanent-O")
-        .eq("is_delete", false)
+        .eq("users.role_type", "Tanent-O")
+        .eq("users.is_delete", false)
         .limit(1);
 
       if (error) {
-        console.error("Error checking owner:", error);
+        console.error("❌ Error checking owner:", error);
         return;
       }
 
-      if (data && data.length > 0) {
-        setExistingOwner(data[0]);
+      if (data && data.length > 0 && data[0].users) {
+        console.log("✅ Existing Tenant-O found:", data[0].users);
+
+        setExistingOwner(data[0].users);
+
+        // Force new user to be Tanent-M
         setFormData((prev) => ({
           ...prev,
           role_type: "Tanent-M",
         }));
       } else {
+        console.log("ℹ️ No Tenant-O found");
+
         setExistingOwner(null);
+
         setFormData((prev) => ({
           ...prev,
           role_type: "Tanent-O",
         }));
       }
     } catch (error) {
-      console.error("Error checking existing owner:", error);
+      console.error("❌ Error checking existing owner:", error);
     } finally {
       setOwnerLoading(false);
     }
@@ -313,37 +368,7 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
     }));
   };
 
-  // useEffect(() => {
-  //   const fetchUsers = async () => {
-  //     if (!debouncedSearchQuery || debouncedSearchQuery.length < 2) {
-  //       setSearchResults([]);
-  //       return;
-  //     }
 
-  //     setSearchLoading(true);
-  //     try {
-  //       let queryBuilder = supabase
-  //         .from("users")
-  //         .select("*, flats!inner(society_id)")
-  //         .eq("flats.society_id", flat.society_id)
-  //         .or(
-  //           `name.ilike.%${debouncedSearchQuery}%,number.ilike.%${debouncedSearchQuery}%`,
-  //         )
-  //         .limit(20);
-
-  //       const { data, error } = await queryBuilder;
-
-  //       if (error) throw error;
-  //       setSearchResults(data || []);
-  //     } catch (error) {
-  //       console.error("Error searching users:", error);
-  //     } finally {
-  //       setSearchLoading(false);
-  //     }
-  //   };
-
-  //   fetchUsers();
-  // }, [debouncedSearchQuery, flat?.society_id]);
   useEffect(() => {
     const fetchUsers = async () => {
       if (!debouncedSearchQuery || debouncedSearchQuery.length < 2) {
@@ -353,14 +378,12 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
 
       setSearchLoading(true);
       try {
-        // Fetch users with role_type Tanent-O or Tanent-M
         const { data, error } = await supabase
           .from("users")
           .select("*")
-          .or(`role_type.eq.Tanent-O,role_type.eq.Tanent-M`)
-          .ilike("name", `%${debouncedSearchQuery}%`)
+          .in("role_type", ["Tanent-O", "Tanent-M"])
           .or(
-            `email.ilike.%${debouncedSearchQuery}%,number.ilike.%${debouncedSearchQuery}%`,
+            `name.ilike.%${debouncedSearchQuery}%,email.ilike.%${debouncedSearchQuery}%,number.ilike.%${debouncedSearchQuery}%`,
           )
           .limit(20);
 
@@ -385,7 +408,8 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
         password: "",
         phone: newValue.number || "",
         whatsapp_number: newValue.whatsapp_number || "",
-        profile_url: newValue.profile_url || "",
+        profile_url: newValue.profile_url ?? null,
+
         role_type: formData.role_type,
       });
       setErrors({});
@@ -405,7 +429,11 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
       flat_id: flat.id,
       building_id: flat.building_id,
       society_id: flat.society_id,
-      profile_url: formData.profile_url || null,
+      profile_url:
+        formData.profile_url && formData.profile_url.trim() !== ""
+          ? formData.profile_url
+          : null,
+
       created_by: user.id,
       updated_by: user.id,
       updated_at: new Date().toISOString(),
@@ -450,178 +478,184 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
     }
   };
 
-  // const handleAddUser = async () => {
-  //   try {
-  //     setLoading(true);
 
-  //     if (!flat?.id || !flat?.building_id || !flat?.society_id) {
-  //       throw new Error("Flat data missing");
-  //     }
-
-  //     let registeredUserId;
-  //     if (selectedUser) {
-  //       registeredUserId = selectedUser.id;
-  //     } else {
-  //       const apiResult = await createUser({
-  //         name: formData.name.trim(),
-  //         email: formData.email.trim(),
-  //         password: formData.password || "123456",
-  //         contact: formData.phone,
-  //         whatsapp: formData.whatsapp_number || formData.phone,
-  //         role_type: formData.role_type,
-  //       });
-  //       registeredUserId = apiResult.user?.id || apiResult.id;
-  //     }
-
-  //     if (!registeredUserId) {
-  //       throw new Error("User ID not returned from API");
-  //     }
-
-  //     console.log("✅ Registered User ID:", registeredUserId);
-
-  //     // Link user to flat
-  //     const { error: userFlatError } = await supabase
-  //       .from("user_flats")
-  //       .insert({
-  //         user_id: registeredUserId,
-  //         society_id: flat.society_id,
-  //         building_id: flat.building_id,
-  //         flat_id: flat.id,
-  //       });
-
-  //     if (userFlatError) {
-  //       console.error("Error linking user to flat:", userFlatError);
-  //       toast.warning("User linked but flat assignment failed");
-  //     }
-
-  //     // Update users table with flat + image
-  //     await updateMemberUser({ registedUserId: registeredUserId });
-
-  //     // Update flat occupancy if owner
-  //     if (formData.role_type === "Tanent-O") {
-  //       await supabase
-  //         .from("flats")
-  //         .update({
-  //           occupancy_status: "Occupied",
-  //           updated_at: new Date().toISOString(),
-  //         })
-  //         .eq("id", flat.id);
-  //     }
-
-  //     toast.success(
-  //       formData.role_type === "Tanent-O"
-  //         ? "Primary owner added successfully"
-  //         : "Family member added successfully",
-  //     );
-
-  //     resetForm();
-  //     onClose();
-  //   } catch (error) {
-  //     console.error("❌ Add user error:", error);
-  //     toast.error(error.message || "Failed to add user");
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
   const handleAddUser = async () => {
     try {
+      console.group("🚀 handleAddUser START");
       setLoading(true);
+
+      // ===============================
+      // 1️⃣ Flat validation
+      // ===============================
+      console.log("🏠 Flat data:", flat);
 
       if (!flat?.id || !flat?.building_id || !flat?.society_id) {
         throw new Error("Flat data missing");
       }
 
-      let registeredUserId;
+      // ===============================
+      // 2️⃣ Admin auth check
+      // ===============================
+      const {
+        data: { user: adminUser },
+      } = await supabase.auth.getUser();
 
+      console.log("🔐 Admin auth user:", adminUser);
+
+      if (!adminUser?.id) {
+        throw new Error("Admin not authenticated");
+      }
+
+      let appUserId; // BIGINT (users.id)
+
+      // ===============================
+      // 3️⃣ Existing user selected
+      // ===============================
       if (selectedUser) {
-        // ✅ Existing user selected
-        registeredUserId = selectedUser.id;
+        console.log("👤 Existing user selected:", selectedUser);
 
-        // Only link user to flat and update profile if needed
-        const { error: userFlatError } = await supabase
-          .from("user_flats")
-          .insert({
-            user_id: registeredUserId,
-            society_id: flat.society_id,
-            building_id: flat.building_id,
-            flat_id: flat.id,
-          });
-
-        if (userFlatError) {
-          console.error("Error linking user to flat:", userFlatError);
-          toast.warning("User linked but flat assignment failed");
-        }
-
-        // Update profile only if any changes
-        await updateMemberUser({ registedUserId: registeredUserId });
-
-        toast.success(
-          formData.role_type === "Tanent-O"
-            ? "Primary owner assigned successfully"
-            : "Family member assigned successfully",
-        );
+        appUserId = selectedUser.id; // BIGINT
+        console.log("✅ Using existing appUserId:", appUserId);
       } else {
-        // ❌ No user selected → create a new user
+        // ===============================
+        // 4️⃣ Create NEW auth user
+        // ===============================
+
         const apiResult = await createUser({
-          name: formData.name.trim(),
-          email: formData.email.trim(),
-          password: formData.password || "123456",
+          name: formData.name?.trim(),
+          email: formData.email?.trim(),
+          password: formData.password || "",
           contact: formData.phone,
           whatsapp: formData.whatsapp_number || formData.phone,
           role_type: formData.role_type,
         });
 
-        registeredUserId = apiResult.user?.id || apiResult.id;
 
-        if (!registeredUserId) {
-          throw new Error("User ID not returned from API");
+        const authUserId = apiResult?.user_id; // UUID
+
+        if (!authUserId) {
+          throw new Error("Auth user ID not returned from createUser API");
         }
 
-        // Link user to flat
-        const { error: userFlatError } = await supabase
-          .from("user_flats")
-          .insert({
-            user_id: registeredUserId,
-            society_id: flat.society_id,
-            building_id: flat.building_id,
-            flat_id: flat.id,
-          });
+        // ===============================
+        // 5️⃣ Check if user already exists
+        // ===============================
+        const { data: existingUser, error: existingUserError } = await supabase
+          .from("users")
+          .select("id")
+          .eq("registed_user_id", authUserId)
+          .maybeSingle();
 
-        if (userFlatError) {
-          console.error("Error linking user to flat:", userFlatError);
-          toast.warning("User linked but flat assignment failed");
+        if (existingUserError) {
+          console.error("❌ Existing user check error:", existingUserError);
+          throw existingUserError;
         }
 
-        // Update users table with flat + image
-        await updateMemberUser({ registedUserId: registeredUserId });
 
-        // Update flat occupancy if owner
-        if (formData.role_type === "Tanent-O") {
+        if (existingUser) {
+          console.log("♻️ App user exists, updating profile");
+
+          const updatePayload = {
+            name: formData.name?.trim(),
+            email: formData.email?.trim(),
+            number: formData.phone,
+            whatsapp_number: formData.whatsapp_number || formData.phone,
+            profile_url:
+              formData.profile_url && formData.profile_url.trim() !== ""
+                ? formData.profile_url
+                : null,
+            created_by: adminUser.id,
+            updated_at: new Date().toISOString(),
+          };
+
           await supabase
-            .from("flats")
-            .update({
-              occupancy_status: "Occupied",
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", flat.id);
-        }
+            .from("users")
+            .update(updatePayload)
+            .eq("id", existingUser.id);
 
-        toast.success(
-          formData.role_type === "Tanent-O"
-            ? "Primary owner added successfully"
-            : "Family member added successfully",
-        );
+          appUserId = existingUser.id;
+        } else {
+          // ===============================
+          // 6️⃣ Insert into users table
+          // ===============================
+          const userInsertPayload = {
+            registed_user_id: authUserId, // UUID
+            name: formData.name?.trim(),
+            email: formData.email?.trim(),
+            number: formData.phone,
+            whatsapp_number: formData.whatsapp_number || formData.phone,
+            role_type: formData.role_type,
+            society_id: flat.society_id,
+            profile_url:
+              formData.profile_url && formData.profile_url.trim() !== ""
+                ? formData.profile_url
+                : null,
+            created_by: adminUser.id, // UUID
+          };
+
+          console.log("📥 Inserting into users table:", userInsertPayload);
+
+          const { data: appUser, error: userError } = await supabase
+            .from("users")
+            .insert(userInsertPayload)
+            .select()
+            .single();
+
+          if (userError) {
+            console.error("❌ users insert error:", userError);
+            throw userError;
+          }
+
+          console.log("✅ User inserted into users table:", appUser);
+          appUserId = appUser.id; // BIGINT
+        }
       }
+
+      // ===============================
+      // 7️⃣ Insert into user_flats
+      // ===============================
+      const userFlatsPayload = {
+        user_id: appUserId, // BIGINT
+        society_id: flat.society_id,
+        building_id: flat.building_id,
+        flat_id: flat.id,
+      };
+
+      console.log("📥 Inserting into user_flats:", userFlatsPayload);
+
+      const { error: userFlatError } = await supabase
+        .from("user_flats")
+        .insert(userFlatsPayload);
+
+      if (userFlatError) {
+        console.error("❌ user_flats insert error:", userFlatError);
+        throw userFlatError;
+      }
+
+      console.log("✅ user_flats insert successful");
+
+      // ===============================
+      // 8️⃣ Success UI
+      // ===============================
+      toast.success(
+        formData.role_type === "Tanent-O"
+          ? "Primary owner assigned successfully"
+          : "Family member assigned successfully"
+      );
 
       resetForm();
       onClose();
+
+      console.groupEnd();
     } catch (error) {
+      console.groupEnd();
       console.error("❌ Add user error:", error);
       toast.error(error.message || "Failed to add user");
     } finally {
       setLoading(false);
     }
   };
+
 
   const handleUpdateUser = async (userId) => {
     try {
@@ -1041,40 +1075,132 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
                             </Paper>
                           </motion.div>
                         ) : (
+                          // <Autocomplete
+                          //   options={searchResults}
+                          //   loading={searchLoading}
+                          //   getOptionLabel={(option) =>
+                          //     `${option.name} (${option.number})`
+                          //   }
+                          //   onInputChange={(e, query) => setSearchQuery(query)}
+                          //   onChange={handleUserSelect}
+                          //   renderOption={(props, option) => (
+                          //     <li {...props} style={{ padding: "10px 16px" }}>
+                          //       <Box display="flex" alignItems="center" gap={2}>
+                          //         <Avatar
+                          //           src={option.profile_url}
+                          //           sx={{ width: 36, height: 36 }}
+                          //         >
+                          //           {option.name?.charAt(0)}
+                          //         </Avatar>
+                          //         <Box>
+                          //           <Typography
+                          //             variant="body2"
+                          //             fontWeight={500}
+                          //           >
+                          //             {option.name}
+                          //           </Typography>
+                          //           <Typography
+                          //             variant="caption"
+                          //             color="text.secondary"
+                          //           >
+                          //             {option.email} • {option.number}
+                          //           </Typography>
+                          //         </Box>
+                          //       </Box>
+                          //     </li>
+                          //   )}
+                          //   renderInput={(params) => (
+                          //     <TextField
+                          //       {...params}
+                          //       placeholder="Search existing users..."
+                          //       variant="outlined"
+                          //       size="small"
+                          //       InputProps={{
+                          //         ...params.InputProps,
+                          //         startAdornment: (
+                          //           <InputAdornment position="start">
+                          //             <Search sx={{ color: theme.hintText }} />
+                          //           </InputAdornment>
+                          //         ),
+                          //       }}
+                          //       sx={{
+                          //         "& .MuiOutlinedInput-root": {
+                          //           borderRadius: 2,
+                          //           backgroundColor: theme.lightBackground,
+                          //         },
+                          //       }}
+                          //     />
+                          //   )}
+                          //   noOptionsText={
+                          //     <Box sx={{ p: 2, textAlign: "center" }}>
+                          //       <Typography
+                          //         variant="body2"
+                          //         color="text.secondary"
+                          //       >
+                          //         {searchQuery.length < 2
+                          //           ? "Type at least 2 characters"
+                          //           : "No users found"}
+                          //       </Typography>
+                          //     </Box>
+                          //   }
+                          // />
                           <Autocomplete
                             options={searchResults}
                             loading={searchLoading}
-                            getOptionLabel={(option) =>
-                              `${option.name} (${option.number})`
+                            /* 🔹 Avoid MUI warning + stable key */
+                            isOptionEqualToValue={(option, value) =>
+                              option.id === value.id
                             }
+                            /* 🔹 Safe label (number optional) */
+                            getOptionLabel={(option) =>
+                              option?.name
+                                ? `${option.name}${option.number ? ` (${option.number})` : ""}`
+                                : ""
+                            }
+                            /* 🔹 Search input */
                             onInputChange={(e, query) => setSearchQuery(query)}
+                            /* 🔹 Selected user */
                             onChange={handleUserSelect}
+                            /* 🔹 Custom option UI */
                             renderOption={(props, option) => (
-                              <li {...props} style={{ padding: "10px 16px" }}>
+                              <li
+                                {...props}
+                                key={option.id}
+                                style={{ padding: "10px 16px" }}
+                              >
                                 <Box display="flex" alignItems="center" gap={2}>
                                   <Avatar
-                                    src={option.profile_url}
+                                    src={option.profile_url || ""}
                                     sx={{ width: 36, height: 36 }}
                                   >
-                                    {option.name?.charAt(0)}
+                                    {option.name?.charAt(0)?.toUpperCase() ||
+                                      "U"}
                                   </Avatar>
-                                  <Box>
+
+                                  <Box sx={{ minWidth: 0 }}>
                                     <Typography
                                       variant="body2"
                                       fontWeight={500}
+                                      noWrap
                                     >
-                                      {option.name}
+                                      {option.name || "Unnamed User"}
                                     </Typography>
+
                                     <Typography
                                       variant="caption"
                                       color="text.secondary"
+                                      noWrap
                                     >
-                                      {option.email} • {option.number}
+                                      {option.email || "No email"}
+                                      {option.number
+                                        ? ` • ${option.number}`
+                                        : ""}
                                     </Typography>
                                   </Box>
                                 </Box>
                               </li>
                             )}
+                            /* 🔹 Input field */
                             renderInput={(params) => (
                               <TextField
                                 {...params}
@@ -1097,6 +1223,7 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
                                 }}
                               />
                             )}
+                            /* 🔹 No data text */
                             noOptionsText={
                               <Box sx={{ p: 2, textAlign: "center" }}>
                                 <Typography
@@ -1299,9 +1426,8 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
 
                       <Box
                         sx={{
-                          border: `2px dashed ${
-                            dragging ? theme.primary : theme.trackSelect
-                          }`,
+                          border: `2px dashed ${dragging ? theme.primary : theme.trackSelect
+                            }`,
                           borderRadius: 2,
                           p: 3,
                           textAlign: "center",

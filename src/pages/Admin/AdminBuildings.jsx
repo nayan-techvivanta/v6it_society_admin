@@ -499,8 +499,8 @@ const BuildingRow = ({
                                   building.occupancy > 70
                                     ? "bg-[#93BD57]"
                                     : building.occupancy > 40
-                                    ? "bg-[#DBA400]"
-                                    : "bg-[#F96E5B]"
+                                      ? "bg-[#DBA400]"
+                                      : "bg-[#F96E5B]"
                                 }`}
                               />
                             </div>
@@ -530,7 +530,7 @@ const BuildingRow = ({
                                   {Math.floor(
                                     (building.units *
                                       (100 - building.occupancy)) /
-                                      100
+                                      100,
                                   )}
                                 </Typography>
                               </div>
@@ -549,7 +549,7 @@ const BuildingRow = ({
                                 </Typography>
                                 <Typography className="font-roboto font-semibold">
                                   {Math.floor(
-                                    (building.units * building.occupancy) / 100
+                                    (building.units * building.occupancy) / 100,
                                   )}
                                 </Typography>
                               </div>
@@ -696,8 +696,8 @@ const BuildingCard = ({
                   building.occupancy > 70
                     ? "#93BD57"
                     : building.occupancy > 40
-                    ? "#DBA400"
-                    : "#F96E5B",
+                      ? "#DBA400"
+                      : "#F96E5B",
               }}
             >
               {building.occupancy}%
@@ -814,7 +814,7 @@ const BuildingCard = ({
                 </Typography>
                 <Typography className="font-roboto text-sm font-medium">
                   {Math.floor(
-                    (building.units * (100 - building.occupancy)) / 100
+                    (building.units * (100 - building.occupancy)) / 100,
                   )}
                 </Typography>
               </div>
@@ -837,8 +837,8 @@ const BuildingCard = ({
                       building.occupancy > 70
                         ? "bg-[#93BD57]"
                         : building.occupancy > 40
-                        ? "bg-[#DBA400]"
-                        : "bg-[#F96E5B]"
+                          ? "bg-[#DBA400]"
+                          : "bg-[#F96E5B]"
                     }`}
                   />
                 </div>
@@ -956,7 +956,7 @@ export default function AdminBuildings() {
         }
       } else {
         toast.error(
-          "No society assigned to your account. Please contact administrator."
+          "No society assigned to your account. Please contact administrator.",
         );
       }
     };
@@ -994,7 +994,7 @@ export default function AdminBuildings() {
             id,
             name
           )
-        `
+        `,
         )
         .eq("is_delete", false)
         .eq("society_id", societyId) // 🔥 CRITICAL: Filter by society_id
@@ -1068,7 +1068,7 @@ export default function AdminBuildings() {
       setOpenAddFlatDialog(true);
       console.log("✅ Dialog state set - should open now"); // Debug
     },
-    [buildings]
+    [buildings],
   );
 
   const handleCloseAddFlatDialog = useCallback(() => {
@@ -1099,13 +1099,13 @@ export default function AdminBuildings() {
         (building) =>
           building.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           building.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          building.id.toString().includes(searchTerm)
+          building.id.toString().includes(searchTerm),
       );
     }
 
     if (statusFilter !== "all") {
       filtered = filtered.filter(
-        (building) => building.status === statusFilter
+        (building) => building.status === statusFilter,
       );
     }
 
@@ -1118,7 +1118,7 @@ export default function AdminBuildings() {
 
     // Optimistic UI
     setBuildings((prev) =>
-      prev.map((b) => (b.id === buildingId ? { ...b, status: newStatus } : b))
+      prev.map((b) => (b.id === buildingId ? { ...b, status: newStatus } : b)),
     );
 
     const { error } = await supabase
@@ -1131,12 +1131,12 @@ export default function AdminBuildings() {
       // Rollback
       setBuildings((prev) =>
         prev.map((b) =>
-          b.id === buildingId ? { ...b, status: currentStatus } : b
-        )
+          b.id === buildingId ? { ...b, status: currentStatus } : b,
+        ),
       );
     } else {
       toast.success(
-        `Building ${newStatus === "active" ? "activated" : "deactivated"}`
+        `Building ${newStatus === "active" ? "activated" : "deactivated"}`,
       );
     }
   }, []);
@@ -1234,7 +1234,7 @@ export default function AdminBuildings() {
 
   const paginatedBuildings = filteredBuildings.slice(
     page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
+    page * rowsPerPage + rowsPerPage,
   );
 
   return (
