@@ -93,7 +93,7 @@ export default function Users() {
       const { data: flatsData, error: flatsError } = await supabase
         .from("flats")
         .select(
-          "id, flat_number, floor_number, bhk_type, occupancy_status, building_id, society_id"
+          "id, flat_number, floor_number, bhk_type, occupancy_status, building_id, society_id",
         )
         .eq("is_active", true)
         .eq("is_delete", false)
@@ -117,7 +117,7 @@ export default function Users() {
   useEffect(() => {
     if (selectedSociety) {
       const societyBuildings = buildings.filter(
-        (building) => building.society_id === selectedSociety
+        (building) => building.society_id === selectedSociety,
       );
       setFilteredBuildings(societyBuildings);
     } else {
@@ -129,12 +129,12 @@ export default function Users() {
   useEffect(() => {
     if (selectedBuilding) {
       const buildingFlats = flats.filter(
-        (flat) => flat.building_id === selectedBuilding
+        (flat) => flat.building_id === selectedBuilding,
       );
       setFilteredFlats(buildingFlats);
     } else if (selectedSociety) {
       const societyFlats = flats.filter(
-        (flat) => flat.society_id === selectedSociety
+        (flat) => flat.society_id === selectedSociety,
       );
       setFilteredFlats(societyFlats);
     } else {
@@ -154,17 +154,18 @@ export default function Users() {
       const { data, error } = await supabase
         .from("users")
         .select(
-          `
-          *,
-          buildings!inner(name, building_type),
-          flats!left(
-            id,
-            flat_number,
-            floor_number,
-            bhk_type,
-            occupancy_status
-          )
-        `
+          //   `
+          //   *,
+          //   buildings!inner(name, building_type),
+          //   flats!left(
+          //     id,
+          //     flat_number,
+          //     floor_number,
+          //     bhk_type,
+          //     occupancy_status
+          //   )
+          // `,
+          "*",
         )
         .in("role_type", ["Tanent-O", "Tanent-M"])
         .eq("is_active", true)
@@ -172,6 +173,7 @@ export default function Users() {
         .order("name", { ascending: true })
         .order("created_at", { ascending: false });
 
+      console.log("data of users------------------->", data);
       if (error) throw error;
 
       const formattedTenants = (data || []).map((tenant) => ({
@@ -212,7 +214,7 @@ export default function Users() {
             bhk_type,
             occupancy_status
           )
-        `
+        `,
         )
         .in("role_type", ["Tanent-O", "Tanent-M"])
         .eq("is_active", true)
@@ -274,7 +276,7 @@ export default function Users() {
           tenant.number?.includes(query) ||
           tenant.whatsapp_number?.includes(query) ||
           tenant.building_name?.toLowerCase().includes(query) ||
-          tenant.flat_number?.toLowerCase().includes(query)
+          tenant.flat_number?.toLowerCase().includes(query),
       );
     }
 
@@ -784,7 +786,7 @@ export default function Users() {
                           <div className="flex flex-wrap gap-1">
                             <span
                               className={`px-2 py-1 rounded-full text-xs font-medium truncate ${getRoleTypeColor(
-                                tenant.role_type
+                                tenant.role_type,
                               )}`}
                             >
                               {tenant.role_type || "Unknown"}
@@ -824,7 +826,7 @@ export default function Users() {
                               {tenant.bhk_type !== "N/A" && (
                                 <span
                                   className={`px-1.5 py-0.5 rounded text-xs ${getBHKColor(
-                                    tenant.bhk_type
+                                    tenant.bhk_type,
                                   )}`}
                                 >
                                   {tenant.bhk_type}
@@ -836,7 +838,7 @@ export default function Users() {
                             <div className="flex items-center gap-2 flex-wrap">
                               <span
                                 className={`px-2 py-0.5 rounded text-xs ${getBuildingTypeColor(
-                                  tenant.building_type
+                                  tenant.building_type,
                                 )}`}
                               >
                                 {tenant.building_type || "N/A"}
@@ -844,7 +846,7 @@ export default function Users() {
 
                               <span
                                 className={`px-2 py-0.5 rounded text-xs ${getOccupancyColor(
-                                  tenant.occupancy_status
+                                  tenant.occupancy_status,
                                 )}`}
                               >
                                 {tenant.occupancy_status}
@@ -875,7 +877,7 @@ export default function Users() {
                           <div className="space-y-2">
                             <span
                               className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 w-fit ${getStatusColor(
-                                tenant.is_active
+                                tenant.is_active,
                               )}`}
                             >
                               {tenant.is_active ? (
@@ -889,7 +891,7 @@ export default function Users() {
                             </span>
                             <div className="text-xs text-hintText truncate">
                               {formatDate(
-                                tenant.updated_at || tenant.created_at
+                                tenant.updated_at || tenant.created_at,
                               )}
                             </div>
                           </div>
@@ -940,7 +942,7 @@ export default function Users() {
                           <button
                             onClick={() =>
                               setExpandedTenant(
-                                expandedTenant === tenant.id ? null : tenant.id
+                                expandedTenant === tenant.id ? null : tenant.id,
                               )
                             }
                             className="text-primary p-1 flex-shrink-0"
@@ -956,7 +958,7 @@ export default function Users() {
                         <div className="flex flex-wrap items-center gap-2">
                           <span
                             className={`px-2 py-1 rounded-full text-xs ${getRoleTypeColor(
-                              tenant.role_type
+                              tenant.role_type,
                             )}`}
                           >
                             {tenant.role_type}
@@ -1001,7 +1003,7 @@ export default function Users() {
                     {tenant.bhk_type !== "N/A" && (
                       <span
                         className={`px-2 py-1 rounded text-xs ${getBHKColor(
-                          tenant.bhk_type
+                          tenant.bhk_type,
                         )}`}
                       >
                         {tenant.bhk_type}
@@ -1009,14 +1011,14 @@ export default function Users() {
                     )}
                     <span
                       className={`px-2 py-1 rounded text-xs ${getBuildingTypeColor(
-                        tenant.building_type
+                        tenant.building_type,
                       )}`}
                     >
                       {tenant.building_type}
                     </span>
                     <span
                       className={`px-2 py-1 rounded text-xs ${getOccupancyColor(
-                        tenant.occupancy_status
+                        tenant.occupancy_status,
                       )}`}
                     >
                       {tenant.occupancy_status}

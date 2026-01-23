@@ -85,7 +85,7 @@ const useDebounce = (callback, delay) => {
       }
       timeoutRef.current = setTimeout(() => callback(...args), delay);
     },
-    [callback, delay]
+    [callback, delay],
   );
 
   useEffect(() => {
@@ -933,7 +933,7 @@ export default function PropertyManager() {
           role_type,
           is_active,
           created_at
-        `
+        `,
         )
         .eq("role_type", "Manager")
         .eq("is_delete", false);
@@ -957,7 +957,7 @@ export default function PropertyManager() {
                 pincode,
                 is_active
               )
-            `
+            `,
             )
             .eq("pm_id", m.id);
 
@@ -987,7 +987,7 @@ export default function PropertyManager() {
               whatsapp: m.whatsapp_number || "-",
             },
           };
-        })
+        }),
       );
 
       setManagers(managersWithSocieties);
@@ -1017,7 +1017,7 @@ export default function PropertyManager() {
         (manager) =>
           manager.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           manager.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          manager.id.toString().includes(searchTerm)
+          manager.id.toString().includes(searchTerm),
       );
     }
 
@@ -1035,8 +1035,8 @@ export default function PropertyManager() {
     // Optimistic update
     setManagers((prev) =>
       prev.map((manager) =>
-        manager.id === managerId ? { ...manager, status: newStatus } : manager
-      )
+        manager.id === managerId ? { ...manager, status: newStatus } : manager,
+      ),
     );
 
     try {
@@ -1051,16 +1051,15 @@ export default function PropertyManager() {
       toast.success(
         `Manager ${
           newStatus === "active" ? "activated" : "deactivated"
-        } successfully!`
+        } successfully!`,
       );
     } catch (error) {
-      // Revert optimistic update on error
       setManagers((prev) =>
         prev.map((manager) =>
           manager.id === managerId
             ? { ...manager, status: currentStatus }
-            : manager
-        )
+            : manager,
+        ),
       );
       toast.error("Failed to update status");
     }
@@ -1077,8 +1076,8 @@ export default function PropertyManager() {
 
         setManagers((prev) =>
           prev.map((manager) =>
-            manager.id === managerId ? { ...manager, loading: true } : manager
-          )
+            manager.id === managerId ? { ...manager, loading: true } : manager,
+          ),
         );
 
         setTimeout(() => {
@@ -1086,13 +1085,13 @@ export default function PropertyManager() {
             prev.map((manager) =>
               manager.id === managerId
                 ? { ...manager, loading: false }
-                : manager
-            )
+                : manager,
+            ),
           );
         }, 500);
       }
     },
-    [openRows]
+    [openRows],
   );
 
   const handleEditManager = (id) => {
@@ -1127,7 +1126,7 @@ export default function PropertyManager() {
 
       setManagers((prev) => prev.filter((m) => m.id !== managerToDelete.id));
       setFilteredManagers((prev) =>
-        prev.filter((m) => m.id !== managerToDelete.id)
+        prev.filter((m) => m.id !== managerToDelete.id),
       );
 
       toast.success("Manager deleted successfully");
@@ -1199,7 +1198,7 @@ export default function PropertyManager() {
 
   const paginatedManagers = filteredManagers.slice(
     page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
+    page * rowsPerPage + rowsPerPage,
   );
 
   return (

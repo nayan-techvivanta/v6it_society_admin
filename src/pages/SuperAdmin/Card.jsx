@@ -395,6 +395,7 @@ export default function Card() {
       created_at,
       is_assigned,
       society_id,
+       card_status, 
       building_id,
       societies (
         id,
@@ -429,6 +430,7 @@ export default function Card() {
           card.is_assigned === true || card.is_assigned === "true"
             ? "assigned"
             : "unassigned",
+        cardStatus: card.card_status || "ACTIVE",
         avatar: card.card_serial_number
           ? card.card_serial_number.slice(0, 2).toUpperCase()
           : "CR",
