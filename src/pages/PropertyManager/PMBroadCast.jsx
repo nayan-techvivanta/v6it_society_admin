@@ -37,6 +37,7 @@ import {
   DialogActions,
   Autocomplete,
 } from "@mui/material";
+import { useBulkNotification } from "../../Hooks/useBulkNotification";
 import {
   CloudUpload as CloudUploadIcon,
   Delete as DeleteIcon,
@@ -201,8 +202,12 @@ const PMBroadCast = () => {
   const [loadingSocieties, setLoadingSocieties] = useState(false);
   const [loadingBuildings, setLoadingBuildings] = useState(false);
   const fileInputRef = useRef(null);
-
-  // Fetch PM ID and assigned societies
+  const {
+    sendBulkNotification,
+    isSending: isNotificationSending,
+    progress,
+    getSocietyBuildingIds,
+  } = useBulkNotification();
   useEffect(() => {
     const fetchPMData = async () => {
       const profileId = localStorage.getItem("profileId");
@@ -222,11 +227,9 @@ const PMBroadCast = () => {
     fetchPMData();
   }, []);
 
-  // Fetch societies assigned to this PM
   const fetchAssignedSocieties = async (pmId) => {
     setLoadingSocieties(true);
     try {
-      // First, get society IDs from pm_society table
       const { data: pmSocieties, error: pmError } = await supabase
         .from("pm_society")
         .select("society_id")
@@ -246,7 +249,6 @@ const PMBroadCast = () => {
 
       const societyIds = pmSocieties.map((item) => item.society_id);
 
-      // Then, get full society details
       const { data: societiesData, error: societiesError } = await supabase
         .from("societies")
         .select("*")
@@ -257,7 +259,6 @@ const PMBroadCast = () => {
 
       setAssignedSocieties(societiesData || []);
 
-      // Set first society as default if available
       if (societiesData && societiesData.length > 0) {
         setFormData((prev) => ({
           ...prev,
@@ -277,7 +278,6 @@ const PMBroadCast = () => {
     }
   };
 
-  // Fetch buildings for a specific society
   const fetchBuildingsForSociety = async (societyId) => {
     if (!societyId) return;
 
@@ -293,7 +293,6 @@ const PMBroadCast = () => {
 
       setBuildings(data || []);
 
-      // Set first building as default if available and broadcast type is building
       if (data && data.length > 0 && formData.broadcastType === "building") {
         setFormData((prev) => ({
           ...prev,
@@ -595,21 +594,114 @@ const PMBroadCast = () => {
     }
   };
 
-  // Save broadcast to database
-  const saveBroadcastToDatabase = async (broadcastData, fileUrls) => {
-    const { data, error } = await supabase
-      .from("broadcast")
-      .insert([broadcastData])
-      .select();
+  // const handleSubmit = async (e) => {
+  //   e.preventDefault();
 
-    if (error) throw error;
-    return data;
-  };
+  //   // Validation
+  //   if (!formData.title.trim()) {
+  //     setSnackbar({
+  //       open: true,
+  //       message: "Please enter a title for the broadcast",
+  //       severity: "error",
+  //     });
+  //     return;
+  //   }
 
+  //   if (!formData.description.trim()) {
+  //     setSnackbar({
+  //       open: true,
+  //       message: "Please enter a description",
+  //       severity: "error",
+  //     });
+  //     return;
+  //   }
+
+  //   if (!formData.societyId) {
+  //     setSnackbar({
+  //       open: true,
+  //       message: "Please select a society",
+  //       severity: "error",
+  //     });
+  //     return;
+  //   }
+
+  //   if (formData.broadcastType === "building" && !formData.buildingId) {
+  //     setSnackbar({
+  //       open: true,
+  //       message: "Please select a building",
+  //       severity: "error",
+  //     });
+  //     return;
+  //   }
+
+  //   setLoading(true);
+
+  //   try {
+  //     // Upload files if any
+  //     let fileUrls = [];
+  //     if (files.length > 0) {
+  //       const uploadPromises = files.map((file) =>
+  //         uploadFileToSupabase(file.file),
+  //       );
+  //       fileUrls = await Promise.all(uploadPromises);
+  //     }
+
+  //     // Prepare broadcast data
+  //     const broadcastData = {
+  //       title: formData.title.trim(),
+  //       message: formData.description.trim(),
+  //       socity_id: formData.societyId,
+  //       building_id:
+  //         formData.broadcastType === "building" ? formData.buildingId : null,
+  //       document: fileUrls.length > 0 ? fileUrls.join(",") : null,
+  //       created_at: new Date().toISOString(),
+  //     };
+
+  //     // Save to database
+  //     await saveBroadcastToDatabase(broadcastData, fileUrls);
+
+  //     // Success message
+  //     const societyName =
+  //       assignedSocieties.find((s) => s.id === formData.societyId)?.name ||
+  //       "the society";
+  //     const buildingName =
+  //       formData.broadcastType === "building"
+  //         ? buildings.find((b) => b.id === formData.buildingId)?.name ||
+  //           "selected building"
+  //         : null;
+
+  //     const successMessage =
+  //       formData.broadcastType === "building"
+  //         ? `Broadcast sent successfully to ${buildingName} in ${societyName}!`
+  //         : `Broadcast sent successfully to entire ${societyName}!`;
+
+  //     setSnackbar({
+  //       open: true,
+  //       message: successMessage,
+  //       severity: "success",
+  //     });
+
+  //     // Reset form
+  //     resetCreateForm();
+
+  //     // Switch to list view and refresh
+  //     setViewMode("list");
+  //     fetchBroadcasts();
+  //   } catch (error) {
+  //     console.error("Error sending broadcast:", error);
+  //     setSnackbar({
+  //       open: true,
+  //       message: `Failed to send broadcast: ${error.message}`,
+  //       severity: "error",
+  //     });
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validation
+    // Validation (unchanged)
     if (!formData.title.trim()) {
       setSnackbar({
         open: true,
@@ -657,14 +749,39 @@ const PMBroadCast = () => {
         );
         fileUrls = await Promise.all(uploadPromises);
       }
+      const imageUrl = fileUrls.length > 0 ? fileUrls[0] : null;
 
-      // Prepare broadcast data
+      // 🔥 NEW: Send notifications using the reusable hook
+      let buildingIds = [];
+
+      if (formData.broadcastType === "society") {
+        // Get ALL buildings for this society
+        buildingIds = await getSocietyBuildingIds(formData.societyId);
+      } else {
+        // Single building selected
+        buildingIds = [formData.buildingId];
+      }
+
+      if (buildingIds.length > 0) {
+        await sendBulkNotification({
+          buildingIds,
+          title: formData.title.trim(),
+          body: formData.description.trim(),
+          imageUrl,
+          notificationType: "Property Manager",
+          data: { screen: "pm-broadcast" },
+          societyName: getSocietyName(formData.societyId),
+        });
+      }
+
       const broadcastData = {
         title: formData.title.trim(),
         message: formData.description.trim(),
-        socity_id: formData.societyId,
+        socity_id: String(formData.societyId),
         building_id:
-          formData.broadcastType === "building" ? formData.buildingId : null,
+          formData.broadcastType === "building"
+            ? String(formData.buildingId)
+            : null,
         document: fileUrls.length > 0 ? fileUrls.join(",") : null,
         created_at: new Date().toISOString(),
       };
@@ -672,14 +789,11 @@ const PMBroadCast = () => {
       // Save to database
       await saveBroadcastToDatabase(broadcastData, fileUrls);
 
-      // Success message
-      const societyName =
-        assignedSocieties.find((s) => s.id === formData.societyId)?.name ||
-        "the society";
+      const societyName = getSocietyName(formData.societyId);
       const buildingName =
         formData.broadcastType === "building"
           ? buildings.find((b) => b.id === formData.buildingId)?.name ||
-          "selected building"
+            "selected building"
           : null;
 
       const successMessage =
@@ -696,7 +810,6 @@ const PMBroadCast = () => {
       // Reset form
       resetCreateForm();
 
-      // Switch to list view and refresh
       setViewMode("list");
       fetchBroadcasts();
     } catch (error) {
@@ -727,7 +840,10 @@ const PMBroadCast = () => {
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Form */}
-          <motion.div variants={itemVariants} className="lg:col-span-2 space-y-6">
+          <motion.div
+            variants={itemVariants}
+            className="lg:col-span-2 space-y-6"
+          >
             <StyledCard>
               <CardContent className="p-6 space-y-6">
                 {/* Title */}
@@ -807,7 +923,7 @@ const PMBroadCast = () => {
                 </motion.div>
 
                 {/* Categories */}
-                <motion.div variants={itemVariants}>
+                {/* <motion.div variants={itemVariants}>
                   <FormControl fullWidth>
                     <InputLabel
                       sx={{
@@ -839,12 +955,12 @@ const PMBroadCast = () => {
                       <MenuItem value="emergency">Emergency / Urgent</MenuItem>
                     </Select>
                   </FormControl>
-                </motion.div>
+                </motion.div> */}
 
                 <Divider sx={{ my: 1 }} />
 
                 {/* Select Society & Building */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-5">
                   <motion.div variants={itemVariants}>
                     <FormControl fullWidth required>
                       <InputLabel
@@ -910,7 +1026,7 @@ const PMBroadCast = () => {
                         fullWidth
                         sx={{
                           "& .MuiToggleButton-root": {
-                            borderRadius: "8px",
+                            // borderRadius: "8px",
                             border: "1px solid rgba(111, 11, 20, 0.2)",
                             "&.Mui-selected": {
                               backgroundColor: "rgba(111, 11, 20, 0.1)",
@@ -1026,13 +1142,19 @@ const PMBroadCast = () => {
                   <Typography
                     variant="body1"
                     className="font-medium"
-                    sx={{ color: "#374151", fontFamily: "'Roboto', sans-serif" }}
+                    sx={{
+                      color: "#374151",
+                      fontFamily: "'Roboto', sans-serif",
+                    }}
                   >
                     Click or Drop files here
                   </Typography>
                   <Typography
                     variant="caption"
-                    sx={{ color: "#9CA3AF", fontFamily: "'Roboto', sans-serif" }}
+                    sx={{
+                      color: "#9CA3AF",
+                      fontFamily: "'Roboto', sans-serif",
+                    }}
                   >
                     (Images, PDF, Doc - Max 10MB)
                   </Typography>
@@ -1064,7 +1186,10 @@ const PMBroadCast = () => {
                               >
                                 {file.name}
                               </Typography>
-                              <Typography variant="caption" color="textSecondary">
+                              <Typography
+                                variant="caption"
+                                color="textSecondary"
+                              >
                                 {formatFileSize(file.size)}
                               </Typography>
                             </div>
@@ -1086,15 +1211,15 @@ const PMBroadCast = () => {
 
             <StyledCard>
               <CardContent className="p-6">
-                <Typography
+                {/* <Typography
                   variant="subtitle1"
                   className="font-bold mb-4"
                   sx={{ color: "#6F0B14", fontFamily: "'Roboto', sans-serif" }}
                 >
                   Publishing Options
-                </Typography>
+                </Typography> */}
 
-                <FormControlLabel
+                {/* <FormControlLabel
                   control={
                     <Switch
                       checked={formData.scheduleForLater}
@@ -1112,7 +1237,7 @@ const PMBroadCast = () => {
                     </Typography>
                   }
                   className="mb-4"
-                />
+                /> */}
 
                 <AnimatePresence>
                   {formData.scheduleForLater && (
@@ -1166,7 +1291,7 @@ const PMBroadCast = () => {
                     ? "Processing..."
                     : formData.scheduleForLater
                       ? "Schedule Broadcast"
-                      : "Send Broadcast Now"}
+                      : "Send Broadcast "}
                 </GradientButton>
 
                 <div className="mt-4 text-center">
@@ -1467,8 +1592,32 @@ const PMBroadCast = () => {
       initial="hidden"
       animate="visible"
       variants={containerVariants}
-      className="p-6 max-w-7xl mx-auto space-y-8"
+      style={{ minHeight: "80vh" }}
+      className="p-6 max-w-7xl mx-auto space-y-8 "
     >
+      {isNotificationSending && (
+        <div className="fixed top-20 right-4 bg-white/95 backdrop-blur-sm p-4 shadow-xl rounded-lg z-50 border max-w-sm animate-in slide-in-from-top-2 duration-300">
+          <div className="flex items-center gap-2 mb-2">
+            <CircularProgress size={18} />
+            <Typography
+              variant="caption"
+              fontWeight={600}
+              className="text-primary"
+            >
+              Sending notifications...
+            </Typography>
+          </div>
+          <div className="text-xs text-gray-600 mb-1">
+            {Math.round(progress)}% complete
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-1.5">
+            <div
+              className="bg-gradient-to-r from-green-500 to-green-600 h-1.5 rounded-full transition-all duration-500"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
         <div>
@@ -1514,11 +1663,14 @@ const PMBroadCast = () => {
                 textTransform: "none",
                 fontFamily: "'Roboto', sans-serif",
                 fontWeight: 600,
-                backgroundColor: viewMode === "create" ? "#6F0B14" : "transparent",
+                backgroundColor:
+                  viewMode === "create" ? "#6F0B14" : "transparent",
                 color: viewMode === "create" ? "#ffffff" : "#6B7280",
                 "&:hover": {
                   backgroundColor:
-                    viewMode === "create" ? "#8A0F1B" : "rgba(111, 11, 20, 0.05)",
+                    viewMode === "create"
+                      ? "#8A0F1B"
+                      : "rgba(111, 11, 20, 0.05)",
                 },
               }}
             >
@@ -1533,7 +1685,8 @@ const PMBroadCast = () => {
                 textTransform: "none",
                 fontFamily: "'Roboto', sans-serif",
                 fontWeight: 600,
-                backgroundColor: viewMode === "list" ? "#6F0B14" : "transparent",
+                backgroundColor:
+                  viewMode === "list" ? "#6F0B14" : "transparent",
                 color: viewMode === "list" ? "#ffffff" : "#6B7280",
                 "&:hover": {
                   backgroundColor:

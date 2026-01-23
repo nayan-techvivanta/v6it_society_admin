@@ -68,12 +68,25 @@ const VisuallyHiddenInput = styled("input", {
   width: 1,
 });
 
-
-const InputField = ({ icon, label, name, value, isEditing, onChange, profileValue, type = "text" }) => (
+const InputField = ({
+  icon,
+  label,
+  name,
+  value,
+  isEditing,
+  onChange,
+  profileValue,
+  type = "text",
+}) => (
   <Box className="space-y-2">
     <Box className="flex items-center gap-2 mb-1">
-      {React.cloneElement(icon, { sx: { color: themeColors.hint, fontSize: 18 } })}
-      <Typography variant="caption" className="font-semibold text-gray-500 uppercase tracking-wider">
+      {React.cloneElement(icon, {
+        sx: { color: themeColors.hint, fontSize: 18 },
+      })}
+      <Typography
+        variant="caption"
+        className="font-semibold text-gray-500 uppercase tracking-wider"
+      >
         {label}
       </Typography>
     </Box>
@@ -91,14 +104,22 @@ const InputField = ({ icon, label, name, value, isEditing, onChange, profileValu
             backgroundColor: "white",
             "& fieldset": { borderColor: "rgba(0,0,0,0.1)" },
             "&:hover fieldset": { borderColor: themeColors.primary },
-            "&.Mui-focused fieldset": { borderColor: themeColors.primary, borderWidth: 1.5 },
+            "&.Mui-focused fieldset": {
+              borderColor: themeColors.primary,
+              borderWidth: 1.5,
+            },
           },
         }}
       />
     ) : (
-      <Paper elevation={0} className="p-3.5 border border-dashed border-gray-300 rounded-lg bg-gray-50/50">
+      <Paper
+        elevation={0}
+        className="p-3.5 border border-dashed border-gray-300 rounded-lg bg-gray-50/50"
+      >
         <Typography className="font-medium text-gray-800 break-all">
-          {profileValue || <span className="text-gray-400 italic">Not provided</span>}
+          {profileValue || (
+            <span className="text-gray-400 italic">Not provided</span>
+          )}
         </Typography>
       </Paper>
     )}
@@ -108,15 +129,21 @@ const InputField = ({ icon, label, name, value, isEditing, onChange, profileValu
 const ReadOnlyField = ({ icon, label, value, bg = "bg-white" }) => (
   <Box className="space-y-2">
     <Box className="flex items-center gap-2 mb-1">
-      {React.cloneElement(icon, { sx: { color: themeColors.hint, fontSize: 18 } })}
-      <Typography variant="caption" className="font-semibold text-gray-500 uppercase tracking-wider">
+      {React.cloneElement(icon, {
+        sx: { color: themeColors.hint, fontSize: 18 },
+      })}
+      <Typography
+        variant="caption"
+        className="font-semibold text-gray-500 uppercase tracking-wider"
+      >
         {label}
       </Typography>
     </Box>
-    <Paper elevation={0} className={`p-3.5 border border-gray-200 rounded-lg ${bg}`}>
-      <Typography className="font-medium text-gray-800">
-        {value}
-      </Typography>
+    <Paper
+      elevation={0}
+      className={`p-3.5 border border-gray-200 rounded-lg ${bg}`}
+    >
+      <Typography className="font-medium text-gray-800">{value}</Typography>
     </Paper>
   </Box>
 );
@@ -473,7 +500,11 @@ export default function CommonProfile() {
   if (isLoading) {
     return (
       <Box className="flex justify-center items-center min-h-[80vh]">
-        <CircularProgress size={60} thickness={4} sx={{ color: themeColors.primary }} />
+        <CircularProgress
+          size={60}
+          thickness={4}
+          sx={{ color: themeColors.primary }}
+        />
       </Box>
     );
   }
@@ -486,7 +517,12 @@ export default function CommonProfile() {
           animate={{ opacity: 1, scale: 1 }}
         >
           <Card className="max-w-md w-full shadow-xl rounded-2xl overflow-hidden">
-            <Box className="h-2" sx={{ background: `linear-gradient(to right, ${themeColors.primary}, #4A040A)` }} />
+            <Box
+              className="h-2"
+              sx={{
+                background: `linear-gradient(to right, ${themeColors.primary}, #4A040A)`,
+              }}
+            />
             <CardContent className="p-8 text-center space-y-6">
               <Typography variant="h5" className="font-bold text-gray-800">
                 Session Expired
@@ -504,7 +540,7 @@ export default function CommonProfile() {
                   "&:hover": { bgcolor: themeColors.secondary },
                   borderRadius: "12px",
                   textTransform: "none",
-                  fontSize: "1rem"
+                  fontSize: "1rem",
                 }}
               >
                 Back to Login
@@ -533,7 +569,7 @@ export default function CommonProfile() {
               bgcolor: themeColors.lightBg,
               color: themeColors.primary,
               "&:hover": { bgcolor: "rgba(111, 11, 20, 0.15)" },
-              transition: "all 0.2s"
+              transition: "all 0.2s",
             }}
           >
             <ArrowBackIcon />
@@ -564,8 +600,8 @@ export default function CommonProfile() {
               "&:hover": {
                 borderWidth: 2,
                 borderColor: "#5A0910",
-                bgcolor: themeColors.lightBg
-              }
+                bgcolor: themeColors.lightBg,
+              },
             }}
           >
             Edit Profile
@@ -581,14 +617,20 @@ export default function CommonProfile() {
               sx={{
                 color: themeColors.hint,
                 textTransform: "none",
-                fontWeight: 500
+                fontWeight: 500,
               }}
             >
               Cancel
             </Button>
             <Button
               variant="contained"
-              startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <SaveIcon />}
+              startIcon={
+                loading ? (
+                  <CircularProgress size={20} color="inherit" />
+                ) : (
+                  <SaveIcon />
+                )
+              }
               onClick={handleSaveProfile}
               disabled={loading}
               sx={{
@@ -599,8 +641,8 @@ export default function CommonProfile() {
                 boxShadow: "0 4px 14px 0 rgba(111, 11, 20, 0.39)",
                 "&:hover": {
                   bgcolor: themeColors.secondary,
-                  boxShadow: "0 6px 20px 0 rgba(111, 11, 20, 0.23)"
-                }
+                  boxShadow: "0 6px 20px 0 rgba(111, 11, 20, 0.23)",
+                },
               }}
             >
               Save Changes
@@ -614,32 +656,70 @@ export default function CommonProfile() {
         <Grid item xs={12} lg={4}>
           <Box className="space-y-6">
             {/* Profile Card */}
-            <Card className="rounded-2xl shadow-sm border border-gray-100 overflow-visible">
-              <Box className="h-32 bg-gradient-to-r from-gray-100 to-gray-50 rounded-t-2xl relative">
-                <Box className="absolute -bottom-16 left-1/2 transform -translate-x-1/2">
-                  <Box className="relative group">
+
+            <Card
+              sx={{
+                borderRadius: "24px",
+                overflow: "visible",
+                border: "1px solid rgba(0,0,0,0.06)",
+                boxShadow: "0 20px 40px rgba(0,0,0,0.08)",
+                background: "#fff",
+              }}
+            >
+              {/* Header */}
+              <Box
+                sx={{
+                  height: 140,
+                  background: `linear-gradient(135deg, ${themeColors.primary}15, ${themeColors.secondary}20)`,
+                  borderTopLeftRadius: 24,
+                  borderTopRightRadius: 24,
+                  position: "relative",
+                }}
+              >
+                {/* Avatar */}
+                <Box
+                  sx={{
+                    position: "absolute",
+                    bottom: -64,
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                  }}
+                >
+                  <Box sx={{ position: "relative" }}>
                     <Avatar
                       src={imagePreview}
                       sx={{
-                        width: 128,
-                        height: 128,
-                        border: `4px solid ${themeColors.white}`,
-                        boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+                        width: 132,
+                        height: 132,
                         fontSize: "3rem",
-                        bgcolor: themeColors.primary
+                        bgcolor: themeColors.primary,
+                        border: "6px solid #fff",
+                        boxShadow: `
+              0 0 0 6px ${themeColors.primary}22,
+              0 16px 40px rgba(0,0,0,0.18)
+            `,
                       }}
                     >
-                      {profile.name?.charAt(0).toUpperCase() || "U"}
+                      {profile.name?.charAt(0)?.toUpperCase() || "U"}
                     </Avatar>
+
+                    {/* Edit button */}
                     <IconButton
                       component="label"
-                      className="absolute bottom-0 right-0 shadow-lg transform translate-x-1/4 translate-y-1/4 transition-transform hover:scale-110"
                       sx={{
+                        position: "absolute",
+                        bottom: 6,
+                        right: 6,
                         bgcolor: themeColors.primary,
-                        color: "white",
-                        "&:hover": { bgcolor: themeColors.secondary },
-                        width: 42,
-                        height: 42
+                        color: "#fff",
+                        width: 40,
+                        height: 40,
+                        boxShadow: "0 6px 16px rgba(0,0,0,0.25)",
+                        "&:hover": {
+                          bgcolor: themeColors.secondary,
+                          transform: "scale(1.08)",
+                        },
+                        transition: "all .25s ease",
                       }}
                     >
                       <EditIcon fontSize="small" />
@@ -652,79 +732,115 @@ export default function CommonProfile() {
                   </Box>
                 </Box>
               </Box>
-              <CardContent className="pt-20 pb-8 px-6 text-center">
-                <Typography variant="h5" className="font-bold text-gray-900 mb-1">
+
+              {/* Content */}
+              <CardContent sx={{ pt: 10, pb: 4, px: 4, textAlign: "center" }}>
+                <Typography variant="h5" sx={{ fontWeight: 700 }}>
                   {profile.name || "User"}
                 </Typography>
-                <Typography variant="body2" className="text-gray-500 mb-6 font-medium bg-gray-100 py-1 px-3 rounded-full inline-block uppercase tracking-wider text-xs">
+
+                <Typography
+                  sx={{
+                    mt: 1,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    color: themeColors.primary,
+                    bgcolor: `${themeColors.primary}12`,
+                    px: 2,
+                    py: 0.5,
+                    borderRadius: "999px",
+                    display: "inline-block",
+                  }}
+                >
                   {profile.role_type || profile.role || "Role"}
                 </Typography>
 
-                <Box className="space-y-3 mt-4">
-                  {selectedFile && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      className="bg-red-50 p-4 rounded-xl border border-red-100 mb-4"
+                {/* Upload confirmation */}
+                {selectedFile && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.25 }}
+                  >
+                    <Box
+                      sx={{
+                        mt: 4,
+                        p: 2.5,
+                        borderRadius: "16px",
+                        bgcolor: "#FFF4F4",
+                        border: "1px solid #FFDADA",
+                      }}
                     >
-                      <Typography variant="caption" className="block text-gray-600 mb-3 truncate">
+                      <Typography
+                        variant="caption"
+                        sx={{ display: "block", mb: 2, color: "#555" }}
+                      >
                         Selected: {selectedFile.name}
                       </Typography>
-                      <Box className="flex gap-2">
+
+                      <Box sx={{ display: "flex", gap: 1.5 }}>
                         <Button
                           fullWidth
                           variant="contained"
+                          size="small"
                           onClick={handleImageUpload}
                           disabled={uploadingImage}
-                          size="small"
                           sx={{
                             bgcolor: themeColors.primary,
                             textTransform: "none",
-                            "&:hover": { bgcolor: themeColors.secondary }
+                            borderRadius: "10px",
+                            "&:hover": { bgcolor: themeColors.secondary },
                           }}
                         >
-                          {uploadingImage ? "Uploading..." : "Confirm Upload"}
+                          {uploadingImage ? "Uploading..." : "Confirm"}
                         </Button>
+
                         <Button
                           fullWidth
                           variant="outlined"
+                          size="small"
                           onClick={() => {
                             setSelectedFile(null);
                             setImagePreview(profile.profile_url || "");
                           }}
-                          size="small"
                           sx={{
+                            borderRadius: "10px",
+                            textTransform: "none",
                             color: themeColors.primary,
                             borderColor: themeColors.primary,
-                            textTransform: "none"
                           }}
                         >
                           Cancel
                         </Button>
                       </Box>
-                    </motion.div>
-                  )}
+                    </Box>
+                  </motion.div>
+                )}
 
-                  <Button
-                    variant="outlined"
-                    fullWidth
-                    startIcon={<LockResetIcon />}
-                    onClick={handleOpenDialog}
-                    sx={{
-                      color: themeColors.primary,
-                      borderColor: "rgba(111, 11, 20, 0.3)",
-                      borderRadius: "10px",
-                      py: 1.5,
-                      textTransform: "none",
-                      "&:hover": {
-                        borderColor: themeColors.primary,
-                        bgcolor: themeColors.lightBg
-                      }
-                    }}
-                  >
-                    Change Password
-                  </Button>
-                </Box>
+                {/* Actions */}
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  startIcon={<LockResetIcon />}
+                  onClick={handleOpenDialog}
+                  sx={{
+                    mt: 4,
+                    py: 1.6,
+                    borderRadius: "14px",
+                    textTransform: "none",
+                    fontWeight: 600,
+                    color: themeColors.primary,
+                    borderColor: `${themeColors.primary}55`,
+                    "&:hover": {
+                      bgcolor: `${themeColors.primary}0D`,
+                      borderColor: themeColors.primary,
+                    },
+                  }}
+                >
+                  Change Password
+                </Button>
               </CardContent>
             </Card>
 
@@ -732,19 +848,30 @@ export default function CommonProfile() {
             {(profile.society_name || profile.building_name) && (
               <Card className="rounded-2xl shadow-sm border border-gray-100 p-2">
                 <CardContent className="p-4 space-y-4">
-                  <Typography variant="subtitle1" className="font-bold mb-4 flex items-center gap-2">
+                  <Typography
+                    variant="subtitle1"
+                    className="font-bold mb-4 flex items-center gap-2"
+                  >
                     <BusinessIcon sx={{ color: themeColors.primary }} />
                     Residence Details
                   </Typography>
 
                   {profile.society_name && (
                     <Box className="flex items-start gap-3 p-3 rounded-lg bg-gray-50">
-                      <ApartmentIcon sx={{ color: themeColors.hint, fontSize: 22, mt: 0.3 }} />
+                      <ApartmentIcon
+                        sx={{ color: themeColors.hint, fontSize: 22, mt: 0.3 }}
+                      />
                       <Box>
-                        <Typography variant="caption" className="text-gray-500 font-medium uppercase tracking-wide">
+                        <Typography
+                          variant="caption"
+                          className="text-gray-500 font-medium uppercase tracking-wide"
+                        >
                           Society
                         </Typography>
-                        <Typography variant="body2" className="font-semibold text-gray-800">
+                        <Typography
+                          variant="body2"
+                          className="font-semibold text-gray-800"
+                        >
                           {profile.society_name}
                         </Typography>
                       </Box>
@@ -754,14 +881,34 @@ export default function CommonProfile() {
                   <Box className="grid grid-cols-2 gap-3">
                     {profile.building_name && (
                       <Box className="p-3 rounded-lg bg-gray-50">
-                        <Typography variant="caption" className="text-gray-500 font-medium block mb-1">Building</Typography>
-                        <Typography variant="body2" className="font-bold text-gray-800">{profile.building_name}</Typography>
+                        <Typography
+                          variant="caption"
+                          className="text-gray-500 font-medium block mb-1"
+                        >
+                          Building
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          className="font-bold text-gray-800"
+                        >
+                          {profile.building_name}
+                        </Typography>
                       </Box>
                     )}
                     {profile.flat_number && (
                       <Box className="p-3 rounded-lg bg-gray-50">
-                        <Typography variant="caption" className="text-gray-500 font-medium block mb-1">Flat No</Typography>
-                        <Typography variant="body2" className="font-bold text-gray-800">{profile.flat_number}</Typography>
+                        <Typography
+                          variant="caption"
+                          className="text-gray-500 font-medium block mb-1"
+                        >
+                          Flat No
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          className="font-bold text-gray-800"
+                        >
+                          {profile.flat_number}
+                        </Typography>
                       </Box>
                     )}
                   </Box>
@@ -773,21 +920,58 @@ export default function CommonProfile() {
 
         {/* RIGHT COLUMN - Personal & Contact Info */}
         <Grid item xs={12} lg={8}>
-          <Card className="rounded-2xl shadow-sm border border-gray-100 h-full">
-            <CardContent className="p-6 md:p-8">
-              <Box className="flex items-center gap-3 mb-8 pb-4 border-b border-gray-100">
-                <Box className="p-2 rounded-lg bg-red-50">
-                  <PersonIcon sx={{ color: themeColors.primary }} />
+          <Card
+            sx={{
+              borderRadius: 3,
+              boxShadow: "0 16px 40px rgba(0,0,0,0.06)",
+              border: "1px solid rgba(111, 11, 20, 0.1)",
+              overflow: "hidden",
+              fontFamily: "Roboto, sans-serif",
+            }}
+          >
+            {/* Gradient Header */}
+            <Box
+              sx={{
+                height: 60,
+                background: `linear-gradient(90deg, ${themeColors.primary}33, ${themeColors.primary}0)`,
+              }}
+            />
+
+            <CardContent sx={{ p: { xs: 4, md: 6 } }}>
+              {/* Title with floating icon */}
+              <Box
+                sx={{ display: "flex", alignItems: "center", gap: 2, mb: 6 }}
+              >
+                <Box
+                  sx={{
+                    width: 40,
+                    height: 40,
+                    bgcolor: themeColors.primary,
+                    color: "#fff",
+                    borderRadius: "50%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                  }}
+                >
+                  <PersonIcon fontSize="small" />
                 </Box>
-                <Typography variant="h6" className="font-bold text-gray-900">
+                <Typography
+                  variant="h6"
+                  fontWeight={700}
+                  color={themeColors.primary}
+                >
                   Personal Information
                 </Typography>
               </Box>
 
+              {/* Grid fields */}
               <Grid container spacing={4}>
+                {/* Full Name */}
                 <Grid item xs={12} md={6}>
                   <InputField
-                    icon={<PersonIcon />}
+                    icon={<PersonIcon sx={{ color: themeColors.primary }} />}
                     label="Full Name"
                     name="name"
                     value={editableProfile?.name || ""}
@@ -796,9 +980,11 @@ export default function CommonProfile() {
                     profileValue={profile.name}
                   />
                 </Grid>
+
+                {/* Email */}
                 <Grid item xs={12} md={6}>
                   <InputField
-                    icon={<EmailIcon />}
+                    icon={<EmailIcon sx={{ color: themeColors.primary }} />}
                     label="Email Address"
                     name="email"
                     value={editableProfile?.email || ""}
@@ -808,9 +994,11 @@ export default function CommonProfile() {
                     type="email"
                   />
                 </Grid>
+
+                {/* Phone */}
                 <Grid item xs={12} md={6}>
                   <InputField
-                    icon={<PhoneIcon />}
+                    icon={<PhoneIcon sx={{ color: themeColors.primary }} />}
                     label="Phone Number"
                     name="number"
                     value={editableProfile?.number || ""}
@@ -819,9 +1007,11 @@ export default function CommonProfile() {
                     profileValue={profile.number}
                   />
                 </Grid>
+
+                {/* WhatsApp */}
                 <Grid item xs={12} md={6}>
                   <InputField
-                    icon={<WhatsAppIcon />}
+                    icon={<WhatsAppIcon sx={{ color: themeColors.primary }} />}
                     label="WhatsApp Number"
                     name="whatsapp_number"
                     value={editableProfile?.whatsapp_number || ""}
@@ -831,39 +1021,74 @@ export default function CommonProfile() {
                   />
                 </Grid>
 
+                {/* Additional Details */}
                 <Grid item xs={12}>
-                  <Typography variant="subtitle2" className="text-gray-400 font-medium uppercase tracking-wider mb-4 mt-2">
+                  <Typography
+                    variant="subtitle2"
+                    sx={{
+                      textTransform: "uppercase",
+                      color: themeColors.hintText,
+                      fontWeight: 600,
+                      letterSpacing: 1,
+                      mb: 3,
+                      mt: 4,
+                    }}
+                  >
                     Additional Details
                   </Typography>
                 </Grid>
 
+                {/* Move-in / Move-out */}
                 {profile.move_in_date && (
                   <Grid item xs={12} md={6}>
                     <ReadOnlyField
-                      icon={<CalendarTodayIcon />}
+                      icon={
+                        <CalendarTodayIcon
+                          sx={{ color: themeColors.primary }}
+                        />
+                      }
                       label="Move In Date"
                       value={profile.move_in_date}
+                      sx={{
+                        borderRadius: 2,
+                        bgcolor: themeColors.lightBackground,
+                        p: 2,
+                      }}
                     />
                   </Grid>
                 )}
                 {profile.move_out_date && (
                   <Grid item xs={12} md={6}>
                     <ReadOnlyField
-                      icon={<CalendarTodayIcon />}
+                      icon={
+                        <CalendarTodayIcon
+                          sx={{ color: themeColors.primary }}
+                        />
+                      }
                       label="Move Out Date"
                       value={profile.move_out_date}
+                      sx={{
+                        borderRadius: 2,
+                        bgcolor: themeColors.lightBackground,
+                        p: 2,
+                      }}
                     />
                   </Grid>
                 )}
+
+                {/* Registered User ID */}
                 <Grid item xs={12}>
                   <ReadOnlyField
-                    icon={<BadgeIcon />}
+                    icon={<BadgeIcon sx={{ color: themeColors.primary }} />}
                     label="Registered User ID"
                     value={profile.registed_user_id || profile.userId}
-                    bg="bg-gray-50"
+                    sx={{
+                      borderRadius: 2,
+                      p: 2,
+                      bgcolor: themeColors.lightBackground,
+                    }}
                   />
                 </Grid>
-
               </Grid>
             </CardContent>
           </Card>
@@ -885,21 +1110,24 @@ export default function CommonProfile() {
         BackdropProps={{
           sx: {
             backgroundColor: "rgba(0, 0, 0, 0.6)",
-            backdropFilter: "blur(4px)"
-          }
+            backdropFilter: "blur(4px)",
+          },
         }}
       >
         <DialogTitle className="flex items-center gap-3 p-6 border-b border-gray-100">
           <Box className="p-2 bg-red-50 rounded-lg">
             <LockResetIcon sx={{ color: themeColors.primary }} />
           </Box>
-          <Typography variant="h6" className="font-bold text-gray-900">Change Password</Typography>
+          <Typography variant="h6" className="font-bold text-gray-900">
+            Change Password
+          </Typography>
         </DialogTitle>
 
         <form onSubmit={handleChangePassword}>
           <DialogContent className="p-6 space-y-5">
             <Typography variant="body2" color="textSecondary" className="mb-2">
-              Enter your new password. You will be logged out after successful change.
+              Enter your new password. You will be logged out after successful
+              change.
             </Typography>
 
             <TextField
@@ -917,12 +1145,12 @@ export default function CommonProfile() {
                   borderRadius: "12px",
                   "&.Mui-focused fieldset": {
                     borderColor: themeColors.primary,
-                    borderWidth: 2
-                  }
+                    borderWidth: 2,
+                  },
                 },
                 "& .MuiInputLabel-root.Mui-focused": {
-                  color: themeColors.primary
-                }
+                  color: themeColors.primary,
+                },
               }}
               InputProps={{
                 endAdornment: (
@@ -931,7 +1159,11 @@ export default function CommonProfile() {
                       onClick={() => togglePasswordVisibility("newPassword")}
                       edge="end"
                     >
-                      {showPassword.newPassword ? <VisibilityOff /> : <Visibility />}
+                      {showPassword.newPassword ? (
+                        <VisibilityOff />
+                      ) : (
+                        <Visibility />
+                      )}
                     </IconButton>
                   </InputAdornment>
                 ),
@@ -951,21 +1183,27 @@ export default function CommonProfile() {
                   borderRadius: "12px",
                   "&.Mui-focused fieldset": {
                     borderColor: themeColors.primary,
-                    borderWidth: 2
-                  }
+                    borderWidth: 2,
+                  },
                 },
                 "& .MuiInputLabel-root.Mui-focused": {
-                  color: themeColors.primary
-                }
+                  color: themeColors.primary,
+                },
               }}
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
                     <IconButton
-                      onClick={() => togglePasswordVisibility("confirmPassword")}
+                      onClick={() =>
+                        togglePasswordVisibility("confirmPassword")
+                      }
                       edge="end"
                     >
-                      {showPassword.confirmPassword ? <VisibilityOff /> : <Visibility />}
+                      {showPassword.confirmPassword ? (
+                        <VisibilityOff />
+                      ) : (
+                        <Visibility />
+                      )}
                     </IconButton>
                   </InputAdornment>
                 ),
@@ -980,7 +1218,7 @@ export default function CommonProfile() {
               sx={{
                 color: "gray",
                 textTransform: "none",
-                fontWeight: 600
+                fontWeight: 600,
               }}
               disabled={loading}
             >
@@ -996,10 +1234,14 @@ export default function CommonProfile() {
                 textTransform: "none",
                 padding: "8px 24px",
                 fontWeight: 600,
-                "&:hover": { bgcolor: themeColors.secondary }
+                "&:hover": { bgcolor: themeColors.secondary },
               }}
             >
-              {loading ? <CircularProgress size={20} color="inherit" /> : "Update Password"}
+              {loading ? (
+                <CircularProgress size={20} color="inherit" />
+              ) : (
+                "Update Password"
+              )}
             </Button>
           </DialogActions>
         </form>

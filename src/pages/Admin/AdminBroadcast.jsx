@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useBulkNotification } from "../../Hooks/useBulkNotification";
 import {
   Box,
   TextField,
@@ -57,7 +58,6 @@ import { styled } from "@mui/material/styles";
 import { supabase } from "../../api/supabaseClient";
 import { uploadImage } from "../../api/uploadImage";
 
-// Styled components for custom design
 const VisuallyHiddenInput = styled("input")({
   clip: "rect(0 0 0 0)",
   clipPath: "inset(50%)",
@@ -195,7 +195,12 @@ const AdminBroadcast = () => {
   const [buildings, setBuildings] = useState([]);
   const [loadingBuildings, setLoadingBuildings] = useState(false);
   const fileInputRef = useRef(null);
-
+  const {
+    sendBulkNotification,
+    isSending: isNotificationSending,
+    progress,
+    getSocietyBuildingIds,
+  } = useBulkNotification();
   useEffect(() => {
     const storedSocietyId = localStorage.getItem("societyId");
     if (storedSocietyId) {
@@ -232,7 +237,7 @@ const AdminBroadcast = () => {
         *,
         buildings(name),
         societies(name)
-      `
+      `,
         )
         .eq("socity_id", societyId)
         .order("created_at", { ascending: false });
@@ -505,8 +510,7 @@ const AdminBroadcast = () => {
     }
   };
 
-  // Save broadcast to database
-  const saveBroadcastToDatabase = async (broadcastData, fileUrls) => {
+  const saveBroadcastToDatabase = async (broadcastData) => {
     const { data, error } = await supabase
       .from("broadcast")
       .insert([broadcastData])
@@ -519,6 +523,7 @@ const AdminBroadcast = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // Validation (same as before)
     if (!formData.title.trim()) {
       setSnackbar({
         open: true,
@@ -558,54 +563,64 @@ const AdminBroadcast = () => {
     setLoading(true);
 
     try {
-      // Upload files if any
       let fileUrls = [];
       if (files.length > 0) {
         const uploadPromises = files.map((file) =>
-          uploadFileToSupabase(file.file)
+          uploadFileToSupabase(file.file),
         );
         fileUrls = await Promise.all(uploadPromises);
       }
+      const imageUrl = fileUrls.length > 0 ? fileUrls[0] : null;
 
-      // Prepare broadcast data
+      let buildingIds = [];
+
+      if (formData.broadcastType === "society") {
+        buildingIds = await getSocietyBuildingIds(societyId);
+      } else {
+        buildingIds = [formData.buildingId];
+      }
+
+      if (buildingIds.length > 0) {
+        await sendBulkNotification({
+          buildingIds,
+          title: formData.title.trim(),
+          body: formData.description.trim(),
+          imageUrl,
+          notificationType: "Admin",
+          data: { screen: "admin-broadcast" },
+          societyName: "Admin Society Broadcast",
+        });
+      }
+
       const broadcastData = {
         title: formData.title.trim(),
         message: formData.description.trim(),
-        socity_id: societyId,
+        socity_id: String(societyId),
         building_id:
-          formData.broadcastType === "building" ? formData.buildingId : null,
+          formData.broadcastType === "building"
+            ? String(formData.buildingId)
+            : null,
         document: fileUrls.length > 0 ? fileUrls.join(",") : null,
         created_at: new Date().toISOString(),
       };
 
-      // Save to database
-      await saveBroadcastToDatabase(broadcastData, fileUrls);
+      await saveBroadcastToDatabase(broadcastData);
 
-      // Success
+      const successMessage =
+        formData.broadcastType === "society"
+          ? "Broadcast sent successfully to entire society!"
+          : "Broadcast sent successfully to selected building!";
+
       setSnackbar({
         open: true,
-        message: `Broadcast sent successfully to ${formData.broadcastType === "society"
-          ? "entire society"
-          : "selected building"
-          }!`,
+        message: successMessage,
         severity: "success",
       });
 
-      // Reset form
-      setFormData({
-        title: "",
-        description: "",
-        category: "general",
-        scheduleForLater: false,
-        scheduledDate: "",
-        scheduledTime: "",
-        broadcastType: "society",
-        buildingId: null,
-      });
-      setFiles([]);
+      resetCreateForm();
 
-      // Switch to list view
       setViewMode("list");
+      fetchBroadcasts();
     } catch (error) {
       console.error("Error sending broadcast:", error);
       setSnackbar({
@@ -622,13 +637,15 @@ const AdminBroadcast = () => {
     setSnackbar((prev) => ({ ...prev, open: false }));
   };
 
-  // Render create form
   const renderCreateForm = () => (
     <div>
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Form */}
-          <motion.div variants={itemVariants} className="lg:col-span-2 space-y-6">
+          <motion.div
+            variants={itemVariants}
+            className="lg:col-span-2 space-y-6"
+          >
             <StyledCard>
               <CardContent className="p-6 space-y-6">
                 {/* Title */}
@@ -996,8 +1013,8 @@ const AdminBroadcast = () => {
                             formData.broadcastType === "society"
                               ? "Entire Society"
                               : buildings.find(
-                                (b) => b.id === formData.buildingId
-                              )?.name || "Select Building"
+                                  (b) => b.id === formData.buildingId,
+                                )?.name || "Select Building"
                           }
                           size="small"
                           sx={{
@@ -1124,7 +1141,7 @@ const AdminBroadcast = () => {
                       sx={{ fontFamily: "'Roboto', sans-serif" }}
                     >
                       {formatFileSize(
-                        files.reduce((acc, file) => acc + file.size, 0)
+                        files.reduce((acc, file) => acc + file.size, 0),
                       )}
                     </Typography>
                   </div>
@@ -1137,7 +1154,6 @@ const AdminBroadcast = () => {
     </div>
   );
 
-  // Render broadcast list
   const renderBroadcastList = () => (
     <motion.div
       initial={{ opacity: 0 }}
@@ -1271,8 +1287,9 @@ const AdminBroadcast = () => {
                         <Chip
                           label={
                             broadcast.building_id
-                              ? `Building: ${broadcast.buildings?.name || "Unknown"
-                              }`
+                              ? `Building: ${
+                                  broadcast.buildings?.name || "Unknown"
+                                }`
                               : "Entire Society"
                           }
                           size="small"
@@ -1314,7 +1331,7 @@ const AdminBroadcast = () => {
                                     onClick={() =>
                                       handleDownload(
                                         url,
-                                        `attachment-${index + 1}`
+                                        `attachment-${index + 1}`,
                                       )
                                     }
                                   >
@@ -1327,7 +1344,7 @@ const AdminBroadcast = () => {
                                     )}
                                   </Avatar>
                                 </Tooltip>
-                              )
+                              ),
                             )}
                           </AvatarGroup>
                         ) : (
@@ -1388,6 +1405,25 @@ const AdminBroadcast = () => {
       className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6 font-roboto"
     >
       <div className="max-w-7xl mx-auto">
+        {isNotificationSending && (
+          <div className="fixed top-20 right-4 bg-white/95 backdrop-blur-sm p-4 shadow-xl rounded-lg z-50 border max-w-sm animate-pulse">
+            <div className="flex items-center gap-2 mb-2">
+              <CircularProgress size={18} />
+              <Typography variant="caption" fontWeight={600}>
+                Broadcasting notifications...
+              </Typography>
+            </div>
+            <div className="text-xs text-gray-600 mb-1">
+              {Math.round(progress)}% complete
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-1.5">
+              <div
+                className="bg-gradient-to-r from-green-500 to-green-600 h-1.5 rounded-full transition-all duration-500"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+        )}
         {/* Header with Toggle */}
         <motion.div variants={itemVariants} className="mb-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -1548,8 +1584,9 @@ const AdminBroadcast = () => {
                   <Chip
                     label={
                       selectedBroadcast.building_id
-                        ? `Building: ${selectedBroadcast.buildings?.name || "Unknown"
-                        }`
+                        ? `Building: ${
+                            selectedBroadcast.buildings?.name || "Unknown"
+                          }`
                         : "Entire Society"
                     }
                     size="small"
@@ -1632,7 +1669,7 @@ const AdminBroadcast = () => {
                               <DownloadIcon fontSize="small" />
                             </IconButton>
                           </div>
-                        )
+                        ),
                       )}
                     </div>
                   </div>

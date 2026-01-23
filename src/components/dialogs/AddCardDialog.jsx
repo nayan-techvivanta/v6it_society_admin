@@ -38,11 +38,13 @@ const AddCardDialog = ({
   // societies = [],
   isEdit = false,
   cardData,
+  onSuccess,
 }) => {
   const [formData, setFormData] = useState({
     society_id: "",
     building_id: "",
     card_serial_number: "",
+    is_assigned: false,
   });
 
   const [societies, setSocieties] = useState([]);
@@ -85,6 +87,7 @@ const AddCardDialog = ({
           society_id: cardData.society_id || "",
           building_id: cardData.building_id || "",
           card_serial_number: cardData.card_serial_number || "",
+          is_assigned: false,
         });
 
         if (cardData.society_id) {
@@ -95,14 +98,14 @@ const AddCardDialog = ({
           society_id: "",
           building_id: "",
           card_serial_number: "",
+          is_assigned: false,
         });
       }
 
       setErrors({});
       setTouched({});
 
-      // ✅ focus first empty field
-      setTimeout(focusEmptyField, 100); // small delay to ensure dialog rendered
+      setTimeout(focusEmptyField, 100);
     }
   }, [open, isEdit, cardData]);
 
@@ -225,7 +228,7 @@ const AddCardDialog = ({
         society_id: formData.society_id,
         card_serial_number: formData.card_serial_number,
         building_id: formData.building_id,
-        is_assigned: true,
+        is_assigned: false,
       };
 
       let query;
@@ -245,7 +248,7 @@ const AddCardDialog = ({
       if (error) throw error;
 
       toast.success(
-        isEdit ? "Card updated successfully!" : "Card created successfully!"
+        isEdit ? "Card updated successfully!" : "Card created successfully!",
       );
 
       onClose();
@@ -309,7 +312,7 @@ const AddCardDialog = ({
         sx={{
           background: `linear-gradient(135deg, #6F0B14 0%, ${alpha(
             "#6F0B14",
-            0.9
+            0.9,
           )} 100%)`,
           color: "white",
           py: 2.5,
@@ -765,8 +768,8 @@ const AddCardDialog = ({
                     {isSubmitting
                       ? "Processing..."
                       : isEdit
-                      ? "Update Card"
-                      : "Create Card"}
+                        ? "Update Card"
+                        : "Create Card"}
                   </Button>
                 </Box>
               </Box>

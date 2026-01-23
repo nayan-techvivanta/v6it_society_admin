@@ -247,11 +247,11 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
       newErrors.password = "Password must be at least 6 characters";
     }
 
-    if (!formData.phone.trim()) {
-      newErrors.phone = "Phone number is required";
-    } else if (!/^[0-9]{10}$/.test(formData.phone.replace(/\D/g, ""))) {
-      newErrors.phone = "Enter a valid 10-digit phone number";
-    }
+    // if (!formData.phone.trim()) {
+    //   newErrors.phone = "Phone number is required";
+    // } else if (!/^[0-9]{10}$/.test(formData.phone.replace(/\D/g, ""))) {
+    //   newErrors.phone = "Enter a valid 10-digit phone number";
+    // }
 
     if (
       formData.whatsapp_number &&

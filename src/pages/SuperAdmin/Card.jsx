@@ -401,7 +401,7 @@ export default function Card() {
         name,
         buildings (id, name)
       )
-    `
+    `,
       )
       .order("created_at", { ascending: false });
 
@@ -413,7 +413,7 @@ export default function Card() {
 
     const mappedCards = data.map((card) => {
       const assignedBuilding = card.societies?.buildings?.find(
-        (b) => b.id === card.building_id
+        (b) => b.id === card.building_id,
       );
 
       return {
@@ -422,8 +422,13 @@ export default function Card() {
         societyId: card.societies?.id || "-",
         societyName: card.societies?.name || "-",
         buildingName: assignedBuilding?.name || "-",
-        isAssigned: card.is_assigned || false,
-        status: card.is_assigned ? "assigned" : "unassigned",
+        // isAssigned: card.is_assigned,
+        // status: card.is_assigned ? "assigned" : "unassigned",
+        isAssigned: card.is_assigned === true || card.is_assigned === "true",
+        status:
+          card.is_assigned === true || card.is_assigned === "true"
+            ? "assigned"
+            : "unassigned",
         avatar: card.card_serial_number
           ? card.card_serial_number.slice(0, 2).toUpperCase()
           : "CR",
@@ -470,8 +475,8 @@ export default function Card() {
                 isAssigned,
                 status: isAssigned ? "assigned" : "unassigned",
               }
-            : card
-        )
+            : card,
+        ),
       );
     } catch (error) {
       console.error("Error updating card status:", error);
@@ -483,7 +488,13 @@ export default function Card() {
 
   const handleAddNewCard = () => {
     setIsEditMode(false);
-    setSelectedCard(null);
+    // setSelectedCard(null);
+    setSelectedCard({
+      society_id: "",
+      building_id: "",
+      card_serial_number: "",
+      is_assigned: false,
+    });
     setOpenDialog(true);
   };
   const handleAssignCard = (cardId) => {
@@ -496,7 +507,7 @@ export default function Card() {
       society_id: cardToEdit.societyId,
       building_id: cardToEdit.buildingId || "",
       card_serial_number: cardToEdit.serialNumber,
-      is_assigned: true,
+      is_assigned: false,
     });
 
     setOpenDialog(true);

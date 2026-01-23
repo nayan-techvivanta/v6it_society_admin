@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useBulkNotification } from "../../Hooks/useBulkNotification";
 import {
   Box,
   TextField,
@@ -163,7 +164,7 @@ const BuildingType = {
 const SelectedSocietyType = {
   id: "",
   name: "",
-  sendTo: "society", // "society" or "building"
+  sendTo: "society",
   selectedBuildings: [],
 };
 
@@ -191,7 +192,12 @@ const Broadcast = () => {
   const [loadingSocieties, setLoadingSocieties] = useState(true);
   const [loadingBuildings, setLoadingBuildings] = useState(false);
   const fileInputRef = useRef(null);
-
+  const {
+    sendBulkNotification,
+    isSending: isNotificationSending,
+    progress,
+    getSocietyBuildingIds,
+  } = useBulkNotification();
   // Fetch societies on component mount
   useEffect(() => {
     fetchSocieties();
@@ -230,8 +236,8 @@ const Broadcast = () => {
         .from("buildings")
         .select("id, name, description, building_type, flat_limit, society_id")
         .eq("society_id", societyId)
-        .eq("is_active", true) // Only fetch active buildings
-        .eq("is_delete", false) // Exclude deleted buildings
+        .eq("is_active", true)
+        .eq("is_delete", false)
         .order("name");
 
       if (error) throw error;
@@ -274,7 +280,7 @@ const Broadcast = () => {
     const newSocieties = newValue
       .filter(
         (society, index, self) =>
-          index === self.findIndex((s) => s.id === society.id)
+          index === self.findIndex((s) => s.id === society.id),
       )
       .map((society) => ({
         id: society.id,
@@ -296,8 +302,8 @@ const Broadcast = () => {
               selectedBuildings:
                 sendTo === "society" ? [] : society.selectedBuildings,
             }
-          : society
-      )
+          : society,
+      ),
     );
   };
 
@@ -306,14 +312,14 @@ const Broadcast = () => {
       prev.map((society) =>
         society.id === societyId
           ? { ...society, selectedBuildings: buildingIds }
-          : society
-      )
+          : society,
+      ),
     );
   };
 
   const removeSociety = (societyId) => {
     setSelectedSocieties((prev) =>
-      prev.filter((society) => society.id !== societyId)
+      prev.filter((society) => society.id !== societyId),
     );
   };
 
@@ -401,7 +407,6 @@ const Broadcast = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
-  // Upload file to Supabase storage
   const uploadFileToSupabase = async (file) => {
     try {
       const result = await uploadImage(file);
@@ -412,7 +417,6 @@ const Broadcast = () => {
     }
   };
 
-  // Save broadcast to database
   const saveBroadcastToDatabase = async (broadcastData) => {
     const { data, error } = await supabase
       .from("broadcast")
@@ -422,10 +426,10 @@ const Broadcast = () => {
     if (error) throw error;
     return data;
   };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // ---- validations (unchanged) ----
     if (selectedSocieties.length === 0) {
       setSnackbar({
         open: true,
@@ -453,18 +457,15 @@ const Broadcast = () => {
       return;
     }
 
-    // Validate building selections
     const invalidSelections = selectedSocieties.filter(
       (society) =>
-        society.sendTo === "building" && society.selectedBuildings.length === 0
+        society.sendTo === "building" && society.selectedBuildings.length === 0,
     );
 
     if (invalidSelections.length > 0) {
       setSnackbar({
         open: true,
-        message: `Please select buildings for ${invalidSelections
-          .map((s) => s.name)
-          .join(", ")}`,
+        message: `Please select buildings for ${invalidSelections.map((s) => s.name).join(", ")}`,
         severity: "error",
       });
       return;
@@ -473,64 +474,74 @@ const Broadcast = () => {
     setLoading(true);
 
     try {
-      // Upload files if any
+      // ---- upload files ----
       let fileUrls = [];
       if (files.length > 0) {
-        const uploadPromises = files.map((file) =>
-          uploadFileToSupabase(file.file)
+        fileUrls = await Promise.all(
+          files.map((file) => uploadFileToSupabase(file.file)),
         );
-        fileUrls = await Promise.all(uploadPromises);
+      }
+      const imageUrl = fileUrls.length > 0 ? fileUrls[0] : null;
+
+      // 🚀 NEW: Use the reusable hook for notifications
+      for (const society of selectedSocieties) {
+        let buildingIds = [];
+
+        if (society.sendTo === "society") {
+          buildingIds = await getSocietyBuildingIds(society.id);
+        } else if (society.sendTo === "building") {
+          buildingIds = society.selectedBuildings;
+        }
+
+        if (buildingIds.length > 0) {
+          await sendBulkNotification({
+            buildingIds,
+            title: formData.title.trim(),
+            body: formData.description.trim(),
+            imageUrl,
+            notificationType: "Super Admin",
+            data: { screen: "broadcast" },
+            societyName: society.name,
+          });
+        }
       }
 
-      // Prepare broadcast data for each society/building combination
-      const broadcastPromises = [];
-
-      selectedSocieties.forEach((society) => {
+      // Save broadcast record (unchanged)
+      const broadcastPromises = selectedSocieties.map((society) => {
         if (society.sendTo === "society") {
-          // Send to entire society
-          const broadcastData = {
-            title: formData.title.trim(),
-            message: formData.description.trim(),
-            socity_id: society.id,
+          return saveBroadcastToDatabase({
+            title: formData.title,
+            message: formData.description,
+            socity_id: String(society.id),
             building_id: null,
-            document: fileUrls.length > 0 ? fileUrls.join(",") : null,
+            document: imageUrl,
             created_at: new Date().toISOString(),
-          };
-          broadcastPromises.push(saveBroadcastToDatabase(broadcastData));
-        } else if (society.sendTo === "building") {
-          // Send to specific buildings in this society
-          society.selectedBuildings.forEach((buildingId) => {
-            const broadcastData = {
-              title: formData.title.trim(),
-              message: formData.description.trim(),
-              socity_id: society.id,
-              building_id: buildingId,
-              document: fileUrls.length > 0 ? fileUrls.join(",") : null,
-              created_at: new Date().toISOString(),
-            };
-            broadcastPromises.push(saveBroadcastToDatabase(broadcastData));
           });
+        } else {
+          return Promise.all(
+            society.selectedBuildings.map((buildingId) =>
+              saveBroadcastToDatabase({
+                title: formData.title,
+                message: formData.description,
+                socity_id: String(society.id),
+                building_id: String(buildingId),
+                document: imageUrl,
+                created_at: new Date().toISOString(),
+              }),
+            ),
+          );
         }
       });
 
-      // Save all broadcasts
-      await Promise.all(broadcastPromises);
-
-      // Success message
-      const totalBroadcasts = selectedSocieties.reduce((total, society) => {
-        if (society.sendTo === "society") return total + 1;
-        return total + society.selectedBuildings.length;
-      }, 0);
+      await Promise.all(broadcastPromises.flat());
 
       setSnackbar({
         open: true,
-        message: `Broadcast sent successfully to ${totalBroadcasts} destination${
-          totalBroadcasts !== 1 ? "s" : ""
-        }!`,
+        message: "Broadcast & notifications sent successfully!",
         severity: "success",
       });
 
-      // Reset form
+      // ---- reset ----
       setFormData({
         title: "",
         description: "",
@@ -542,10 +553,10 @@ const Broadcast = () => {
       setSelectedSocieties([]);
       setFiles([]);
     } catch (error) {
-      console.error("Error sending broadcast:", error);
+      console.error("Broadcast Error:", error);
       setSnackbar({
         open: true,
-        message: `Failed to send broadcast: ${error.message}`,
+        message: error.message || "Failed to send broadcast",
         severity: "error",
       });
     } finally {
@@ -564,6 +575,27 @@ const Broadcast = () => {
       return total + society.selectedBuildings.length;
     }, 0);
   };
+  // if (isNotificationSending) {
+  //   return (
+  //     <div className="fixed top-4 right-4 bg-white p-6 shadow-2xl rounded-xl z-50 border border-gray-200 max-w-sm">
+  //       <div className="flex items-center gap-2 mb-2">
+  //         <CircularProgress size={20} />
+  //         <Typography variant="subtitle2" fontWeight={600}>
+  //           Sending notifications...
+  //         </Typography>
+  //       </div>
+  //       <div className="text-sm text-gray-600 mb-3">
+  //         {Math.round(progress)}% complete
+  //       </div>
+  //       <div className="w-full bg-gray-200 rounded-full h-2">
+  //         <div
+  //           className="bg-gradient-to-r from-green-500 to-green-600 h-2 rounded-full transition-all duration-300"
+  //           style={{ width: `${progress}%` }}
+  //         />
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
   return (
     <motion.div
@@ -573,6 +605,26 @@ const Broadcast = () => {
       className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4 md:p-6 font-roboto"
     >
       <div className="max-w-6xl mx-auto">
+        {isNotificationSending && (
+          <div className="fixed top-20 right-4 bg-white/95 backdrop-blur-sm p-4 shadow-xl rounded-lg z-50 border max-w-sm">
+            <div className="flex items-center gap-2 mb-2">
+              <CircularProgress size={18} />
+              <Typography
+                variant="caption"
+                fontWeight={600}
+                className="text-primary"
+              >
+                Broadcasting to {getTotalDestinations()} destinations...
+              </Typography>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-1.5">
+              <div
+                className="bg-gradient-to-r from-primary to-red-600 h-1.5 rounded-full transition-all"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+        )}
         {/* Header */}
         <motion.div variants={itemVariants} className="mb-8">
           <Typography
@@ -745,7 +797,7 @@ const Broadcast = () => {
                                   onChange={(e) =>
                                     handleSocietySendToChange(
                                       society.id,
-                                      e.target.value
+                                      e.target.value,
                                     )
                                   }
                                   label="Send To"
@@ -787,7 +839,7 @@ const Broadcast = () => {
                                       onChange={(e) =>
                                         handleBuildingSelection(
                                           society.id,
-                                          e.target.value
+                                          e.target.value,
                                         )
                                       }
                                       label="Select Buildings *"
@@ -876,7 +928,7 @@ const Broadcast = () => {
                                           >
                                             <Checkbox
                                               checked={society.selectedBuildings.includes(
-                                                building.id
+                                                building.id,
                                               )}
                                             />
                                             <ListItemText
@@ -903,7 +955,7 @@ const Broadcast = () => {
                                               }}
                                             />
                                           </MenuItem>
-                                        )
+                                        ),
                                       )}
                                     </Select>
                                   </FormControl>
@@ -1300,10 +1352,10 @@ const Broadcast = () => {
                   {loading
                     ? "Sending..."
                     : formData.scheduleForLater
-                    ? "Schedule Broadcast"
-                    : `Send to ${getTotalDestinations()} destination${
-                        getTotalDestinations() !== 1 ? "s" : ""
-                      }`}
+                      ? "Schedule Broadcast"
+                      : `Send to ${getTotalDestinations()} destination${
+                          getTotalDestinations() !== 1 ? "s" : ""
+                        }`}
                 </GradientButton>
               </motion.div>
 
