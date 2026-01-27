@@ -21,6 +21,7 @@ import {
   Autocomplete,
   Chip,
 } from "@mui/material";
+import { BsDoorOpenFill } from "react-icons/bs";
 import {
   Close,
   CheckCircle,
@@ -46,6 +47,7 @@ const AddDeviceDialog = ({
     device_serial_number: "",
     society_id: "",
     building_id: "",
+    flat_id: "",
   });
 
   const [errors, setErrors] = useState({});
@@ -59,6 +61,9 @@ const AddDeviceDialog = ({
   const [loadingSocieties, setLoadingSocieties] = useState(false);
   const [loadingBuildings, setLoadingBuildings] = useState(false);
   const [filteredBuildings, setFilteredBuildings] = useState([]);
+  const [flats, setFlats] = useState([]);
+  const [filteredFlats, setFilteredFlats] = useState([]);
+  const [loadingFlats, setLoadingFlats] = useState(false);
 
   // Status options
   const statusOptions = [
@@ -75,7 +80,6 @@ const AddDeviceDialog = ({
     }
   }, [open]);
 
-  // Fetch buildings when society is selected
   useEffect(() => {
     if (formData.society_id) {
       fetchBuildings(formData.society_id);
@@ -90,31 +94,34 @@ const AddDeviceDialog = ({
       if (isEdit && deviceData) {
         setFormData({
           device_serial_number: deviceData.device_serial_number || "",
-          society_id: deviceData.society_id || "",
-          building_id: deviceData.building_id || "",
+          society_id: Number(deviceData.society_id) || "",
+          building_id: Number(deviceData.building_id) || "",
+          flat_id: Number(deviceData.flat_id) || "",
           issue_date:
             deviceData.issue_date || new Date().toISOString().split("T")[0],
           status: deviceData.status || "active",
         });
 
         if (deviceData.society_id) {
-          fetchBuildings(deviceData.society_id);
+          fetchBuildings(Number(deviceData.society_id));
+        }
+
+        if (deviceData.building_id) {
+          fetchFlats(Number(deviceData.building_id));
         }
       } else {
         setFormData({
           device_serial_number: "",
           society_id: "",
           building_id: "",
+          flat_id: "",
           issue_date: new Date().toISOString().split("T")[0],
           status: "active",
         });
       }
-      setErrors({});
-      setTouched({});
     }
-  }, [open, deviceData, isEdit]);
+  }, [open, isEdit, deviceData]);
 
-  // Fetch societies from Supabase
   const fetchSocieties = async () => {
     try {
       setLoadingSocieties(true);
@@ -159,6 +166,31 @@ const AddDeviceDialog = ({
       setLoadingBuildings(false);
     }
   };
+  const fetchFlats = async (buildingId) => {
+    try {
+      setLoadingFlats(true);
+
+      const { data, error } = await supabase
+        .from("flats")
+        .select("id, flat_number, floor_number, bhk_type")
+        .eq("building_id", buildingId)
+        .eq("is_delete", false)
+        .eq("is_active", true)
+        .order("flat_number");
+
+      if (error) throw error;
+
+      setFlats(data || []);
+      setFilteredFlats(data || []);
+    } catch (error) {
+      console.error("Fetch flats error:", error);
+      toast.error("Failed to load flats");
+      setFlats([]);
+      setFilteredFlats([]);
+    } finally {
+      setLoadingFlats(false);
+    }
+  };
 
   // Search buildings
   const handleBuildingSearch = (searchValue) => {
@@ -170,9 +202,23 @@ const AddDeviceDialog = ({
     const filtered = buildings.filter(
       (building) =>
         building.name.toLowerCase().includes(searchValue.toLowerCase()) ||
-        building.address?.toLowerCase().includes(searchValue.toLowerCase())
+        building.address?.toLowerCase().includes(searchValue.toLowerCase()),
     );
     setFilteredBuildings(filtered);
+  };
+  const handleFlatSearch = (value) => {
+    if (!value.trim()) {
+      setFilteredFlats(flats);
+      return;
+    }
+
+    const filtered = flats.filter(
+      (flat) =>
+        flat.flat_number.toLowerCase().includes(value.toLowerCase()) ||
+        String(flat.floor_number).includes(value),
+    );
+
+    setFilteredFlats(filtered);
   };
 
   // Validation
@@ -197,6 +243,9 @@ const AddDeviceDialog = ({
     if (!formData.issue_date) {
       newErrors.issue_date = "Issue date is required";
     }
+    if (!formData.flat_id) {
+      newErrors.flat_id = "Please select a flat";
+    }
 
     setErrors(newErrors);
     setIsFormValid(Object.keys(newErrors).length === 0);
@@ -206,33 +255,6 @@ const AddDeviceDialog = ({
     validateForm();
   }, [formData]);
 
-  // const handleSubmit = async (e) => {
-  //   e.preventDefault();
-
-  //   if (!isFormValid) {
-  //     toast.error("Please fix all errors before submitting");
-  //     return;
-  //   }
-
-  //   setIsSubmitting(true);
-  //   try {
-  //     // Prepare data for parent component
-  //     const devicePayload = {
-  //       device_serial_number: formData.device_serial_number,
-  //       society_id: formData.society_id,
-  //       building_id: formData.building_id,
-  //       issue_date: formData.issue_date,
-  //       status: formData.status,
-  //     };
-
-  //     onSubmit(devicePayload);
-  //   } catch (error) {
-  //     console.error("Error in device submission:", error);
-  //     toast.error(`Failed to ${isEdit ? "update" : "add"} device`);
-  //   } finally {
-  //     setIsSubmitting(false);
-  //   }
-  // };
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -246,18 +268,20 @@ const AddDeviceDialog = ({
     try {
       const devicePayload = {
         device_serial_number: formData.device_serial_number,
-        society_id: Number(formData.society_id), // bigint safety
-        building_id: Number(formData.building_id), // bigint safety
+        society_id: Number(formData.society_id),
+        building_id: Number(formData.building_id),
+        flat_id: formData.flat_id ? Number(formData.flat_id) : null,
         issue_date: formData.issue_date,
         status: formData.status,
       };
+      console.log("FINAL PAYLOAD 👉", devicePayload);
 
       await onSubmit(devicePayload);
 
       toast.success(
         isEdit
           ? "Device updated successfully ✅"
-          : "Device added successfully ✅"
+          : "Device added successfully ✅",
       );
 
       onClose();
@@ -265,7 +289,7 @@ const AddDeviceDialog = ({
       console.error("Error in device submission:", error);
 
       toast.error(
-        error?.message || `Failed to ${isEdit ? "update" : "add"} device`
+        error?.message || `Failed to ${isEdit ? "update" : "add"} device`,
       );
     } finally {
       setIsSubmitting(false);
@@ -284,35 +308,47 @@ const AddDeviceDialog = ({
   };
 
   const handleSocietyChange = async (e) => {
-    const societyId = e.target.value;
+    const societyId = Number(e.target.value);
 
     setFormData((prev) => ({
       ...prev,
       society_id: societyId,
       building_id: "",
+      flat_id: "",
     }));
 
     setBuildings([]);
-    setFilteredBuildings([]);
+    setFlats([]);
 
     if (societyId) {
-      await fetchBuildings(Number(societyId)); // 👈 ensure bigint
+      await fetchBuildings(societyId);
     }
   };
 
-  const handleBuildingChange = (e) => {
-    const buildingId = e.target.value;
-    setFormData((prev) => ({ ...prev, building_id: buildingId }));
-    setTouched((prev) => ({ ...prev, building_id: true }));
+  // const handleBuildingChange = (e) => {
+  //   const buildingId = e.target.value;
+  //   setFormData((prev) => ({ ...prev, building_id: buildingId }));
+  //   setTouched((prev) => ({ ...prev, building_id: true }));
 
-    if (errors.building_id) {
-      setErrors((prev) => ({ ...prev, building_id: "" }));
+  //   if (errors.building_id) {
+  //     setErrors((prev) => ({ ...prev, building_id: "" }));
+  //   }
+  // };
+  const handleBuildingChange = async (e) => {
+    const buildingId = Number(e.target.value);
+
+    setFormData((prev) => ({
+      ...prev,
+      building_id: buildingId,
+      flat_id: "",
+    }));
+
+    setFlats([]);
+    setFilteredFlats([]);
+
+    if (buildingId) {
+      await fetchFlats(buildingId);
     }
-  };
-
-  const handleGenerateSerial = () => {
-    const newSerial = generateSerialNumber();
-    setFormData((prev) => ({ ...prev, device_serial_number: newSerial }));
   };
 
   const handleClose = () => {
@@ -334,6 +370,11 @@ const AddDeviceDialog = ({
     const building = buildings.find((b) => b.id === formData.building_id);
     return building ? building.name : "";
   };
+  const getSelectedFlatName = () => {
+    if (!formData.flat_id) return "";
+    const flat = flats.find((f) => f.id === Number(formData.flat_id));
+    return flat ? `Flat ${flat.flat_number} (Floor ${flat.floor_number})` : "";
+  };
 
   return (
     <Dialog
@@ -353,7 +394,7 @@ const AddDeviceDialog = ({
         sx={{
           background: `linear-gradient(135deg, #6F0B14 0%, ${alpha(
             "#6F0B14",
-            0.9
+            0.9,
           )} 100%)`,
           color: "white",
           py: 2.5,
@@ -431,34 +472,6 @@ const AddDeviceDialog = ({
                     Device Serial Number
                   </Typography>
 
-                  {/* <TextField
-                    fullWidth
-                    value={formData.device_serial_number}
-                    onChange={handleFieldChange("device_serial_number")}
-                    error={
-                      !!errors.device_serial_number &&
-                      touched.device_serial_number
-                    }
-                    helperText={
-                      (touched.device_serial_number &&
-                        errors.device_serial_number) ||
-                      "Unique identifier for the device"
-                    }
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Tag sx={{ color: "#A29EB6", fontSize: 20 }} />
-                        </InputAdornment>
-                      ),
-
-                      sx: {
-                        borderRadius: 1.5,
-                        height: 44,
-                      },
-                    }}
-                    placeholder="e.g., DEV12345"
-                    size="small"
-                  /> */}
                   <TextField
                     fullWidth
                     value={formData.device_serial_number}
@@ -542,7 +555,7 @@ const AddDeviceDialog = ({
                         }
 
                         const selectedSociety = societies.find(
-                          (s) => s.id === selected
+                          (s) => s.id === selected,
                         );
                         return (
                           <Box>
@@ -656,14 +669,14 @@ const AddDeviceDialog = ({
                               {!formData.society_id
                                 ? "Select a society first"
                                 : loadingBuildings
-                                ? "Loading buildings..."
-                                : "Select a building"}
+                                  ? "Loading buildings..."
+                                  : "Select a building"}
                             </Typography>
                           );
                         }
 
                         const selectedBuilding = buildings.find(
-                          (b) => b.id === selected
+                          (b) => b.id === selected,
                         );
                         return (
                           <Box>
@@ -684,8 +697,8 @@ const AddDeviceDialog = ({
                           {!formData.society_id
                             ? "Select a society first"
                             : loadingBuildings
-                            ? "Loading..."
-                            : "Select a building"}
+                              ? "Loading..."
+                              : "Select a building"}
                         </Typography>
                       </MenuItem>
 
@@ -743,10 +756,112 @@ const AddDeviceDialog = ({
                   </FormControl>
                 </Box>
               </Grid>
+              <Grid item xs={12} md={6}>
+                <Box>
+                  <Typography
+                    component="label"
+                    variant="caption"
+                    fontWeight={600}
+                    display="block"
+                    mb={1}
+                    color="#6F0B14"
+                    sx={{
+                      "&::after": {
+                        content: '"*"',
+                        color: "#B31B1B",
+                        marginLeft: 0.5,
+                      },
+                    }}
+                  >
+                    Flat
+                  </Typography>
+
+                  <FormControl
+                    fullWidth
+                    error={!!errors.flat_id && touched.flat_id}
+                    size="small"
+                  >
+                    <Select
+                      value={formData.flat_id}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          flat_id: Number(e.target.value),
+                        }))
+                      }
+                      displayEmpty
+                      disabled={!formData.building_id || loadingFlats}
+                      sx={{
+                        borderRadius: 1.5,
+                        height: 44,
+                        backgroundColor: "white",
+                        border: "1px solid",
+                        borderColor: errors.flat_id ? "#B31B1B" : "#E0E0E0",
+                      }}
+                      renderValue={(selected) => {
+                        if (!selected) {
+                          return (
+                            <Typography
+                              color="#A29EB6"
+                              sx={{ fontStyle: "italic" }}
+                            >
+                              {!formData.building_id
+                                ? "Select building first"
+                                : loadingFlats
+                                  ? "Loading flats..."
+                                  : "Select a flat"}
+                            </Typography>
+                          );
+                        }
+
+                        const flat = flats.find(
+                          (f) => f.id === Number(selected),
+                        );
+                        return flat
+                          ? `Flat ${flat.flat_number} (Floor ${flat.floor_number})`
+                          : "";
+                      }}
+                    >
+                      <MenuItem value="" disabled>
+                        Select a flat
+                      </MenuItem>
+
+                      {filteredFlats.map((flat) => (
+                        <MenuItem key={flat.id} value={flat.id}>
+                          Flat {flat.flat_number} • Floor {flat.floor_number} •{" "}
+                          {flat.bhk_type}
+                        </MenuItem>
+                      ))}
+                    </Select>
+
+                    {errors.flat_id && (
+                      <Typography
+                        variant="caption"
+                        color="#B31B1B"
+                        sx={{ mt: 0.5, ml: 1 }}
+                      >
+                        {errors.flat_id}
+                      </Typography>
+                    )}
+
+                    {flats.length > 10 && (
+                      <TextField
+                        fullWidth
+                        size="small"
+                        placeholder="Search flats..."
+                        sx={{ mt: 1 }}
+                        onChange={(e) => handleFlatSearch(e.target.value)}
+                      />
+                    )}
+                  </FormControl>
+                </Box>
+              </Grid>
             </Grid>
 
             {/* Selected Info Preview */}
-            {(formData.society_id || formData.building_id) && (
+            {(formData.society_id ||
+              formData.building_id ||
+              formData.flat_id) && (
               <Box
                 sx={{
                   mt: 3,
@@ -781,6 +896,19 @@ const AddDeviceDialog = ({
                         <Apartment fontSize="small" sx={{ color: "#6F0B14" }} />
                         <Typography variant="body2">
                           <strong>Building:</strong> {getSelectedBuildingName()}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  )}
+                  {formData.flat_id && (
+                    <Grid item xs={12} md={6}>
+                      <Box display="flex" alignItems="center" gap={1}>
+                        <BsDoorOpenFill
+                          fontSize="small"
+                          sx={{ color: "#6F0B14" }}
+                        />
+                        <Typography variant="body2">
+                          <strong>Flat:</strong> {getSelectedFlatName()}
                         </Typography>
                       </Box>
                     </Grid>
@@ -858,8 +986,8 @@ const AddDeviceDialog = ({
                     {isSubmitting
                       ? "Processing..."
                       : isEdit
-                      ? "Update Device"
-                      : "Add Device"}
+                        ? "Update Device"
+                        : "Add Device"}
                   </Button>
                 </Box>
               </Box>

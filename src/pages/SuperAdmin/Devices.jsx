@@ -108,8 +108,11 @@ const DeviceRow = ({ device, isMobile, onEdit, onDelete }) => {
           {device.building_name || "Not Assigned"}
         </Typography>
       </TableCell>
-
-      {/* Issue Date */}
+      <TableCell className="p-4">
+        <Typography className="font-roboto font-medium text-black">
+          {device.flat_name || "Not Assigned"}
+        </Typography>
+      </TableCell>
 
       {/* Actions */}
       <TableCell className="p-4">
@@ -211,6 +214,14 @@ const DeviceCard = ({ deviceItem, onEdit, onDelete }) => {
               {deviceItem.building_name || "Not Assigned"}
             </Typography>
           </div>
+          <div className="bg-lightBackground p-3 rounded-lg col-span-2">
+            <Typography className="font-roboto text-xs text-hintText mb-1">
+              Flat
+            </Typography>
+            <Typography className="font-roboto text-sm font-semibold text-black">
+              {deviceItem.flat_name || "Not Assigned"}
+            </Typography>
+          </div>
         </div>
 
         <div className="flex gap-2 pt-3 border-t border-gray-100">
@@ -253,35 +264,65 @@ export default function Devices() {
         .from("devices")
         .select(
           `
-          id,
-          device_serial_number,
-          created_at,
-          societies (
-            id,
-            name
-          ),
-          buildings (
-            id,
-            name
-          )
-        `
+    id,
+    device_serial_number,
+    created_at,
+    society_id,
+    building_id,
+    flat_id,
+    societies (
+      id,
+      name
+    ),
+    buildings (
+      id,
+      name
+    ),
+    flats (
+      id,
+      flat_number,
+      floor_number,
+      bhk_type
+    )
+  `,
         )
         .order("created_at", { ascending: false });
 
       if (error) throw error;
 
       // Format the data
+      // const formattedDevices = devicesData.map((device) => ({
+      //   id: device.id,
+      //   device_serial_number: device.device_serial_number,
+      //   society_name: device.societies?.name || null,
+      //   building_name: device.buildings?.name || null,
+      //   society_id: device.societies?.id || null,
+      //   building_id: device.buildings?.id || null,
+      //   flat_id: device.flats?.id || null,
+      //   created_at: device.created_at,
+      //   avatar:
+      //     device.device_serial_number?.substring(0, 2).toUpperCase() || "DV",
+      //   last_seen: new Date().toISOString(), // You might want to fetch this from another table
+      // }));
       const formattedDevices = devicesData.map((device) => ({
         id: device.id,
         device_serial_number: device.device_serial_number,
-        society_name: device.societies?.name || null,
-        building_name: device.buildings?.name || null,
+
         society_id: device.societies?.id || null,
         building_id: device.buildings?.id || null,
+        flat_id: device.flats?.id || null,
+
+        society_name: device.societies?.name || "Not Assigned",
+        building_name: device.buildings?.name || "Not Assigned",
+
+        flat_name: device.flats
+          ? `${device.flats.flat_number} (Floor ${device.flats.floor_number})`
+          : "Not Assigned",
+
         created_at: device.created_at,
+
         avatar:
           device.device_serial_number?.substring(0, 2).toUpperCase() || "DV",
-        last_seen: new Date().toISOString(), // You might want to fetch this from another table
       }));
 
       setDevices(formattedDevices);
@@ -341,6 +382,7 @@ export default function Devices() {
             device_serial_number: deviceData.device_serial_number,
             society_id: deviceData.society_id,
             building_id: deviceData.building_id,
+            flat_id: deviceData.flat_id,
           })
           .eq("id", selectedDevice.id);
 
@@ -351,6 +393,7 @@ export default function Devices() {
           device_serial_number: deviceData.device_serial_number,
           society_id: deviceData.society_id,
           building_id: deviceData.building_id,
+          flat_id: deviceData.flat_id,
         });
 
         if (error) throw error;
@@ -365,7 +408,7 @@ export default function Devices() {
     } catch (error) {
       console.error("Error saving device:", error);
       alert(
-        `Failed to ${isEditMode ? "update" : "add"} device. Please try again.`
+        `Failed to ${isEditMode ? "update" : "add"} device. Please try again.`,
       );
     }
   };
@@ -377,6 +420,7 @@ export default function Devices() {
     "Device Name",
     "Society Name",
     "Building Name",
+    "Flat/Shop/Office",
     "Actions",
   ];
 

@@ -79,6 +79,7 @@ import { supabase } from "../../api/supabaseClient";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import "dayjs/locale/en";
+import { FaAddressCard, FaMobileAlt, FaPhone } from "react-icons/fa";
 
 dayjs.extend(relativeTime);
 
@@ -192,7 +193,7 @@ export default function SuperAdminVisitors() {
           societies:society_id (id, name),
           buildings:building_id (name),
           flats:flat_id (flat_number)
-        `
+        `,
         )
         .eq("is_delete", false)
         .order("created_at", { ascending: false });
@@ -220,13 +221,13 @@ export default function SuperAdminVisitors() {
           case "week":
             query = query.gte(
               "created_at",
-              today.subtract(7, "day").toISOString()
+              today.subtract(7, "day").toISOString(),
             );
             break;
           case "month":
             query = query.gte(
               "created_at",
-              today.subtract(30, "day").toISOString()
+              today.subtract(30, "day").toISOString(),
             );
             break;
           default:
@@ -274,7 +275,7 @@ export default function SuperAdminVisitors() {
     setExpandedRows((prev) =>
       prev.includes(visitorId)
         ? prev.filter((id) => id !== visitorId)
-        : [...prev, visitorId]
+        : [...prev, visitorId],
     );
   };
 
@@ -524,7 +525,10 @@ export default function SuperAdminVisitors() {
                   Society & Location
                 </TableCell>
                 <TableCell className="font-semibold text-primary">
-                  Visit Details
+                  Visitor Type
+                </TableCell>
+                <TableCell className="font-semibold text-primary">
+                  Visit purpose
                 </TableCell>
                 <TableCell className="font-semibold text-primary">
                   Visit Time
@@ -596,35 +600,28 @@ export default function SuperAdminVisitors() {
                                 visitorTypeConfig.Other.icon}
                             </Avatar>
                           )}
-                          <div>
+                          <div className="flex flex-col space-y-1">
+                            {/* Visitor Name */}
                             <Typography
-                              variant="subtitle2"
-                              className="font-semibold"
+                              variant="subtitle1"
+                              className="font-semibold text-gray-800"
                             >
-                              {visitor.visitor_name}
+                              {visitor.visitor_name || "Unknown Visitor"}
                             </Typography>
-                            <div className="flex items-center space-x-2">
-                              <Chip
-                                label={visitor.visitor_type}
-                                size="small"
-                                style={{
-                                  backgroundColor:
-                                    visitorTypeConfig[visitor.visitor_type]
-                                      ?.color + "20",
-                                  color:
-                                    visitorTypeConfig[visitor.visitor_type]
-                                      ?.color,
-                                }}
-                              />
-                              {visitor.phone_number && (
+
+                            {/* Phone Number */}
+                            {visitor.phone_number && (
+                              <div className="flex items-center space-x-1">
+                                <FaMobileAlt className="text-gray-400 w-3 h-3" />{" "}
+                                {/* optional phone icon */}
                                 <Typography
-                                  variant="caption"
-                                  className="text-hintText"
+                                  variant="body2"
+                                  className="text-gray-500"
                                 >
                                   {visitor.phone_number}
                                 </Typography>
-                              )}
-                            </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </TableCell>
@@ -663,6 +660,36 @@ export default function SuperAdminVisitors() {
                             )}
                           </div>
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        <Box className="space-y-1">
+                          <Typography variant="body2" className="font-medium">
+                            {visitor.visitor_type || "Not specified"}
+                          </Typography>
+
+                          {visitor.card_number && (
+                            <Tooltip
+                              title={`Card Number: ${visitor.card_number}`}
+                              arrow
+                            >
+                              <Chip
+                                icon={<FaAddressCard size={12} />}
+                                label={visitor.card_number}
+                                size="small"
+                                variant="outlined"
+                                sx={{
+                                  fontSize: "0.75rem",
+                                  height: 22,
+                                  padding: "0.5px",
+                                  color: "text.secondary",
+                                  borderColor: "divider",
+                                  backgroundColor: "grey.50",
+                                  cursor: "pointer",
+                                }}
+                              />
+                            </Tooltip>
+                          )}
+                        </Box>
                       </TableCell>
 
                       <TableCell>
@@ -975,7 +1002,7 @@ export default function SuperAdminVisitors() {
                                             </Typography>
                                             <Typography variant="body2">
                                               {formatDateTime(
-                                                visitor.created_at
+                                                visitor.created_at,
                                               )}
                                             </Typography>
                                           </div>
@@ -988,7 +1015,7 @@ export default function SuperAdminVisitors() {
                                             </Typography>
                                             <Typography variant="body2">
                                               {formatDateTime(
-                                                visitor.updated_at
+                                                visitor.updated_at,
                                               )}
                                             </Typography>
                                           </div>
@@ -1022,7 +1049,7 @@ export default function SuperAdminVisitors() {
                                             >
                                               Rescheduled for:{" "}
                                               {formatDateTime(
-                                                visitor.rescheduled_at
+                                                visitor.rescheduled_at,
                                               )}
                                             </Typography>
                                           )}
@@ -1342,7 +1369,7 @@ export default function SuperAdminVisitors() {
                 </Grid>
 
                 {/* Timing Information */}
-                <Grid item xs={12} md={6}>
+                {/* <Grid item xs={12} md={6}>
                   <Card className="h-full">
                     <CardContent>
                       <Typography
@@ -1361,6 +1388,90 @@ export default function SuperAdminVisitors() {
                       <Typography variant="caption" className="text-hintText">
                         {getTimeAgo(selectedVisitor.in_time)}
                       </Typography>
+                    </CardContent>
+                  </Card>
+                </Grid> */}
+                <Grid item xs={12} md={6}>
+                  <Card className="h-full">
+                    <CardContent>
+                      <Typography
+                        variant="subtitle1"
+                        className="font-semibold mb-3 flex items-center"
+                      >
+                        <AccessTime className="mr-2" />
+                        Timing Information
+                      </Typography>
+
+                      <div className="space-y-3">
+                        {/* Check-in Time */}
+                        <div>
+                          <Typography
+                            variant="caption"
+                            className="text-hintText block"
+                          >
+                            Check-in Time
+                          </Typography>
+                          <Typography variant="body1" className="font-semibold">
+                            {formatDateTime(selectedVisitor.in_time)}
+                          </Typography>
+                          <Typography
+                            variant="caption"
+                            className="text-hintText"
+                          >
+                            {getTimeAgo(selectedVisitor.in_time)}
+                          </Typography>
+                        </div>
+
+                        {/* Checkout Time */}
+                        {selectedVisitor.checkout_at && (
+                          <div>
+                            <Typography
+                              variant="caption"
+                              className="text-hintText block"
+                            >
+                              Checkout Time
+                            </Typography>
+                            <Typography
+                              variant="body1"
+                              className="font-semibold text-reject"
+                            >
+                              {formatDateTime(selectedVisitor.checkout_at)}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              className="text-hintText"
+                            >
+                              {getTimeAgo(selectedVisitor.checkout_at)}
+                            </Typography>
+                          </div>
+                        )}
+
+                        {/* Partial / Parcel Checkout Time */}
+                        {selectedVisitor.partial_checkout_at && (
+                          <div>
+                            <Typography
+                              variant="caption"
+                              className="text-hintText block"
+                            >
+                              Parcel / Partial Checkout
+                            </Typography>
+                            <Typography
+                              variant="body1"
+                              className="font-semibold text-warning"
+                            >
+                              {formatDateTime(
+                                selectedVisitor.partial_checkout_at,
+                              )}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              className="text-hintText"
+                            >
+                              {getTimeAgo(selectedVisitor.partial_checkout_at)}
+                            </Typography>
+                          </div>
+                        )}
+                      </div>
                     </CardContent>
                   </Card>
                 </Grid>
@@ -1450,35 +1561,36 @@ export default function SuperAdminVisitors() {
                 )}
 
                 {/* Additional Notes */}
-                {selectedVisitor.rejected_reschedule_reason && (
-                  <Grid item xs={12}>
-                    <Card className="bg-red-50 border-red-200">
-                      <CardContent>
-                        <Typography
-                          variant="subtitle1"
-                          className="font-semibold text-reject mb-2 flex items-center"
-                        >
-                          <Cancel className="mr-2" />
-                          {selectedVisitor.approved_status === "Reschedule"
-                            ? "Reschedule Reason"
-                            : "Rejection Reason"}
-                        </Typography>
-                        <Typography variant="body1">
-                          {selectedVisitor.rejected_reschedule_reason}
-                        </Typography>
-                        {selectedVisitor.rescheduled_at && (
+                {selectedVisitor.rejected_reschedule_reason &&
+                  selectedVisitor.approved_status !== "Approved" && (
+                    <Grid item xs={12}>
+                      <Card className="bg-red-50 border-red-200">
+                        <CardContent>
                           <Typography
-                            variant="caption"
-                            className="text-hintText block mt-2"
+                            variant="subtitle1"
+                            className="font-semibold text-reject mb-2 flex items-center"
                           >
-                            Rescheduled for:{" "}
-                            {formatDateTime(selectedVisitor.rescheduled_at)}
+                            <Cancel className="mr-2" />
+                            {selectedVisitor.approved_status === "Reschedule"
+                              ? "Reschedule Reason"
+                              : "Rejection Reason"}
                           </Typography>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                )}
+                          <Typography variant="body1">
+                            {selectedVisitor.rejected_reschedule_reason}
+                          </Typography>
+                          {selectedVisitor.rescheduled_at && (
+                            <Typography
+                              variant="caption"
+                              className="text-hintText block mt-2"
+                            >
+                              Rescheduled for:{" "}
+                              {formatDateTime(selectedVisitor.rescheduled_at)}
+                            </Typography>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  )}
               </Grid>
             </DialogContent>
 

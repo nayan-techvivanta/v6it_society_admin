@@ -142,12 +142,10 @@ export default function Users() {
     }
   }, [selectedBuilding, selectedSociety, flats]);
 
-  // Fetch tenants when filters change
   useEffect(() => {
     fetchTenants();
   }, [selectedSociety, selectedBuilding, selectedFlat, selectedRoleType]);
 
-  // Fetch all tenants (no filters)
   const fetchAllTenants = useCallback(async () => {
     setLoading(true);
     try {
@@ -196,7 +194,6 @@ export default function Users() {
     }
   }, []);
 
-  // Fetch tenants with filters
   const fetchTenants = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -262,7 +259,6 @@ export default function Users() {
     }
   }, [selectedSociety, selectedBuilding, selectedFlat, selectedRoleType]);
 
-  // Sort and filter tenants
   const sortedTenants = useMemo(() => {
     let sortableTenants = [...tenants];
 
@@ -280,7 +276,6 @@ export default function Users() {
       );
     }
 
-    // Sorting
     sortableTenants.sort((a, b) => {
       let aValue = a[sortConfig.key];
       let bValue = b[sortConfig.key];
@@ -288,7 +283,6 @@ export default function Users() {
       if (aValue == null) return 1;
       if (bValue == null) return -1;
 
-      // Handle special sorting for numeric fields
       if (sortConfig.key === "floor_number") {
         return sortConfig.direction === "asc"
           ? aValue - bValue
