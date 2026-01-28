@@ -14,6 +14,8 @@ export const useBulkNotification = () => {
       notificationType = "broadcast",
       data = { screen: "notification" },
       societyName = "Selected users",
+      society_id = null,
+      building_id = null,
     }) => {
       if (!buildingIds?.length || !title?.trim() || !body?.trim()) {
         throw new Error("Building IDs, title, and body are required");
@@ -56,12 +58,22 @@ export const useBulkNotification = () => {
         }
 
         setProgress(60);
+        // const notificationsPayload = users.map((u) => ({
+        //   user_id: u.id,
+        //   title: title.trim(),
+        //   body: body.trim(),
+        //   type: notificationType,
+        //   document: imageUrl || null,
+        // }));
         const notificationsPayload = users.map((u) => ({
           user_id: u.id,
           title: title.trim(),
           body: body.trim(),
           type: notificationType,
           document: imageUrl || null,
+
+          society_id,
+          building_id,
         }));
 
         const { error: insertError } = await supabase

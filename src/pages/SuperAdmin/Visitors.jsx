@@ -74,6 +74,10 @@ import {
   ScheduleSend,
   ExitToApp,
   TaskAlt,
+  LocationOn,
+  EventNote,
+  CreditCardOff,
+  RadioButtonUnchecked,
 } from "@mui/icons-material";
 import { supabase } from "../../api/supabaseClient";
 import dayjs from "dayjs";
@@ -193,6 +197,7 @@ export default function SuperAdminVisitors() {
           societies:society_id (id, name),
           buildings:building_id (name),
           flats:flat_id (flat_number)
+          is_card_scan
         `,
         )
         .eq("is_delete", false)
@@ -322,6 +327,18 @@ export default function SuperAdminVisitors() {
         break;
       default:
         setStatusFilter("all");
+    }
+  };
+  const getCardScanStatus = (status) => {
+    switch (status) {
+      case "Scan":
+        return "Scanned";
+      case "WrongScan":
+        return "Wrong Scan";
+      case "NotScan":
+        return "Not Scanned";
+      default:
+        return "Unknown";
     }
   };
 
@@ -534,6 +551,9 @@ export default function SuperAdminVisitors() {
                   Visit Time
                 </TableCell>
                 <TableCell className="font-semibold text-primary">
+                  Scaning Status
+                </TableCell>
+                <TableCell className="font-semibold text-primary">
                   Status
                 </TableCell>
                 <TableCell className="font-semibold text-primary text-center">
@@ -717,7 +737,11 @@ export default function SuperAdminVisitors() {
                           {getTimeAgo(visitor.in_time)}
                         </Typography>
                       </TableCell>
-
+                      <TableCell>
+                        <Typography variant="body2" className="font-medium">
+                          {getCardScanStatus(visitor.is_card_scan)}
+                        </Typography>
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Chip
@@ -1076,118 +1100,107 @@ export default function SuperAdminVisitors() {
       <Dialog
         open={detailDialogOpen}
         onClose={() => setDetailDialogOpen(false)}
-        maxWidth="md"
+        maxWidth="lg"
         fullWidth
         PaperProps={{
-          className: "rounded-xl",
+          className: "rounded-2xl",
+          sx: { maxHeight: "90vh" },
         }}
       >
         {selectedVisitor && (
           <>
+            {/* Dialog Header */}
             <DialogTitle className="bg-gradient-to-r from-primary to-primary/90 text-white p-6">
               <div className="flex justify-between items-center">
                 <div>
                   <Typography variant="h5" className="font-bold">
                     Visitor Details
                   </Typography>
-                  <Typography variant="body2" className="text-white/90">
-                    Complete visitor information
+                  <Typography variant="body2" className="text-white/90 mt-1">
+                    Complete visitor information and tracking
                   </Typography>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   <Chip
                     label={selectedVisitor.visitor_type}
                     size="small"
-                    className="bg-white/20 text-white border-white/30"
+                    className="bg-white/20 text-white border-white/30 font-medium"
                     icon={visitorTypeConfig[selectedVisitor.visitor_type]?.icon}
                   />
                   <Avatar className="bg-white/20">
-                    <AdminPanelSettings className="text-white" />
+                    <Person className="text-white" />
                   </Avatar>
                 </div>
               </div>
             </DialogTitle>
 
-            <DialogContent className="p-6">
-              <Grid container spacing={3}>
-                {/* Visitor Profile Section */}
+            <DialogContent className="p-0 overflow-hidden">
+              {/* Main Content Container */}
+              <div className="p-6">
+                <Grid container spacing={3}>
+                  {/* Left Column - Images (xs=12 md=4) */}
+                  <Grid item xs={12} md={4}>
+                    {/* Profile Photo */}
+                    <Card className="mb-4 overflow-hidden">
+                      <div className="p-3 bg-gray-50 border-b border-gray-200">
+                        <Typography
+                          variant="subtitle1"
+                          className="font-medium flex items-center"
+                        >
+                          <ImageIcon className="mr-2" fontSize="small" />
+                          Profile Photo
+                        </Typography>
+                      </div>
+                      <CardMedia
+                        component="img"
+                        image={
+                          selectedVisitor.image_url ||
+                          "/api/placeholder/400/300"
+                        }
+                        alt="Visitor Profile"
+                        className="h-72 object-cover bg-gray-100"
+                      />
+                    </Card>
 
-                {/* Images Section */}
-                <Grid item xs={12}>
-                  <Typography variant="h6" className="font-semibold mb-3">
-                    Visitor Images
-                  </Typography>
-                  <Grid container spacing={2}>
-                    {selectedVisitor.image_url && (
-                      <Grid item xs={12} md={6}>
-                        <Card>
-                          <CardContent>
-                            <Typography
-                              variant="subtitle2"
-                              className="text-hintText mb-2"
-                            >
-                              Profile Photo
-                            </Typography>
-                            <CardMedia
-                              component="img"
-                              image={selectedVisitor.image_url}
-                              alt="Visitor Profile"
-                              className="rounded-lg h-64 object-cover"
-                            />
-                          </CardContent>
-                        </Card>
-                      </Grid>
-                    )}
+                    {/* ID Proof Document */}
                     {selectedVisitor.id_proof_image && (
-                      <Grid item xs={12} md={6}>
-                        <Card>
-                          <CardContent>
-                            <Typography
-                              variant="subtitle2"
-                              className="text-hintText mb-2"
-                            >
-                              ID Proof Document
-                            </Typography>
-                            <CardMedia
-                              component="img"
-                              image={selectedVisitor.id_proof_image}
-                              alt="ID Proof"
-                              className="rounded-lg h-64 object-cover"
-                            />
-                          </CardContent>
-                        </Card>
-                      </Grid>
+                      <Card className="overflow-hidden">
+                        <div className="p-3 bg-gray-50 border-b border-gray-200">
+                          <Typography
+                            variant="subtitle1"
+                            className="font-medium flex items-center"
+                          >
+                            <Badge className="mr-2" fontSize="small" />
+                            ID Proof Document
+                          </Typography>
+                        </div>
+                        <CardMedia
+                          component="img"
+                          image={selectedVisitor.id_proof_image}
+                          alt="ID Proof"
+                          className="h-56 object-cover bg-gray-100"
+                        />
+                      </Card>
                     )}
                   </Grid>
-                </Grid>
-                <Grid item xs={12}>
-                  <div className="flex flex-col sm:flex-row items-center sm:items-start sm:space-x-4 mb-6 gap-4">
-                    {/* {selectedVisitor.image_url ? (
-                      <Avatar
-                        src={selectedVisitor.image_url}
-                        alt={selectedVisitor.visitor_name}
-                        className="w-24 h-24 border-4 border-white shadow-lg"
-                      />
-                    ) : (
-                      <Avatar className="w-24 h-24 bg-primary/10 border-4 border-white shadow-lg">
-                        {selectedVisitor.visitor_name?.charAt(0) || "V"}
-                      </Avatar>
-                    )} */}
-                    <div className="flex-1">
+
+                  {/* Right Column - All Details (xs=12 md=8) */}
+                  <Grid item xs={12} md={8}>
+                    {/* Visitor Header */}
+                    <div className="mb-6">
                       <Typography
                         variant="h4"
-                        className="font-bold text-gray-900"
+                        className="font-bold text-gray-900 mb-3"
                       >
                         {selectedVisitor.visitor_name}
                       </Typography>
-                      <div className="flex flex-wrap items-center gap-3 mt-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <Chip
                           label={selectedVisitor.visitor_type}
                           size="medium"
+                          className="font-medium"
                           style={{
-                            backgroundColor:
-                              visitorTypeConfig[selectedVisitor.visitor_type]
-                                ?.color + "20",
+                            backgroundColor: `${visitorTypeConfig[selectedVisitor.visitor_type]?.color}15`,
                             color:
                               visitorTypeConfig[selectedVisitor.visitor_type]
                                 ?.color,
@@ -1203,6 +1216,7 @@ export default function SuperAdminVisitors() {
                           }
                           label={selectedVisitor.approved_status}
                           size="medium"
+                          className="font-medium"
                           style={{
                             backgroundColor:
                               statusConfig[selectedVisitor.approved_status]
@@ -1217,389 +1231,467 @@ export default function SuperAdminVisitors() {
                             label={`OTP: ${selectedVisitor.visitor_otp}`}
                             size="medium"
                             className="bg-primary/10 text-primary font-bold"
-                            icon={<Security />}
+                            icon={<Security fontSize="small" />}
                           />
                         )}
                       </div>
                     </div>
-                  </div>
-                </Grid>
-                {/* Contact Information */}
-                <Grid item xs={12} md={6}>
-                  <Card className="h-full">
-                    <CardContent>
-                      <Typography
-                        variant="subtitle1"
-                        className="font-semibold mb-3 flex items-center"
-                      >
-                        <Phone className="mr-2" />
-                        Contact Information
-                      </Typography>
-                      <Typography
-                        variant="body1"
-                        className="font-semibold mb-2 text-lg"
-                      >
-                        {selectedVisitor.phone_number || "Not provided"}
-                      </Typography>
-                      <Typography variant="body2" className="text-hintText">
-                        Primary contact number
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
 
-                {/* Society Information */}
-                <Grid item xs={12} md={6}>
-                  <Card className="h-full">
-                    <CardContent>
-                      <Typography
-                        variant="subtitle1"
-                        className="font-semibold mb-3 flex items-center"
-                      >
-                        <Domain className="mr-2" />
-                        Society Information
-                      </Typography>
-                      <Typography
-                        variant="body1"
-                        className="font-semibold mb-2 text-lg"
-                      >
-                        {selectedVisitor.society_name}
-                      </Typography>
-                      <Typography variant="caption" className="text-hintText">
-                        Society ID: {selectedVisitor.society_id}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-
-                {/* Location Details */}
-                <Grid item xs={12}>
-                  <Card>
-                    <CardContent>
-                      <Typography
-                        variant="subtitle1"
-                        className="font-semibold mb-3 flex items-center"
-                      >
-                        <LocationCity className="mr-2" />
-                        Location Details
-                      </Typography>
-                      <Grid container spacing={2}>
-                        <Grid item xs={12} md={6}>
-                          <div>
+                    {/* Row 1: Contact + Vehicle */}
+                    <Grid container spacing={2} className="mb-4">
+                      <Grid item xs={12} sm={6}>
+                        <Card className="h-full">
+                          <CardContent>
                             <Typography
-                              variant="body2"
-                              className="text-hintText mb-1"
+                              variant="subtitle1"
+                              className="font-medium mb-3 flex items-center text-gray-700"
                             >
-                              Building
+                              <Phone
+                                className="mr-2 text-primary"
+                                fontSize="small"
+                              />
+                              Contact Information
                             </Typography>
                             <Typography
-                              variant="body1"
-                              className="font-semibold"
+                              variant="h6"
+                              className="font-bold text-gray-900 mb-1"
                             >
-                              {selectedVisitor.building_name || "Not specified"}
+                              {selectedVisitor.phone_number || "Not provided"}
                             </Typography>
                             <Typography
                               variant="caption"
-                              className="text-hintText"
+                              className="text-gray-500"
                             >
-                              Building ID: {selectedVisitor.building_id}
+                              Primary contact number
                             </Typography>
-                          </div>
-                        </Grid>
-                        <Grid item xs={12} md={6}>
-                          <div>
-                            <Typography
-                              variant="body2"
-                              className="text-hintText mb-1"
-                            >
-                              Flat Number
-                            </Typography>
-                            <Typography
-                              variant="body1"
-                              className="font-semibold"
-                            >
-                              {selectedVisitor.flat_number || "Not specified"}
-                            </Typography>
-                            <Typography
-                              variant="caption"
-                              className="text-hintText"
-                            >
-                              Flat ID: {selectedVisitor.flat_id}
-                            </Typography>
-                          </div>
-                        </Grid>
+                          </CardContent>
+                        </Card>
                       </Grid>
-                    </CardContent>
-                  </Card>
-                </Grid>
-
-                {/* Visit Purpose & Vehicle */}
-                <Grid item xs={12} md={8}>
-                  <Card className="h-full">
-                    <CardContent>
-                      <Typography
-                        variant="subtitle1"
-                        className="font-semibold mb-3 flex items-center"
-                      >
-                        <Notes className="mr-2" />
-                        Purpose of Visit
-                      </Typography>
-                      <Typography variant="body1" className="text-gray-800">
-                        {selectedVisitor.purpose || "No purpose specified"}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-
-                <Grid item xs={12} md={4}>
-                  <Card className="h-full">
-                    <CardContent>
-                      <Typography
-                        variant="subtitle1"
-                        className="font-semibold mb-3 flex items-center"
-                      >
-                        <DriveEta className="mr-2" />
-                        Vehicle Information
-                      </Typography>
-                      <Typography variant="body1" className="font-semibold">
-                        {selectedVisitor.vehicle_number || "No vehicle"}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-
-                {/* Timing Information */}
-                {/* <Grid item xs={12} md={6}>
-                  <Card className="h-full">
-                    <CardContent>
-                      <Typography
-                        variant="subtitle1"
-                        className="font-semibold mb-3 flex items-center"
-                      >
-                        <AccessTime className="mr-2" />
-                        Check-in Time
-                      </Typography>
-                      <Typography
-                        variant="body1"
-                        className="font-semibold mb-1 text-lg"
-                      >
-                        {formatDateTime(selectedVisitor.in_time)}
-                      </Typography>
-                      <Typography variant="caption" className="text-hintText">
-                        {getTimeAgo(selectedVisitor.in_time)}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid> */}
-                <Grid item xs={12} md={6}>
-                  <Card className="h-full">
-                    <CardContent>
-                      <Typography
-                        variant="subtitle1"
-                        className="font-semibold mb-3 flex items-center"
-                      >
-                        <AccessTime className="mr-2" />
-                        Timing Information
-                      </Typography>
-
-                      <div className="space-y-3">
-                        {/* Check-in Time */}
-                        <div>
-                          <Typography
-                            variant="caption"
-                            className="text-hintText block"
-                          >
-                            Check-in Time
-                          </Typography>
-                          <Typography variant="body1" className="font-semibold">
-                            {formatDateTime(selectedVisitor.in_time)}
-                          </Typography>
-                          <Typography
-                            variant="caption"
-                            className="text-hintText"
-                          >
-                            {getTimeAgo(selectedVisitor.in_time)}
-                          </Typography>
-                        </div>
-
-                        {/* Checkout Time */}
-                        {selectedVisitor.checkout_at && (
-                          <div>
+                      <Grid item xs={12} sm={6}>
+                        <Card className="h-full">
+                          <CardContent>
                             <Typography
-                              variant="caption"
-                              className="text-hintText block"
+                              variant="subtitle1"
+                              className="font-medium mb-3 flex items-center text-gray-700"
                             >
-                              Checkout Time
+                              <DirectionsCar
+                                className="mr-2 text-primary"
+                                fontSize="small"
+                              />
+                              Vehicle Information
                             </Typography>
                             <Typography
-                              variant="body1"
-                              className="font-semibold text-reject"
+                              variant="h6"
+                              className="font-bold text-gray-900"
                             >
-                              {formatDateTime(selectedVisitor.checkout_at)}
+                              {selectedVisitor.vehicle_number || "No vehicle"}
                             </Typography>
-                            <Typography
-                              variant="caption"
-                              className="text-hintText"
-                            >
-                              {getTimeAgo(selectedVisitor.checkout_at)}
-                            </Typography>
-                          </div>
-                        )}
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    </Grid>
 
-                        {/* Partial / Parcel Checkout Time */}
-                        {selectedVisitor.partial_checkout_at && (
-                          <div>
-                            <Typography
-                              variant="caption"
-                              className="text-hintText block"
-                            >
-                              Parcel / Partial Checkout
-                            </Typography>
-                            <Typography
-                              variant="body1"
-                              className="font-semibold text-warning"
-                            >
-                              {formatDateTime(
-                                selectedVisitor.partial_checkout_at,
-                              )}
-                            </Typography>
-                            <Typography
-                              variant="caption"
-                              className="text-hintText"
-                            >
-                              {getTimeAgo(selectedVisitor.partial_checkout_at)}
-                            </Typography>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Grid>
-
-                <Grid item xs={12} md={6}>
-                  <Card className="h-full">
-                    <CardContent>
-                      <Typography
-                        variant="subtitle1"
-                        className="font-semibold mb-3 flex items-center"
-                      >
-                        <CalendarToday className="mr-2" />
-                        Created Date
-                      </Typography>
-                      <Typography variant="body1" className="font-semibold">
-                        {formatDateTime(selectedVisitor.created_at)}
-                      </Typography>
-                      <Typography variant="caption" className="text-hintText">
-                        {getTimeAgo(selectedVisitor.created_at)}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-
-                {/* Card Information */}
-                {selectedVisitor.card_id && (
-                  <Grid item xs={12}>
-                    <Card className="bg-gray-50">
+                    {/* Society Information */}
+                    <Card className="mb-4">
                       <CardContent>
                         <Typography
                           variant="subtitle1"
-                          className="font-semibold mb-3 flex items-center"
+                          className="font-medium mb-3 flex items-center text-gray-700"
                         >
-                          <CreditCard className="mr-2" />
-                          Card Information
+                          <Domain
+                            className="mr-2 text-primary"
+                            fontSize="small"
+                          />
+                          Society Information
                         </Typography>
-                        <Grid container spacing={2}>
+                        <Typography
+                          variant="h6"
+                          className="font-bold text-gray-900 mb-1"
+                        >
+                          {selectedVisitor.society_name}
+                        </Typography>
+                        <Typography variant="caption" className="text-gray-500">
+                          Society ID: {selectedVisitor.society_id}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+
+                    {/* Location Details */}
+                    <Card className="mb-4">
+                      <CardContent>
+                        <Typography
+                          variant="subtitle1"
+                          className="font-medium mb-3 flex items-center text-gray-700"
+                        >
+                          <LocationOn
+                            className="mr-2 text-primary"
+                            fontSize="small"
+                          />
+                          Location Details
+                        </Typography>
+                        <Grid container spacing={3}>
                           <Grid item xs={12} sm={4}>
+                            <div>
+                              <Typography
+                                variant="body2"
+                                className="text-gray-500 mb-1"
+                              >
+                                Building
+                              </Typography>
+                              <Typography
+                                variant="h6"
+                                className="font-bold text-gray-900"
+                              >
+                                {selectedVisitor.building_name ||
+                                  "Not specified"}
+                              </Typography>
+                              <Typography
+                                variant="caption"
+                                className="text-gray-500"
+                              >
+                                Building ID: {selectedVisitor.building_id}
+                              </Typography>
+                            </div>
+                          </Grid>
+                          <Grid item xs={12} sm={4}>
+                            <div>
+                              <Typography
+                                variant="body2"
+                                className="text-gray-500 mb-1"
+                              >
+                                Flat Number
+                              </Typography>
+                              <Typography
+                                variant="h6"
+                                className="font-bold text-gray-900"
+                              >
+                                {selectedVisitor.flat_number || "Not specified"}
+                              </Typography>
+                              <Typography
+                                variant="caption"
+                                className="text-gray-500"
+                              >
+                                Flat ID: {selectedVisitor.flat_id}
+                              </Typography>
+                            </div>
+                          </Grid>
+                          <Grid item xs={12} sm={4}>
+                            <div>
+                              <Typography
+                                variant="body2"
+                                className="text-gray-500 mb-1"
+                              >
+                                Unit Type
+                              </Typography>
+                              <Typography
+                                variant="h6"
+                                className="font-bold text-gray-900"
+                              >
+                                {selectedVisitor.unit_type || "Residential"}
+                              </Typography>
+                            </div>
+                          </Grid>
+                        </Grid>
+                      </CardContent>
+                    </Card>
+
+                    {/* Row 2: Purpose + Timing */}
+                    <Grid container spacing={2} className="mb-4">
+                      <Grid item xs={12} md={8}>
+                        <Card className="h-full">
+                          <CardContent>
                             <Typography
-                              variant="body2"
-                              className="text-hintText"
+                              variant="subtitle1"
+                              className="font-medium mb-3 flex items-center text-gray-700"
                             >
-                              Card ID
+                              <EventNote
+                                className="mr-2 text-primary"
+                                fontSize="small"
+                              />
+                              Purpose of Visit
                             </Typography>
                             <Typography
                               variant="body1"
-                              className="font-semibold"
+                              className="text-gray-800"
                             >
-                              {selectedVisitor.card_id}
+                              {selectedVisitor.purpose ||
+                                "No purpose specified"}
                             </Typography>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                      <Grid item xs={12} md={4}>
+                        <Card className="h-full">
+                          <CardContent>
+                            <Typography
+                              variant="subtitle1"
+                              className="font-medium mb-3 flex items-center text-gray-700"
+                            >
+                              <AccessTime
+                                className="mr-2 text-primary"
+                                fontSize="small"
+                              />
+                              Timing Information
+                            </Typography>
+                            <div className="space-y-3">
+                              <div>
+                                <Typography
+                                  variant="caption"
+                                  className="text-gray-500 block"
+                                >
+                                  Check-in Time
+                                </Typography>
+                                <Typography
+                                  variant="body1"
+                                  className="font-bold text-gray-900"
+                                >
+                                  {formatDateTime(selectedVisitor.in_time)}
+                                </Typography>
+                                <Typography
+                                  variant="caption"
+                                  className="text-gray-500"
+                                >
+                                  {getTimeAgo(selectedVisitor.in_time)}
+                                </Typography>
+                              </div>
+                              {selectedVisitor.partial_checkout_at && (
+                                <div>
+                                  <Typography
+                                    variant="caption"
+                                    className="text-gray-500 block"
+                                  >
+                                    Partial Checkout
+                                  </Typography>
+                                  <Typography
+                                    variant="body1"
+                                    className="font-bold text-warning"
+                                  >
+                                    {formatDateTime(
+                                      selectedVisitor.partial_checkout_at,
+                                    )}
+                                  </Typography>
+                                  <Typography
+                                    variant="caption"
+                                    className="text-gray-500"
+                                  >
+                                    {getTimeAgo(
+                                      selectedVisitor.partial_checkout_at,
+                                    )}
+                                  </Typography>
+                                </div>
+                              )}
+                              {selectedVisitor.checkout_at && (
+                                <div>
+                                  <Typography
+                                    variant="caption"
+                                    className="text-gray-500 block"
+                                  >
+                                    Final Checkout
+                                  </Typography>
+                                  <Typography
+                                    variant="body1"
+                                    className="font-bold text-error"
+                                  >
+                                    {formatDateTime(
+                                      selectedVisitor.checkout_at,
+                                    )}
+                                  </Typography>
+                                  <Typography
+                                    variant="caption"
+                                    className="text-gray-500"
+                                  >
+                                    {getTimeAgo(selectedVisitor.checkout_at)}
+                                  </Typography>
+                                </div>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    </Grid>
+
+                    {/* Card Information (Conditional) */}
+                    {selectedVisitor.card_id && (
+                      <Card className="bg-gray-50 mb-4">
+                        <CardContent>
+                          <Typography
+                            variant="subtitle1"
+                            className="font-medium mb-3 flex items-center text-gray-700"
+                          >
+                            <CreditCard
+                              className="mr-2 text-primary"
+                              fontSize="small"
+                            />
+                            Card Information
+                          </Typography>
+                          <Grid container spacing={3}>
+                            <Grid item xs={12} sm={4}>
+                              <Typography
+                                variant="body2"
+                                className="text-gray-500 mb-1"
+                              >
+                                Card ID
+                              </Typography>
+                              <Typography
+                                variant="body1"
+                                className="font-bold text-gray-900"
+                              >
+                                {selectedVisitor.card_id}
+                              </Typography>
+                            </Grid>
+                            <Grid item xs={12} sm={4}>
+                              <Typography
+                                variant="body2"
+                                className="text-gray-500 mb-1"
+                              >
+                                Card Status
+                              </Typography>
+                              <Chip
+                                label={selectedVisitor.card_status || "N/A"}
+                                size="small"
+                                className={`font-medium ${
+                                  selectedVisitor.card_status === "OUT"
+                                    ? "bg-error/10 text-error"
+                                    : "bg-success/10 text-success"
+                                }`}
+                              />
+                            </Grid>
+                            <Grid item xs={12} sm={4}>
+                              <Typography
+                                variant="body2"
+                                className="text-gray-500 mb-1"
+                              >
+                                Card Number
+                              </Typography>
+                              <Typography
+                                variant="body1"
+                                className="font-bold text-gray-900"
+                              >
+                                {selectedVisitor.card_number || "N/A"}
+                              </Typography>
+                            </Grid>
                           </Grid>
-                          <Grid item xs={12} sm={4}>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Card Scan Status (Always Visible) */}
+                    <Card className="bg-emerald-50/50 mb-4 border border-emerald-200/50">
+                      <CardContent>
+                        <Typography
+                          variant="subtitle1"
+                          className="font-medium mb-3 flex items-center text-emerald-700"
+                        >
+                          <CreditCardOff className="mr-2" fontSize="small" />
+                          Card Scan Status
+                        </Typography>
+                        <Grid container spacing={2} alignItems="center">
+                          <Grid item xs={12} md={4}>
                             <Typography
                               variant="body2"
-                              className="text-hintText"
+                              className="text-gray-500 mb-1"
                             >
-                              Card Status
+                              Scan Result
                             </Typography>
                             <Chip
-                              label={selectedVisitor.card_status || "N/A"}
-                              size="small"
-                              className={
-                                selectedVisitor.card_status === "OUT"
-                                  ? "bg-reject/10 text-reject"
-                                  : "bg-success/10 text-success"
+                              label={getCardScanStatus(
+                                selectedVisitor.is_card_scan,
+                              )}
+                              size="medium"
+                              className={`
+                    font-medium px-3 py-1
+                    ${
+                      selectedVisitor.is_card_scan === "Scan"
+                        ? "bg-success/20 text-success border-success/30"
+                        : selectedVisitor.is_card_scan === "WrongScan"
+                          ? "bg-warning/20 text-warning border-warning/30"
+                          : "bg-gray-100 text-gray-700 border-gray-300"
+                    }
+                  `}
+                              icon={
+                                selectedVisitor.is_card_scan === "Scan" ? (
+                                  <CheckCircle fontSize="small" />
+                                ) : selectedVisitor.is_card_scan ===
+                                  "WrongScan" ? (
+                                  <Warning fontSize="small" />
+                                ) : (
+                                  <RadioButtonUnchecked fontSize="small" />
+                                )
                               }
                             />
                           </Grid>
-                          <Grid item xs={12} sm={4}>
+                          <Grid item xs={12} md={8}>
                             <Typography
                               variant="body2"
-                              className="text-hintText"
+                              className="text-gray-600"
                             >
-                              Card Number
-                            </Typography>
-                            <Typography
-                              variant="body1"
-                              className="font-semibold"
-                            >
-                              {selectedVisitor.card_number || "N/A"}
+                              {selectedVisitor.is_card_scan === "Scan" &&
+                                "Card successfully scanned and verified."}
+                              {selectedVisitor.is_card_scan === "WrongScan" &&
+                                "Card scan failed - incorrect or damaged card."}
+                              {selectedVisitor.is_card_scan === "NotScan" &&
+                                "No card scan attempted or detected."}
+                              {!selectedVisitor.is_card_scan &&
+                                "Scan status not recorded."}
                             </Typography>
                           </Grid>
                         </Grid>
                       </CardContent>
                     </Card>
-                  </Grid>
-                )}
 
-                {/* Additional Notes */}
-                {selectedVisitor.rejected_reschedule_reason &&
-                  selectedVisitor.approved_status !== "Approved" && (
-                    <Grid item xs={12}>
-                      <Card className="bg-red-50 border-red-200">
-                        <CardContent>
-                          <Typography
-                            variant="subtitle1"
-                            className="font-semibold text-reject mb-2 flex items-center"
-                          >
-                            <Cancel className="mr-2" />
-                            {selectedVisitor.approved_status === "Reschedule"
-                              ? "Reschedule Reason"
-                              : "Rejection Reason"}
-                          </Typography>
-                          <Typography variant="body1">
-                            {selectedVisitor.rejected_reschedule_reason}
-                          </Typography>
-                          {selectedVisitor.rescheduled_at && (
+                    {/* Rejection Reason (Conditional) */}
+                    {selectedVisitor.rejected_reschedule_reason &&
+                      selectedVisitor.approved_status !== "Approved" &&
+                      selectedVisitor.approved_status !== "Checkout" && (
+                        <Card className="bg-red-50 border border-red-200">
+                          <CardContent>
                             <Typography
-                              variant="caption"
-                              className="text-hintText block mt-2"
+                              variant="subtitle1"
+                              className="font-medium text-red-600 mb-2 flex items-center"
                             >
-                              Rescheduled for:{" "}
-                              {formatDateTime(selectedVisitor.rescheduled_at)}
+                              {selectedVisitor.approved_status ===
+                              "Reschedule" ? (
+                                <>
+                                  <Schedule className="mr-2" fontSize="small" />
+                                  Reschedule Reason
+                                </>
+                              ) : (
+                                <>
+                                  <Cancel className="mr-2" fontSize="small" />
+                                  Rejection Reason
+                                </>
+                              )}
                             </Typography>
-                          )}
-                        </CardContent>
-                      </Card>
-                    </Grid>
-                  )}
-              </Grid>
+                            <Typography
+                              variant="body1"
+                              className="text-gray-800"
+                            >
+                              {selectedVisitor.rejected_reschedule_reason}
+                            </Typography>
+                            {selectedVisitor.rescheduled_at && (
+                              <Typography
+                                variant="caption"
+                                className="text-gray-500 block mt-2"
+                              >
+                                Rescheduled for:{" "}
+                                {formatDateTime(selectedVisitor.rescheduled_at)}
+                              </Typography>
+                            )}
+                          </CardContent>
+                        </Card>
+                      )}
+                  </Grid>
+                </Grid>
+              </div>
             </DialogContent>
 
-            <DialogActions className="p-6 bg-gray-50 border-t">
+            {/* Dialog Actions */}
+            <DialogActions className="p-4 bg-gray-50 border-t border-gray-200">
               <div className="flex justify-end w-full items-center">
                 <Button
                   onClick={() => setDetailDialogOpen(false)}
                   variant="outlined"
-                  className="border-gray-300 text-gray-700 hover:border-primary hover:text-primary hover:bg-lightBackground"
+                  className="border-gray-300 text-gray-700 hover:border-primary hover:text-primary hover:bg-gray-50"
                 >
                   Close
                 </Button>

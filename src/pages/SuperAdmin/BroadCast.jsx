@@ -191,6 +191,7 @@ const Broadcast = () => {
   });
   const [loadingSocieties, setLoadingSocieties] = useState(true);
   const [loadingBuildings, setLoadingBuildings] = useState(false);
+  const profileId = Number(localStorage.getItem("profileId"));
   const fileInputRef = useRef(null);
   const {
     sendBulkNotification,
@@ -276,7 +277,6 @@ const Broadcast = () => {
   };
 
   const handleSocietySelection = (event, newValue) => {
-    // Filter out duplicates and map to selected society format
     const newSocieties = newValue
       .filter(
         (society, index, self) =>
@@ -285,7 +285,7 @@ const Broadcast = () => {
       .map((society) => ({
         id: society.id,
         name: society.name,
-        sendTo: "society", // Default to entire society
+        sendTo: "society",
         selectedBuildings: [],
       }));
 
@@ -438,7 +438,9 @@ const Broadcast = () => {
       });
       return;
     }
-
+    if (!profileId) {
+      throw new Error("User profileId not found in localStorage");
+    }
     if (!formData.title.trim()) {
       setSnackbar({
         open: true,
@@ -483,7 +485,6 @@ const Broadcast = () => {
       }
       const imageUrl = fileUrls.length > 0 ? fileUrls[0] : null;
 
-      // 🚀 NEW: Use the reusable hook for notifications
       for (const society of selectedSocieties) {
         let buildingIds = [];
 
@@ -502,6 +503,13 @@ const Broadcast = () => {
             notificationType: "Super Admin",
             data: { screen: "broadcast" },
             societyName: society.name,
+            society_id: society.id,
+
+            building_id:
+              society.sendTo === "building" &&
+              society.selectedBuildings.length === 1
+                ? society.selectedBuildings[0]
+                : null,
           });
         }
       }
@@ -515,6 +523,7 @@ const Broadcast = () => {
             socity_id: String(society.id),
             building_id: null,
             document: imageUrl,
+            user_id: profileId,
             created_at: new Date().toISOString(),
           });
         } else {
@@ -526,6 +535,7 @@ const Broadcast = () => {
                 socity_id: String(society.id),
                 building_id: String(buildingId),
                 document: imageUrl,
+                user_id: profileId,
                 created_at: new Date().toISOString(),
               }),
             ),
