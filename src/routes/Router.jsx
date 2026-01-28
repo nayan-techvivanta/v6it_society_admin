@@ -41,6 +41,7 @@ import AdminUsers from "../pages/Admin/AdminUsers";
 import TermsAndConditions from "../pages/TermsAndConditions";
 import PrivacyPolicy from "../pages/PrivacyPolicy";
 import AdminTicket from "../pages/Admin/AdminTicket";
+import AboutUs from "../pages/About";
 // import AdminComplaints from "../pages/Admin/Complaints";
 
 export default function Router() {
@@ -150,6 +151,7 @@ export default function Router() {
         <Route path="/unauthorized" element={<Unauthorized />} />
         <Route path="/terms" element={<TermsAndConditions />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
+         <Route path="/about" element={<AboutUs />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
