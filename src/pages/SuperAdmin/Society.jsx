@@ -227,31 +227,23 @@ const SocietyRow = ({
 
         <TableCell className="p-4" align="center">
           <div className="flex items-center justify-center gap-1">
-            {/* <IconButton
-              size="small"
-              onClick={() => onAssign(society)}
-              disabled={!society.is_active}
-              sx={{
-                color: "#2563EB",
-                "&:hover": { backgroundColor: "rgba(37,99,235,0.08)" },
-              }}
-            >
-              <Person fontSize="small" />
-            </IconButton> */}
             {/* Assign / Change Manager */}
-
-            <FormControlLabel
-              control={
-                <PrimarySwitch
-                  checked={society.is_active}
-                  onChange={(e) =>
-                    onStatusToggle(society.id, society.is_active)
-                  }
-                  size="small"
-                />
-              }
-              sx={{ m: 0 }}
-            />
+            {society.loading ? (
+              <CircularProgress size={18} />
+            ) : (
+              <FormControlLabel
+                control={
+                  <PrimarySwitch
+                    checked={society.is_active}
+                    onChange={(e) =>
+                      onStatusToggle(society.id, society.is_active)
+                    }
+                    size="small"
+                  />
+                }
+                sx={{ m: 0 }}
+              />
+            )}
             <IconButton
               size="small"
               onClick={() => onEdit(society)}
@@ -471,7 +463,7 @@ const SocietyRow = ({
                                 <Typography className="font-roboto font-semibold">
                                   {society.created_at
                                     ? new Date(
-                                        society.created_at
+                                        society.created_at,
                                       ).toLocaleDateString()
                                     : "N/A"}
                                 </Typography>
@@ -746,7 +738,7 @@ export default function Society() {
             *,
             buildings (id)
             user:users ( id, name )
-            `
+            `,
         )
         .eq("is_delete", false)
         .order("id", { ascending: false });
@@ -784,14 +776,14 @@ export default function Society() {
           society.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
           society.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
           society.state.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          society.pincode.toLowerCase().includes(searchTerm.toLowerCase())
+          society.pincode.toLowerCase().includes(searchTerm.toLowerCase()),
       );
     }
 
     if (statusFilter !== "all") {
       filtered = filtered.filter(
         (society) =>
-          (society.is_active ? "active" : "inactive") === statusFilter
+          (society.is_active ? "active" : "inactive") === statusFilter,
       );
     }
 
@@ -799,11 +791,35 @@ export default function Society() {
     setPage(0);
   }, [societies, searchTerm, statusFilter]);
 
+  // const handleStatusToggle = useCallback(async (societyId, currentStatus) => {
+  //   const newStatus = !currentStatus;
+
+  //   setSocieties((prev) =>
+  //     prev.map((s) => (s.id === societyId ? { ...s, is_active: newStatus } : s))
+  //   );
+
+  //   const { error } = await supabase
+  //     .from("societies")
+  //     .update({ is_active: newStatus })
+  //     .eq("id", societyId);
+
+  //   if (error) {
+  //     toast.error("Failed to update status");
+
+  //     setSocieties((prev) =>
+  //       prev.map((s) =>
+  //         s.id === societyId ? { ...s, is_active: currentStatus } : s
+  //       )
+  //     );
+  //   } else {
+  //     toast.success(`Society ${newStatus ? "activated" : "deactivated"}`);
+  //   }
+  // }, []);
   const handleStatusToggle = useCallback(async (societyId, currentStatus) => {
     const newStatus = !currentStatus;
 
     setSocieties((prev) =>
-      prev.map((s) => (s.id === societyId ? { ...s, is_active: newStatus } : s))
+      prev.map((s) => (s.id === societyId ? { ...s, loading: true } : s)),
     );
 
     const { error } = await supabase
@@ -816,11 +832,21 @@ export default function Society() {
 
       setSocieties((prev) =>
         prev.map((s) =>
-          s.id === societyId ? { ...s, is_active: currentStatus } : s
-        )
+          s.id === societyId
+            ? { ...s, is_active: currentStatus, loading: false }
+            : s,
+        ),
       );
     } else {
       toast.success(`Society ${newStatus ? "activated" : "deactivated"}`);
+
+      setSocieties((prev) =>
+        prev.map((s) =>
+          s.id === societyId
+            ? { ...s, is_active: newStatus, loading: false }
+            : s,
+        ),
+      );
     }
   }, []);
 
@@ -835,8 +861,8 @@ export default function Society() {
 
         setSocieties((prev) =>
           prev.map((society) =>
-            society.id === societyId ? { ...society, loading: true } : society
-          )
+            society.id === societyId ? { ...society, loading: true } : society,
+          ),
         );
 
         setTimeout(() => {
@@ -844,13 +870,13 @@ export default function Society() {
             prev.map((society) =>
               society.id === societyId
                 ? { ...society, loading: false }
-                : society
-            )
+                : society,
+            ),
           );
         }, 500);
       }
     },
-    [openRows]
+    [openRows],
   );
 
   const handleEditSociety = (society) => {
@@ -928,7 +954,7 @@ export default function Society() {
 
   const paginatedSocieties = filteredSocieties.slice(
     page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
+    page * rowsPerPage + rowsPerPage,
   );
 
   const headers = [

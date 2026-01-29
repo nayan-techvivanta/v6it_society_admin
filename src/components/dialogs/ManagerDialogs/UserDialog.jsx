@@ -154,7 +154,7 @@ const UserDialog = ({
             apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
             Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           },
-        }
+        },
       );
 
       return res.data;
@@ -246,7 +246,7 @@ const UserDialog = ({
           whatsapp_number: formData.whatsapp || formData.contact,
         };
 
-        await onSubmit(userPayload); // your parent handler
+        await onSubmit(userPayload);
       } else {
         // For creating new Admin
         const apiPayload = {
@@ -260,9 +260,8 @@ const UserDialog = ({
           society_id: formData.society_id || null,
         };
 
-        const result = await createUser(apiPayload); // ✅ use helper with token
+        const result = await createUser(apiPayload);
 
-        // If building/society info needs to be saved separately
         if ((formData.building_id || formData.society_id) && result.user_id) {
           await onSubmit({
             id: result.user_id,
@@ -330,7 +329,7 @@ const UserDialog = ({
         sx={{
           background: `linear-gradient(135deg, #6F0B14 0%, ${alpha(
             "#6F0B14",
-            0.8
+            0.8,
           )} 100%)`,
           color: "white",
           py: 3,
@@ -771,13 +770,13 @@ const UserDialog = ({
                     fontSize: "1rem",
                     background: `linear-gradient(135deg, #6F0B14 0%, ${alpha(
                       "#6F0B14",
-                      0.9
+                      0.9,
                     )} 100%)`,
                     boxShadow: "0 4px 14px rgba(111, 11, 20, 0.3)",
                     "&:hover": {
                       background: `linear-gradient(135deg, ${alpha(
                         "#6F0B14",
-                        0.9
+                        0.9,
                       )} 0%, #6F0B14 100%)`,
                       boxShadow: "0 6px 20px rgba(111, 11, 20, 0.4)",
                     },
@@ -797,8 +796,8 @@ const UserDialog = ({
                   {isSubmitting
                     ? "Processing..."
                     : isEdit
-                    ? "Update Admin"
-                    : "Create Admin"}
+                      ? "Update Admin"
+                      : "Create Admin"}
                 </Button>
               </Box>
             </Box>

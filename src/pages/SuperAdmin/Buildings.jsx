@@ -131,7 +131,7 @@ const BuildingRow = ({
 
         <TableCell className="p-4">
           <Typography className="font-roboto font-semibold text-sm text-gray-800">
-            #{building.id.toString().padStart(3, "0")}
+            # {building.id}
           </Typography>
         </TableCell>
 
@@ -228,16 +228,20 @@ const BuildingRow = ({
 
         <TableCell className="p-4" align="center">
           <div className="flex items-center justify-center gap-1">
-            <FormControlLabel
-              control={
-                <PrimarySwitch
-                  checked={currentStatus === "active"}
-                  onChange={(e) => onStatusToggle(building.id, currentStatus)}
-                  size="small"
-                />
-              }
-              sx={{ m: 0 }}
-            />
+            {building.loading ? (
+              <CircularProgress size={18} />
+            ) : (
+              <FormControlLabel
+                control={
+                  <PrimarySwitch
+                    checked={currentStatus === "active"}
+                    onChange={(e) => onStatusToggle(building.id, currentStatus)}
+                    size="small"
+                  />
+                }
+                sx={{ m: 0 }}
+              />
+            )}
             {/* <IconButton
               size="small"
               onClick={() => onAssign(building)}
@@ -440,7 +444,7 @@ const BuildingRow = ({
                                   {Math.floor(
                                     (building.units *
                                       (100 - building.occupancy)) /
-                                      100
+                                      100,
                                   )}
                                 </Typography>
                               </div>
@@ -459,7 +463,7 @@ const BuildingRow = ({
                                 </Typography>
                                 <Typography className="font-roboto font-semibold">
                                   {Math.floor(
-                                    (building.units * building.occupancy) / 100
+                                    (building.units * building.occupancy) / 100,
                                   )}
                                 </Typography>
                               </div>
@@ -606,8 +610,8 @@ const BuildingCard = ({
                   building.occupancy > 70
                     ? "#93BD57"
                     : building.occupancy > 40
-                    ? "#DBA400"
-                    : "#F96E5B",
+                      ? "#DBA400"
+                      : "#F96E5B",
               }}
             >
               {building.occupancy}%
@@ -722,7 +726,7 @@ const BuildingCard = ({
                 </Typography>
                 <Typography className="font-roboto text-sm font-medium">
                   {Math.floor(
-                    (building.units * (100 - building.occupancy)) / 100
+                    (building.units * (100 - building.occupancy)) / 100,
                   )}
                 </Typography>
               </div>
@@ -745,8 +749,8 @@ const BuildingCard = ({
                       building.occupancy > 70
                         ? "bg-[#93BD57]"
                         : building.occupancy > 40
-                        ? "bg-[#DBA400]"
-                        : "bg-[#F96E5B]"
+                          ? "bg-[#DBA400]"
+                          : "bg-[#F96E5B]"
                     }`}
                   />
                 </div>
@@ -876,7 +880,7 @@ export default function Buildings() {
       id,
       name
     )
-  `
+  `,
       )
       .eq("is_delete", false)
       .order("id", { ascending: false });
@@ -952,13 +956,13 @@ export default function Buildings() {
           building.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           building.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
           building.manager.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          building.id.toString().includes(searchTerm)
+          building.id.toString().includes(searchTerm),
       );
     }
 
     if (statusFilter !== "all") {
       filtered = filtered.filter(
-        (building) => building.status === statusFilter
+        (building) => building.status === statusFilter,
       );
     }
 
@@ -966,12 +970,41 @@ export default function Buildings() {
     setPage(0);
   }, [buildings, searchTerm, statusFilter]);
 
+  // const handleStatusToggle = useCallback(async (buildingId, currentStatus) => {
+  //   const newStatus = currentStatus === "active" ? "inactive" : "active";
+
+  //   // Optimistic UI
+  //   setBuildings((prev) =>
+  //     prev.map((b) => (b.id === buildingId ? { ...b, status: newStatus } : b))
+  //   );
+
+  //   const { error } = await supabase
+  //     .from("buildings")
+  //     .update({ is_active: newStatus === "active" })
+  //     .eq("id", buildingId);
+
+  //   if (error) {
+  //     toast.error("Failed to update status");
+
+  //     // rollback
+  //     setBuildings((prev) =>
+  //       prev.map((b) =>
+  //         b.id === buildingId ? { ...b, status: currentStatus } : b
+  //       )
+  //     );
+  //   } else {
+  //     toast.success(
+  //       `Building ${newStatus === "active" ? "activated" : "deactivated"}`
+  //     );
+  //   }
+  // }, []);
   const handleStatusToggle = useCallback(async (buildingId, currentStatus) => {
     const newStatus = currentStatus === "active" ? "inactive" : "active";
 
-    // Optimistic UI
     setBuildings((prev) =>
-      prev.map((b) => (b.id === buildingId ? { ...b, status: newStatus } : b))
+      prev.map((b) =>
+        b.id === buildingId ? { ...b, status: newStatus, loading: true } : b,
+      ),
     );
 
     const { error } = await supabase
@@ -982,15 +1015,20 @@ export default function Buildings() {
     if (error) {
       toast.error("Failed to update status");
 
-      // rollback
       setBuildings((prev) =>
         prev.map((b) =>
-          b.id === buildingId ? { ...b, status: currentStatus } : b
-        )
+          b.id === buildingId
+            ? { ...b, status: currentStatus, loading: false }
+            : b,
+        ),
       );
     } else {
       toast.success(
-        `Building ${newStatus === "active" ? "activated" : "deactivated"}`
+        `Building ${newStatus === "active" ? "activated" : "deactivated"}`,
+      );
+
+      setBuildings((prev) =>
+        prev.map((b) => (b.id === buildingId ? { ...b, loading: false } : b)),
       );
     }
   }, []);
@@ -1008,8 +1046,8 @@ export default function Buildings() {
           prev.map((building) =>
             building.id === buildingId
               ? { ...building, loading: true }
-              : building
-          )
+              : building,
+          ),
         );
 
         setTimeout(() => {
@@ -1017,13 +1055,13 @@ export default function Buildings() {
             prev.map((building) =>
               building.id === buildingId
                 ? { ...building, loading: false }
-                : building
-            )
+                : building,
+            ),
           );
         }, 500);
       }
     },
-    [openRows]
+    [openRows],
   );
 
   const handleEditBuilding = (id) => {
@@ -1102,7 +1140,7 @@ export default function Buildings() {
 
   const paginatedBuildings = filteredBuildings.slice(
     page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
+    page * rowsPerPage + rowsPerPage,
   );
 
   // Calculate statistics
@@ -1110,7 +1148,7 @@ export default function Buildings() {
   const activeBuildings = buildings.filter((b) => b.status === "active").length;
   const totalUnits = buildings.reduce(
     (sum, building) => sum + building.units,
-    0
+    0,
   );
   const totalOccupancy =
     buildings.reduce((sum, building) => sum + building.occupancy, 0) /

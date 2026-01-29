@@ -254,53 +254,53 @@ export default function AdminCards() {
     }
   };
 
-  const handleAddCard = async () => {
-    const serialNumber = prompt("Enter card serial number:");
-    if (!serialNumber) return;
+  // const handleAddCard = async () => {
+  //   const serialNumber = prompt("Enter card serial number:");
+  //   if (!serialNumber) return;
 
-    try {
-      const societyId = localStorage.getItem("societyId");
-      const { data, error } = await supabase
-        .from("cards")
-        .insert([
-          {
-            card_serial_number: serialNumber,
-            society_id: societyId,
-            is_assigned: false,
-            building_id: null,
-            card_status: "ACTIVE",
-          },
-        ])
-        .select()
-        .single();
+  //   try {
+  //     const societyId = localStorage.getItem("societyId");
+  //     const { data, error } = await supabase
+  //       .from("cards")
+  //       .insert([
+  //         {
+  //           card_serial_number: serialNumber,
+  //           society_id: societyId,
+  //           is_assigned: false,
+  //           building_id: null,
+  //           card_status: "ACTIVE",
+  //         },
+  //       ])
+  //       .select()
+  //       .single();
 
-      if (error) throw error;
+  //     if (error) throw error;
 
-      const { data: societyData } = await supabase
-        .from("societies")
-        .select("name")
-        .eq("id", societyId)
-        .single();
+  //     const { data: societyData } = await supabase
+  //       .from("societies")
+  //       .select("name")
+  //       .eq("id", societyId)
+  //       .single();
 
-      const newCard = {
-        ...data,
-        society_name: societyData?.name || "N/A",
-        building_name: null,
-        displayStatus: "unassigned",
-        isLost: false,
-      };
+  //     const newCard = {
+  //       ...data,
+  //       society_name: societyData?.name || "N/A",
+  //       building_name: null,
+  //       displayStatus: "unassigned",
+  //       isLost: false,
+  //     };
 
-      setCards((prev) => [newCard, ...prev]);
-      setStats((prev) => ({
-        ...prev,
-        total: prev.total + 1,
-        unassigned: prev.unassigned + 1,
-      }));
-    } catch (error) {
-      console.error("Error adding card:", error);
-      alert("Error adding card: " + error.message);
-    }
-  };
+  //     setCards((prev) => [newCard, ...prev]);
+  //     setStats((prev) => ({
+  //       ...prev,
+  //       total: prev.total + 1,
+  //       unassigned: prev.unassigned + 1,
+  //     }));
+  //   } catch (error) {
+  //     console.error("Error adding card:", error);
+  //     alert("Error adding card: " + error.message);
+  //   }
+  // };
 
   const filteredCards = cards
     .filter((card) => {
@@ -591,14 +591,6 @@ export default function AdminCards() {
                           ? "Try adjusting your search criteria"
                           : "Add your first card to get started"}
                       </Typography>
-                      <Button
-                        variant="contained"
-                        startIcon={<Add />}
-                        onClick={handleAddCard}
-                        className="bg-primary hover:bg-primary/90 text-white"
-                      >
-                        Add New Card
-                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>

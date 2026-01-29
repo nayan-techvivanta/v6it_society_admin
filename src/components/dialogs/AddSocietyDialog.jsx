@@ -43,6 +43,7 @@ const AddSocietyDialog = ({
     state: "",
     country: "",
     pincode: "",
+    location: "",
   });
 
   const [errors, setErrors] = useState({});
@@ -60,6 +61,7 @@ const AddSocietyDialog = ({
           state: society.state || "",
           country: society.country || "",
           pincode: society.pincode || "",
+          location: society.location || "",
         });
       } else {
         setFormData({
@@ -69,6 +71,7 @@ const AddSocietyDialog = ({
           state: "",
           country: "",
           pincode: "",
+          location: "",
         });
       }
       setErrors({});
@@ -85,46 +88,10 @@ const AddSocietyDialog = ({
     if (!formData.state.trim()) newErrors.state = "State is required";
     if (!formData.country.trim()) newErrors.country = "Country is required";
     if (!formData.pincode.trim()) newErrors.pincode = "Pincode is required";
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  //   const handleSubmit = async (e) => {
-  //     e.preventDefault();
-
-  //     if (!validateForm()) {
-  //       toast.error("Please fix all errors before submitting");
-  //       return;
-  //     }
-
-  //     setIsSubmitting(true);
-  //     try {
-  //       let result;
-
-  //       if (isEdit) {
-  //         result = await supabase
-  //           .from("societies")
-  //           .update(formData)
-  //           .eq("id", society.id);
-  //       } else {
-  //         result = await supabase.from("societies").insert([formData]).select();
-  //       }
-
-  //       if (result.error) throw result.error;
-
-  //       onSubmit(formData);
-  //       toast.success(
-  //         isEdit ? "Society updated successfully!" : "Society added successfully!"
-  //       );
-  //       onClose();
-  //     } catch (error) {
-  //       console.error("Error saving society:", error);
-  //       toast.error("Failed to save society");
-  //     } finally {
-  //       setIsSubmitting(false);
-  //     }
-  //   };
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -166,7 +133,9 @@ const AddSocietyDialog = ({
 
       onSubmit(societyData);
       toast.success(
-        isEdit ? "Society updated successfully!" : "Society added successfully!"
+        isEdit
+          ? "Society updated successfully!"
+          : "Society added successfully!",
       );
       onClose();
     } catch (error) {
@@ -210,7 +179,7 @@ const AddSocietyDialog = ({
         sx={{
           background: `linear-gradient(135deg, #6F0B14 0%, ${alpha(
             "#6F0B14",
-            0.9
+            0.9,
           )} 100%)`,
           color: "white",
           py: 2.5,
@@ -521,6 +490,47 @@ const AddSocietyDialog = ({
                 />
               </Box>
             </Box>
+            {/* Location */}
+            <Box sx={{ mb: 3 }}>
+              <Typography
+                component="label"
+                variant="caption"
+                fontWeight={600}
+                display="block"
+                mb={1}
+                color="#6F0B14"
+                // sx={{
+                //   "&::after": {
+                //     content: '"*"',
+                //     color: "#B31B1B",
+                //     marginLeft: 0.5,
+                //   },
+                // }}
+              >
+                Location (Optional)
+              </Typography>
+
+              <TextField
+                fullWidth
+                value={formData.location}
+                onChange={handleFieldChange("location")}
+                error={!!errors.location && touched.location}
+                helperText={touched.location && errors.location}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Map sx={{ color: "#A29EB6", fontSize: 20 }} />
+                    </InputAdornment>
+                  ),
+                  sx: {
+                    borderRadius: 1.5,
+                    height: 44,
+                  },
+                }}
+                placeholder="Enter location / landmark / area"
+                size="small"
+              />
+            </Box>
 
             {/* Dialog Actions */}
             <DialogActions
@@ -592,8 +602,8 @@ const AddSocietyDialog = ({
                     {isSubmitting
                       ? "Processing..."
                       : isEdit
-                      ? "Update Society"
-                      : "Add Society"}
+                        ? "Update Society"
+                        : "Add Society"}
                   </Button>
                 </Box>
               </Box>

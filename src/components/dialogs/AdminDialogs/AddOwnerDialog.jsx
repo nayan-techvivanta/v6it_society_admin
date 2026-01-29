@@ -135,50 +135,14 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
     setIsEditMode(false);
   };
 
-  // const checkExistingOwner = async () => {
-  //   setOwnerLoading(true);
-  //   try {
-  //     const { data, error } = await supabase
-  //       .from("users")
-  //       .select(
-  //         "id, name, email, number, whatsapp_number, profile_url, role_type",
-  //       )
-  //       .eq("flat_id", flat.id)
-  //       .eq("role_type", "Tanent-O")
-  //       .eq("is_delete", false)
-  //       .limit(1);
-
-  //     if (error) {
-  //       console.error("Error checking owner:", error);
-  //       return;
-  //     }
-
-  //     if (data && data.length > 0) {
-  //       setExistingOwner(data[0]);
-  //       setFormData((prev) => ({
-  //         ...prev,
-  //         role_type: "Tanent-M",
-  //       }));
-  //     } else {
-  //       setExistingOwner(null);
-  //       setFormData((prev) => ({
-  //         ...prev,
-  //         role_type: "Tanent-O",
-  //       }));
-  //     }
-  //   } catch (error) {
-  //     console.error("Error checking existing owner:", error);
-  //   } finally {
-  //     setOwnerLoading(false);
-  //   }
-  // };
   const checkExistingOwner = async () => {
     setOwnerLoading(true);
 
     try {
       const { data, error } = await supabase
         .from("user_flats")
-        .select(`
+        .select(
+          `
         user_id,
         users (
           id,
@@ -190,7 +154,8 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
           role_type,
           is_delete
         )
-      `)
+      `,
+        )
         .eq("flat_id", flat.id)
         .eq("users.role_type", "Tanent-O")
         .eq("users.is_delete", false)
@@ -206,7 +171,6 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
 
         setExistingOwner(data[0].users);
 
-        // Force new user to be Tanent-M
         setFormData((prev) => ({
           ...prev,
           role_type: "Tanent-M",
@@ -368,7 +332,6 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
     }));
   };
 
-
   useEffect(() => {
     const fetchUsers = async () => {
       if (!debouncedSearchQuery || debouncedSearchQuery.length < 2) {
@@ -478,7 +441,6 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
     }
   };
 
-
   const handleAddUser = async () => {
     try {
       console.group("🚀 handleAddUser START");
@@ -530,7 +492,6 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
           role_type: formData.role_type,
         });
 
-
         const authUserId = apiResult?.user_id; // UUID
 
         if (!authUserId) {
@@ -551,7 +512,6 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
           throw existingUserError;
         }
 
-
         if (existingUser) {
           console.log("♻️ App user exists, updating profile");
 
@@ -560,6 +520,7 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
             email: formData.email?.trim(),
             number: formData.phone,
             whatsapp_number: formData.whatsapp_number || formData.phone,
+            society_id: flat.society_id,
             profile_url:
               formData.profile_url && formData.profile_url.trim() !== ""
                 ? formData.profile_url
@@ -579,7 +540,7 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
           // 6️⃣ Insert into users table
           // ===============================
           const userInsertPayload = {
-            registed_user_id: authUserId, // UUID
+            registed_user_id: authUserId,
             name: formData.name?.trim(),
             email: formData.email?.trim(),
             number: formData.phone,
@@ -640,7 +601,7 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
       toast.success(
         formData.role_type === "Tanent-O"
           ? "Primary owner assigned successfully"
-          : "Family member assigned successfully"
+          : "Family member assigned successfully",
       );
 
       resetForm();
@@ -655,7 +616,6 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
       setLoading(false);
     }
   };
-
 
   const handleUpdateUser = async (userId) => {
     try {
@@ -1426,8 +1386,9 @@ export default function AddOwnerDialog({ open, onClose, flat }) {
 
                       <Box
                         sx={{
-                          border: `2px dashed ${dragging ? theme.primary : theme.trackSelect
-                            }`,
+                          border: `2px dashed ${
+                            dragging ? theme.primary : theme.trackSelect
+                          }`,
                           borderRadius: 2,
                           p: 3,
                           textAlign: "center",

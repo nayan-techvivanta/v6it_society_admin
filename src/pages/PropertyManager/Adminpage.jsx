@@ -80,8 +80,8 @@ const CollapsibleRow = ({ user, onEdit, onDelete, onAssign, societyName }) => {
   const displayId = userId.substring
     ? userId.substring(0, 8)
     : userId.slice
-    ? userId.slice(0, 8)
-    : "N/A";
+      ? userId.slice(0, 8)
+      : "N/A";
 
   return (
     <>
@@ -344,7 +344,7 @@ const CollapsibleRow = ({ user, onEdit, onDelete, onAssign, societyName }) => {
                                 year: "numeric",
                                 hour: "2-digit",
                                 minute: "2-digit",
-                              }
+                              },
                             )
                           : "N/A"}
                       </Typography>
@@ -365,7 +365,7 @@ const CollapsibleRow = ({ user, onEdit, onDelete, onAssign, societyName }) => {
                                 day: "2-digit",
                                 month: "short",
                                 year: "numeric",
-                              }
+                              },
                             )
                           : "N/A"}
                       </Typography>
@@ -386,7 +386,7 @@ const CollapsibleRow = ({ user, onEdit, onDelete, onAssign, societyName }) => {
                               day: "2-digit",
                               month: "short",
                               year: "numeric",
-                            }
+                            },
                           )}
                         </Typography>
                       </Box>
@@ -405,7 +405,7 @@ const CollapsibleRow = ({ user, onEdit, onDelete, onAssign, societyName }) => {
 // Assign/Edit Society Dialog Component
 const AssignSocietyDialog = ({ open, onClose, onSubmit, societies, user }) => {
   const [selectedSociety, setSelectedSociety] = useState(
-    user?.society_id || ""
+    user?.society_id || "",
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -457,7 +457,7 @@ const AssignSocietyDialog = ({ open, onClose, onSubmit, societies, user }) => {
         sx={{
           background: `linear-gradient(135deg, #6F0B14 0%, ${alpha(
             "#6F0B14",
-            0.9
+            0.9,
           )} 100%)`,
           color: "white",
           py: 2.5,
@@ -565,8 +565,8 @@ const AssignSocietyDialog = ({ open, onClose, onSubmit, societies, user }) => {
           {isSubmitting
             ? "Saving..."
             : user?.society_id
-            ? "Update Society"
-            : "Assign to Society"}
+              ? "Update Society"
+              : "Assign to Society"}
         </Button>
       </DialogActions>
     </Dialog>
@@ -587,35 +587,132 @@ export default function AdminPage() {
     society: "all",
     status: "all",
   });
+  // const propertyManagerId = localStorage.getItem("profileId");
+  // // Fetch Admins and Societies from Supabase
+  // const fetchData = async () => {
+  //   try {
+  //     setLoading(true);
 
-  // Fetch Admins and Societies from Supabase
+  //     // Fetch Admins (role_type = "Admin")
+  //     const { data: usersData, error: usersError } = await supabase
+  //       .from("users")
+  //       .select("*")
+  //       .eq("role_type", "Admin")
+  //       .order("created_at", { ascending: false });
+
+  //     if (usersError) throw usersError;
+
+  //     // Fetch Societies
+  //     const { data: societiesData, error: societiesError } = await supabase
+  //       .from("societies")
+  //       .select("id, name")
+  //       .order("name");
+
+  //     if (societiesError) throw societiesError;
+  //     setSocieties(societiesData || []);
+
+  //     setUsers(usersData || []);
+  //   } catch (error) {
+  //     console.error("Error fetching data:", error);
+  //     toast.error("Failed to load data");
+  //     setUsers([]);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+  const propertyManagerId = localStorage.getItem("profileId");
+
+  // const fetchData = async () => {
+  //   try {
+  //     setLoading(true);
+
+  //     // 1️⃣ pm_society se pm_id nikalo
+  //     const { data: pmSocietyData, error: pmSocietyError } = await supabase
+  //       .from("pm_society")
+  //       .select("pm_id")
+  //       .eq("pm_id", propertyManagerId)
+  //       .single();
+
+  //     if (pmSocietyError) throw pmSocietyError;
+
+  //     const pmId = pmSocietyData?.pm_id;
+
+  //     if (!pmId) {
+  //       setUsers([]);
+  //       return;
+  //     }
+
+  //     // 2️⃣ users table se PM ka data lao
+  //     const { data: usersData, error: usersError } = await supabase
+  //       .from("users")
+  //       .select("*")
+  //       .eq("id", pmId)
+  //       .single();
+
+  //     if (usersError) throw usersError;
+
+  //     setUsers(usersData ? [usersData] : []);
+  //   } catch (error) {
+  //     console.error("Error fetching PM data:", error);
+  //     toast.error("Failed to load data");
+  //     setUsers([]);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
   const fetchData = async () => {
     try {
       setLoading(true);
 
-      // Fetch Admins (role_type = "Admin")
+      /* ===============================
+       1️⃣ PM ki assigned societies
+       =============================== */
+      const { data: pmSocietyRows, error: pmSocietyError } = await supabase
+        .from("pm_society")
+        .select("society_id")
+        .eq("pm_id", propertyManagerId);
+
+      if (pmSocietyError) throw pmSocietyError;
+
+      const societyIds = pmSocietyRows?.map((row) => row.society_id) || [];
+
+      if (societyIds.length === 0) {
+        setUsers([]);
+        setSocieties([]);
+        return;
+      }
+
+      /* ===============================
+       2️⃣ Society dropdown data
+       =============================== */
+      const { data: societiesData, error: societiesError } = await supabase
+        .from("societies")
+        .select("id, name")
+        .in("id", societyIds)
+        .order("name");
+
+      if (societiesError) throw societiesError;
+
+      setSocieties(societiesData || []);
+
+      /* ===============================
+       3️⃣ Admins of those societies
+       =============================== */
       const { data: usersData, error: usersError } = await supabase
         .from("users")
         .select("*")
         .eq("role_type", "Admin")
+        .in("society_id", societyIds)
         .order("created_at", { ascending: false });
 
       if (usersError) throw usersError;
-
-      // Fetch Societies
-      const { data: societiesData, error: societiesError } = await supabase
-        .from("societies")
-        .select("id, name")
-        .order("name");
-
-      if (societiesError) throw societiesError;
-      setSocieties(societiesData || []);
 
       setUsers(usersData || []);
     } catch (error) {
       console.error("Error fetching data:", error);
       toast.error("Failed to load data");
       setUsers([]);
+      setSocieties([]);
     } finally {
       setLoading(false);
     }
@@ -763,14 +860,14 @@ export default function AdminPage() {
 
       setUsers((prev) =>
         prev.map((user) =>
-          user.id === userId ? { ...user, society_id: societyId } : user
-        )
+          user.id === userId ? { ...user, society_id: societyId } : user,
+        ),
       );
 
       toast.success(
         societyId
           ? "Society assignment updated successfully!"
-          : "Society removed successfully!"
+          : "Society removed successfully!",
       );
     } catch (error) {
       console.error("Error assigning society:", error);
@@ -1081,11 +1178,12 @@ export default function AdminPage() {
                     <MenuItem value="all">All Societies</MenuItem>
                     <MenuItem value="assigned">Assigned</MenuItem>
                     <MenuItem value="unassigned">Unassigned</MenuItem>
-                    {societies.map((society) => (
-                      <MenuItem key={society.id} value={society.id}>
-                        {society.name}
-                      </MenuItem>
-                    ))}
+                    {societies?.length > 0 &&
+                      societies.map((society) => (
+                        <MenuItem key={society.id} value={society.id}>
+                          {society.name}
+                        </MenuItem>
+                      ))}
                   </Select>
                 </FormControl>
               </Grid>
@@ -1135,8 +1233,8 @@ export default function AdminPage() {
                       filters.society === "assigned"
                         ? "Assigned"
                         : filters.society === "unassigned"
-                        ? "Unassigned"
-                        : getSocietyName(filters.society) || filters.society
+                          ? "Unassigned"
+                          : getSocietyName(filters.society) || filters.society
                     }`}
                     onDelete={() => setFilters({ ...filters, society: "all" })}
                     size="small"
