@@ -165,54 +165,6 @@ const AddCardDialog = ({
     }
   };
 
-  // const handleSubmit = async (e) => {
-  //   e.preventDefault();
-
-  //   if (!isFormValid) {
-  //     toast.error("Please fix all errors before submitting");
-  //     return;
-  //   }
-
-  //   setIsSubmitting(true);
-
-  //   try {
-  //     let query;
-
-  //     const payload = {
-  //       society_id: formData.society_id,
-  //       card_serial_number: formData.card_serial_number,
-  //       building_id: formData.building_id,
-  //     };
-
-  //     if (isEdit && cardData?.id) {
-  //       // 🔹 UPDATE CARD
-  //       query = supabase
-  //         .from("cards")
-  //         .update(payload)
-  //         .eq("id", cardData.id)
-  //         .select()
-  //         .single();
-  //     } else {
-  //       // 🔹 INSERT CARD
-  //       query = supabase.from("cards").insert([payload]).select().single();
-  //     }
-
-  //     const { error } = await query;
-
-  //     if (error) throw error;
-
-  //     toast.success(
-  //       isEdit ? "Card updated successfully!" : "Card created successfully!"
-  //     );
-
-  //     onClose(); // parent will refresh list
-  //   } catch (error) {
-  //     console.error("Save card error:", error);
-  //     toast.error(error.message || "Failed to save card");
-  //   } finally {
-  //     setIsSubmitting(false);
-  //   }
-  // };
   const handleSubmit = async (e) => {
     e.preventDefault();
 

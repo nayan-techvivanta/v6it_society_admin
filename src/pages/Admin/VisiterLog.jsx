@@ -28,6 +28,7 @@ import {
   CircularProgress,
   Avatar,
   Badge,
+  Collapse,
 } from "@mui/material";
 import {
   Search,
@@ -51,8 +52,12 @@ import {
   Check,
   Close,
   WatchLater,
+  KeyboardArrowDown,
+  KeyboardArrowUp,
 } from "@mui/icons-material";
-import { supabase } from "../../api/supabaseClient";
+
+// import { supabase } from "../../api/supabaseClient";
+import { fetchSocietyVisitors } from "../../api/visitors";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import "dayjs/locale/en";
@@ -79,8 +84,9 @@ const theme = {
   textPrimary: "#1e293b",
   textSecondary: "#64748b",
 };
+
 export default function VisitorLog() {
-  const [visitors, setVisitors] = useState([]);
+  const [visitorGroups, setVisitorGroups] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -94,6 +100,7 @@ export default function VisitorLog() {
     approved: 0,
     checkedOut: 0,
   });
+  const [expandedGroups, setExpandedGroups] = useState({});
 
   const statusConfig = {
     Pending: {
@@ -153,6 +160,7 @@ export default function VisitorLog() {
 
   const fetchVisitors = async () => {
     try {
+      setLoading(true);
       const societyId = localStorage.getItem("societyId");
 
       if (!societyId) {
@@ -160,57 +168,24 @@ export default function VisitorLog() {
         return;
       }
 
-      let query = supabase
-        .from("visitors")
-        .select("*")
-        .eq("society_id", societyId)
-        .eq("is_delete", false)
-        .order("created_at", { ascending: false });
+      const result = await fetchSocietyVisitors(societyId);
 
-      // Apply filters
-      if (statusFilter !== "all") {
-        query = query.eq("approved_status", statusFilter);
+      if (result.success && result.visitors) {
+        setVisitorGroups(result.visitors);
+
+        const flattenedVisitors = result.visitors.flatMap(
+          (group) => group.all_visitors || [],
+        );
+        calculateStats(flattenedVisitors);
+      } else {
+        console.error("Failed to fetch visitors:", result.error);
+        setVisitorGroups([]);
       }
-
-      if (visitorTypeFilter !== "all") {
-        query = query.eq("visitor_type", visitorTypeFilter);
-      }
-
-      // Apply date filter
-      if (dateFilter !== "all") {
-        const today = dayjs().startOf("day");
-        switch (dateFilter) {
-          case "today":
-            query = query.gte("created_at", today.toISOString());
-            break;
-          case "week":
-            query = query.gte(
-              "created_at",
-              today.subtract(7, "day").toISOString()
-            );
-            break;
-          case "month":
-            query = query.gte(
-              "created_at",
-              today.subtract(30, "day").toISOString()
-            );
-            break;
-          default:
-            break;
-        }
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.error("Supabase error:", error);
-        throw error;
-      }
-
-      setVisitors(data || []);
-      calculateStats(data || []);
     } catch (error) {
       console.error("Error fetching visitors:", error);
+      setVisitorGroups([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -231,39 +206,55 @@ export default function VisitorLog() {
     setSearchTerm(e.target.value);
   };
 
-  const filteredVisitors = visitors.filter((visitor) => {
+  const toggleGroupExpand = (groupId) => {
+    setExpandedGroups((prev) => ({
+      ...prev,
+      [groupId]: !prev[groupId],
+    }));
+  };
+
+  const filteredGroups = visitorGroups.filter((group) => {
     const searchLower = searchTerm.toLowerCase();
-    return (
-      visitor.visitor_name?.toLowerCase().includes(searchLower) ||
-      visitor.phone_number?.toLowerCase().includes(searchLower) ||
-      visitor.flat_number?.toLowerCase().includes(searchLower) ||
-      visitor.vehicle_number?.toLowerCase().includes(searchLower) ||
-      visitor.purpose?.toLowerCase().includes(searchLower)
-    );
+    const mainVisitor = group.all_visitors?.[0] || group;
+
+    const groupMatchesSearch = group.all_visitors?.some((visitor) => {
+      return (
+        visitor.visitor_name?.toLowerCase().includes(searchLower) ||
+        visitor.phone_number?.toLowerCase().includes(searchLower) ||
+        visitor.flat_number?.toLowerCase().includes(searchLower) ||
+        visitor.vehicle_number?.toLowerCase().includes(searchLower) ||
+        visitor.purpose?.toLowerCase().includes(searchLower)
+      );
+    });
+
+    if (statusFilter !== "all" && visitorTypeFilter !== "all") {
+      return (
+        groupMatchesSearch &&
+        group.all_visitors?.some((v) => v.approved_status === statusFilter) &&
+        group.all_visitors?.some((v) => v.visitor_type === visitorTypeFilter)
+      );
+    }
+
+    if (statusFilter !== "all") {
+      return (
+        groupMatchesSearch &&
+        group.all_visitors?.some((v) => v.approved_status === statusFilter)
+      );
+    }
+
+    if (visitorTypeFilter !== "all") {
+      return (
+        groupMatchesSearch &&
+        group.all_visitors?.some((v) => v.visitor_type === visitorTypeFilter)
+      );
+    }
+
+    return groupMatchesSearch;
   });
 
   const handleViewDetails = (visitor) => {
     setSelectedVisitor(visitor);
     setDetailDialogOpen(true);
-  };
-
-  const handleStatusUpdate = async (visitorId, newStatus) => {
-    try {
-      const { error } = await supabase
-        .from("visitors")
-        .update({
-          approved_status: newStatus,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", visitorId);
-
-      if (error) throw error;
-
-      // Refresh the visitor list
-      fetchVisitors();
-    } catch (error) {
-      console.error("Error updating status:", error);
-    }
   };
 
   const formatDateTime = (dateTime) => {
@@ -276,12 +267,63 @@ export default function VisitorLog() {
     return dayjs(dateTime).fromNow();
   };
 
+  const getLatestVisitTime = (allVisitors) => {
+    if (!allVisitors || allVisitors.length === 0) return null;
+    return allVisitors.reduce((latest, visitor) => {
+      const currentTime = visitor.in_time || visitor.created_at;
+      return currentTime > latest ? currentTime : latest;
+    }, allVisitors[0].in_time || allVisitors[0].created_at);
+  };
+
+  const getVisitorType = (allVisitors) => {
+    if (!allVisitors || allVisitors.length === 0) return "Guest";
+    return allVisitors[0].visitor_type || "Guest";
+  };
+
+  const getFlatNumber = (allVisitors) => {
+    if (!allVisitors || allVisitors.length === 0) return "N/A";
+    return allVisitors[0].flat_number || "N/A";
+  };
+
   useEffect(() => {
     fetchVisitors();
   }, [statusFilter, visitorTypeFilter, dateFilter]);
 
+  // Apply date filter to the groups
+  useEffect(() => {
+    if (visitorGroups.length > 0) {
+      let filtered = [...visitorGroups];
+
+      if (dateFilter !== "all") {
+        const today = dayjs().startOf("day");
+        filtered = filtered.filter((group) => {
+          const latestVisitTime = getLatestVisitTime(group.all_visitors);
+          if (!latestVisitTime) return false;
+
+          const visitDate = dayjs(latestVisitTime);
+          switch (dateFilter) {
+            case "today":
+              return visitDate.isSame(today, "day");
+            case "week":
+              return visitDate.isAfter(today.subtract(7, "day"));
+            case "month":
+              return visitDate.isAfter(today.subtract(30, "day"));
+            default:
+              return true;
+          }
+        });
+      }
+
+      // Calculate stats from filtered groups
+      const flattenedVisitors = filtered.flatMap(
+        (group) => group.all_visitors || [],
+      );
+      calculateStats(flattenedVisitors);
+    }
+  }, [visitorGroups, dateFilter]);
+
   return (
-    <div className="p-6 font-roboto">
+    <div className="p-6 font-roboto max-h-[80vh]">
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
@@ -297,92 +339,14 @@ export default function VisitorLog() {
           startIcon={<Refresh />}
           onClick={fetchVisitors}
           className="bg-button hover:bg-primary text-white normal-case"
+          disabled={loading}
         >
-          Refresh
+          {loading ? <CircularProgress size={24} /> : "Refresh"}
         </Button>
       </div>
 
       {/* Stats Cards */}
-      {/* <Grid container spacing={3} className="mb-6">
-        <Grid item xs={12} sm={6} md={3}>
-          <Card className="shadow-sm border border-gray-100">
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div>
-                  <Typography variant="body2" className="text-hintText">
-                    Total Visitors
-                  </Typography>
-                  <Typography variant="h4" className="font-bold">
-                    {stats.total}
-                  </Typography>
-                </div>
-                <Avatar className="bg-primary bg-opacity-10">
-                  <Person className="text-primary" />
-                </Avatar>
-              </div>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card className="shadow-sm border border-gray-100">
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div>
-                  <Typography variant="body2" className="text-hintText">
-                    Pending
-                  </Typography>
-                  <Typography variant="h4" className="font-bold text-pending">
-                    {stats.pending}
-                  </Typography>
-                </div>
-                <Avatar className="bg-pending bg-opacity-10">
-                  <WatchLater className="text-pending" />
-                </Avatar>
-              </div>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card className="shadow-sm border border-gray-100">
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div>
-                  <Typography variant="body2" className="text-hintText">
-                    Approved
-                  </Typography>
-                  <Typography variant="h4" className="font-bold text-success">
-                    {stats.approved}
-                  </Typography>
-                </div>
-                <Avatar className="bg-success bg-opacity-10">
-                  <CheckCircle className="text-success" />
-                </Avatar>
-              </div>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card className="shadow-sm border border-gray-100">
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div>
-                  <Typography variant="body2" className="text-hintText">
-                    Checked Out
-                  </Typography>
-                  <Typography variant="h4" className="font-bold text-primary">
-                    {stats.checkedOut}
-                  </Typography>
-                </div>
-                <Avatar className="bg-primary bg-opacity-10">
-                  <Check className="text-primary" />
-                </Avatar>
-              </div>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid> */}
       <Grid container spacing={3} className="mb-6">
-        {/* Total Visitors */}
         <Grid item xs={12} sm={6} md={3}>
           <Card className="rounded-lg border shadow-sm">
             <CardContent className="p-4">
@@ -596,7 +560,7 @@ export default function VisitorLog() {
                   Visit Time
                 </TableCell>
                 <TableCell className="font-semibold text-primary">
-                  Status
+                  Status & Entries
                 </TableCell>
                 <TableCell className="font-semibold text-primary text-center">
                   Actions
@@ -604,7 +568,13 @@ export default function VisitorLog() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredVisitors.length === 0 ? (
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={6} align="center" className="py-12">
+                    <CircularProgress />
+                  </TableCell>
+                </TableRow>
+              ) : filteredGroups.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} align="center" className="py-12">
                     <div className="flex flex-col items-center justify-center">
@@ -621,147 +591,277 @@ export default function VisitorLog() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredVisitors.map((visitor) => (
-                  <TableRow
-                    key={visitor.id}
-                    hover
-                    className="hover:bg-lightBackground"
-                  >
-                    <TableCell>
-                      <div className="flex items-center space-x-3">
-                        <Avatar className="bg-primary bg-opacity-10">
-                          {visitorTypeConfig[visitor.visitor_type]?.icon ||
-                            visitorTypeConfig.Other.icon}
-                        </Avatar>
-                        <div>
-                          <Typography
-                            variant="subtitle2"
-                            className="font-semibold"
-                          >
-                            {visitor.visitor_name || "Unknown Visitor"}
-                          </Typography>
-                          <div className="flex items-center space-x-2">
-                            <Typography
-                              variant="caption"
-                              className="text-hintText"
-                            >
-                              {visitor.visitor_type || "Guest"}
-                            </Typography>
-                            {/* {visitor.visitor_otp && (
-                              <Chip
-                                label={`OTP: ${visitor.visitor_otp}`}
-                                size="small"
-                                className="bg-primary bg-opacity-10 text-primary text-xs"
-                              />
-                            )} */}
-                          </div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2 mb-1">
-                        <Home fontSize="small" className="text-hintText" />
-                        <Typography variant="body2">
-                          {visitor.flat_number || "N/A"}
-                        </Typography>
-                      </div>
-                      {visitor.phone_number && (
-                        <div className="flex items-center space-x-2">
-                          <Phone fontSize="small" className="text-hintText" />
-                          <Typography variant="body2" className="text-hintText">
-                            {visitor.phone_number}
-                          </Typography>
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" className="mb-1">
-                        <span className="text-hintText font-medium">
-                          Purpose:
-                        </span>{" "}
-                        {visitor.purpose || "No purpose specified"}
-                      </Typography>
+                filteredGroups.map((group) => {
+                  const allVisitors = group.all_visitors || [];
+                  const mainVisitor = allVisitors[0] || group;
+                  const isExpanded = expandedGroups[group.id] || false;
+                  const latestVisitTime = getLatestVisitTime(allVisitors);
 
-                      {visitor.vehicle_number && (
-                        <div className="flex items-center space-x-2">
-                          <CarIcon fontSize="small" className="text-hintText" />
+                  return (
+                    <React.Fragment key={group.id}>
+                      {/* Main Group Row */}
+                      <TableRow hover className="hover:bg-lightBackground">
+                        <TableCell>
+                          <div className="flex items-center space-x-3">
+                            <IconButton
+                              size="small"
+                              onClick={() => toggleGroupExpand(group.id)}
+                            >
+                              {isExpanded ? (
+                                <KeyboardArrowUp />
+                              ) : (
+                                <KeyboardArrowDown />
+                              )}
+                            </IconButton>
+                            <Avatar className="bg-primary bg-opacity-10">
+                              {visitorTypeConfig[getVisitorType(allVisitors)]
+                                ?.icon || visitorTypeConfig.Other.icon}
+                            </Avatar>
+                            <div>
+                              <Typography
+                                variant="subtitle2"
+                                className="font-semibold"
+                              >
+                                {mainVisitor.visitor_name || "Unknown Visitor"}
+                              </Typography>
+                              <div className="flex items-center space-x-2">
+                                <Typography
+                                  variant="caption"
+                                  className="text-hintText"
+                                >
+                                  {getVisitorType(allVisitors)}
+                                </Typography>
+                                <Chip
+                                  label={`${group.total_entries || allVisitors.length} visits`}
+                                  size="small"
+                                  className="bg-primary bg-opacity-10 text-primary text-xs"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2 mb-1">
+                            <Home fontSize="small" className="text-hintText" />
+                            <Typography variant="body2">
+                              {getFlatNumber(allVisitors)}
+                            </Typography>
+                          </div>
+                          {mainVisitor.phone_number && (
+                            <div className="flex items-center space-x-2">
+                              <Phone
+                                fontSize="small"
+                                className="text-hintText"
+                              />
+                              <Typography
+                                variant="body2"
+                                className="text-hintText"
+                              >
+                                {mainVisitor.phone_number}
+                              </Typography>
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" className="mb-1">
+                            <span className="text-hintText font-medium">
+                              Purpose:
+                            </span>{" "}
+                            {mainVisitor.purpose || "No purpose specified"}
+                          </Typography>
+
+                          {mainVisitor.vehicle_number && (
+                            <div className="flex items-center space-x-2">
+                              <CarIcon
+                                fontSize="small"
+                                className="text-hintText"
+                              />
+                              <Typography
+                                variant="caption"
+                                className="text-hintText"
+                              >
+                                {mainVisitor.vehicle_number}
+                              </Typography>
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" className="font-medium">
+                            {formatDateTime(latestVisitTime)}
+                          </Typography>
                           <Typography
                             variant="caption"
                             className="text-hintText"
                           >
-                            {visitor.vehicle_number}
+                            {getTimeAgo(latestVisitTime)}
                           </Typography>
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" className="font-medium">
-                        {formatDateTime(visitor.in_time)}
-                      </Typography>
-                      <Typography variant="caption" className="text-hintText">
-                        {getTimeAgo(visitor.in_time)}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        icon={statusConfig[visitor.approved_status]?.icon}
-                        label={visitor.approved_status || "Pending"}
-                        size="small"
-                        style={{
-                          backgroundColor:
-                            statusConfig[visitor.approved_status]?.bgColor,
-                          color: statusConfig[visitor.approved_status]?.color,
-                          border: `1px solid ${
-                            statusConfig[visitor.approved_status]?.color
-                          }`,
-                        }}
-                        className="font-medium"
-                      />
-                      {visitor.card_status && (
-                        <Typography
-                          variant="caption"
-                          className="text-hintText block mt-1"
-                        >
-                          <CreditCard fontSize="inherit" />{" "}
-                          {visitor.card_status}
-                        </Typography>
-                      )}
-                    </TableCell>
-                    <TableCell align="center">
-                      <div className="flex justify-center space-x-1">
-                        <IconButton
-                          size="small"
-                          onClick={() => handleViewDetails(visitor)}
-                          className="text-primary hover:bg-lightBackground"
-                        >
-                          <Visibility fontSize="small" />
-                        </IconButton>
-                        {visitor.approved_status === "Pending" && (
-                          <>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col space-y-2">
+                            <Chip
+                              icon={
+                                statusConfig[mainVisitor.approved_status]?.icon
+                              }
+                              label={mainVisitor.approved_status || "Pending"}
+                              size="small"
+                              style={{
+                                backgroundColor:
+                                  statusConfig[mainVisitor.approved_status]
+                                    ?.bgColor,
+                                color:
+                                  statusConfig[mainVisitor.approved_status]
+                                    ?.color,
+                                border: `1px solid ${
+                                  statusConfig[mainVisitor.approved_status]
+                                    ?.color
+                                }`,
+                              }}
+                              className="font-medium w-fit"
+                            />
+                            <div className="flex items-center space-x-1">
+                              <Typography
+                                variant="caption"
+                                className="text-hintText"
+                              >
+                                <Person fontSize="inherit" /> Total Entries:
+                              </Typography>
+                              <Typography
+                                variant="caption"
+                                className="font-semibold text-primary"
+                              >
+                                {group.total_entries || allVisitors.length}
+                              </Typography>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell align="center">
+                          <div className="flex justify-center space-x-1">
                             <IconButton
                               size="small"
-                              onClick={() =>
-                                handleStatusUpdate(visitor.id, "Approved")
-                              }
-                              className="text-success hover:bg-green-50"
+                              onClick={() => handleViewDetails(mainVisitor)}
+                              className="text-primary hover:bg-lightBackground"
                             >
-                              <CheckCircle fontSize="small" />
+                              <Visibility fontSize="small" />
                             </IconButton>
-                            <IconButton
-                              size="small"
-                              onClick={() =>
-                                handleStatusUpdate(visitor.id, "Rejected")
-                              }
-                              className="text-reject hover:bg-red-50"
+                          </div>
+                        </TableCell>
+                      </TableRow>
+
+                      {/* Expanded Rows for Individual Visits */}
+                      {isExpanded && allVisitors.length > 1 && (
+                        <TableRow>
+                          <TableCell colSpan={6} className="p-0">
+                            <Collapse
+                              in={isExpanded}
+                              timeout="auto"
+                              unmountOnExit
                             >
-                              <Close fontSize="small" />
-                            </IconButton>
-                          </>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
+                              <div className="bg-gray-50 p-4">
+                                <Typography
+                                  variant="subtitle2"
+                                  className="font-semibold mb-3 text-gray-700"
+                                >
+                                  All Visits ({allVisitors.length})
+                                </Typography>
+                                <div className="space-y-3">
+                                  {allVisitors.map((visit, index) => (
+                                    <div
+                                      key={visit.id}
+                                      className="flex items-center justify-between bg-white p-3 rounded-lg border border-gray-200"
+                                    >
+                                      <div className="flex-1">
+                                        <Typography
+                                          variant="body2"
+                                          className="font-medium"
+                                        >
+                                          Visit #{index + 1}
+                                        </Typography>
+                                        <Typography
+                                          variant="caption"
+                                          className="text-hintText"
+                                        >
+                                          {formatDateTime(
+                                            visit.in_time || visit.created_at,
+                                          )}
+                                        </Typography>
+                                      </div>
+                                      <div className="flex-1">
+                                        <Typography
+                                          variant="caption"
+                                          className="text-hintText"
+                                        >
+                                          Flat:
+                                        </Typography>
+                                        <Typography
+                                          variant="body2"
+                                          className="font-medium"
+                                        >
+                                          {visit.flat_number || "N/A"}
+                                        </Typography>
+                                      </div>
+                                      <div className="flex-1">
+                                        <Typography
+                                          variant="caption"
+                                          className="text-hintText"
+                                        >
+                                          Status:
+                                        </Typography>
+                                        <Chip
+                                          label={
+                                            visit.approved_status || "Pending"
+                                          }
+                                          size="small"
+                                          style={{
+                                            backgroundColor:
+                                              statusConfig[
+                                                visit.approved_status
+                                              ]?.bgColor,
+                                            color:
+                                              statusConfig[
+                                                visit.approved_status
+                                              ]?.color,
+                                            border: `1px solid ${
+                                              statusConfig[
+                                                visit.approved_status
+                                              ]?.color
+                                            }`,
+                                          }}
+                                          className="font-medium"
+                                        />
+                                      </div>
+                                      <div className="flex-1">
+                                        <Typography
+                                          variant="caption"
+                                          className="text-hintText"
+                                        >
+                                          Type:
+                                        </Typography>
+                                        <Typography variant="body2">
+                                          {visit.visit_type || "normal"}
+                                        </Typography>
+                                      </div>
+                                      <div>
+                                        <IconButton
+                                          size="small"
+                                          onClick={() =>
+                                            handleViewDetails(visit)
+                                          }
+                                          className="text-primary"
+                                        >
+                                          <Visibility fontSize="small" />
+                                        </IconButton>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </Collapse>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </React.Fragment>
+                  );
+                })
               )}
             </TableBody>
           </Table>
@@ -808,6 +908,13 @@ export default function VisitorLog() {
                               ?.color,
                         }}
                       />
+                      {selectedVisitor.visit_type && (
+                        <Chip
+                          label={selectedVisitor.visit_type}
+                          size="small"
+                          className="ml-2 bg-primary bg-opacity-10 text-primary"
+                        />
+                      )}
                     </div>
                   </div>
                 </Grid>
@@ -881,6 +988,11 @@ export default function VisitorLog() {
                       {selectedVisitor.card_status &&
                         ` • ${selectedVisitor.card_status}`}
                     </Typography>
+                    {selectedVisitor.is_card_scan && (
+                      <Typography variant="caption" className="text-hintText">
+                        Scan Status: {selectedVisitor.is_card_scan}
+                      </Typography>
+                    )}
                   </Card>
                 </Grid>
 
@@ -893,10 +1005,14 @@ export default function VisitorLog() {
                       <ScheduleIcon fontSize="small" /> Check-in Time
                     </Typography>
                     <Typography variant="body1" className="font-medium">
-                      {formatDateTime(selectedVisitor.in_time)}
+                      {formatDateTime(
+                        selectedVisitor.in_time || selectedVisitor.created_at,
+                      )}
                     </Typography>
                     <Typography variant="caption" className="text-hintText">
-                      {getTimeAgo(selectedVisitor.in_time)}
+                      {getTimeAgo(
+                        selectedVisitor.in_time || selectedVisitor.created_at,
+                      )}
                     </Typography>
                   </Card>
                 </Grid>
@@ -965,6 +1081,46 @@ export default function VisitorLog() {
                     </Card>
                   </Grid>
                 )}
+
+                {selectedVisitor.image_url && (
+                  <Grid item xs={12} md={6}>
+                    <Card variant="outlined" className="p-3">
+                      <Typography
+                        variant="subtitle2"
+                        className="text-hintText mb-1"
+                      >
+                        Visitor Image
+                      </Typography>
+                      <div className="flex justify-center">
+                        <img
+                          src={selectedVisitor.image_url}
+                          alt="Visitor"
+                          className="rounded-lg max-h-48 object-cover"
+                        />
+                      </div>
+                    </Card>
+                  </Grid>
+                )}
+
+                {selectedVisitor.id_proof_image && (
+                  <Grid item xs={12} md={6}>
+                    <Card variant="outlined" className="p-3">
+                      <Typography
+                        variant="subtitle2"
+                        className="text-hintText mb-1"
+                      >
+                        ID Proof
+                      </Typography>
+                      <div className="flex justify-center">
+                        <img
+                          src={selectedVisitor.id_proof_image}
+                          alt="ID Proof"
+                          className="rounded-lg max-h-48 object-cover"
+                        />
+                      </div>
+                    </Card>
+                  </Grid>
+                )}
               </Grid>
             </DialogContent>
             <DialogActions className="p-4 border-t">
@@ -974,32 +1130,6 @@ export default function VisitorLog() {
               >
                 Close
               </Button>
-              {selectedVisitor.approved_status === "Pending" && (
-                <>
-                  <Button
-                    onClick={() => {
-                      handleStatusUpdate(selectedVisitor.id, "Approved");
-                      setDetailDialogOpen(false);
-                    }}
-                    variant="contained"
-                    className="bg-success hover:bg-green-700 text-white"
-                    startIcon={<CheckCircle />}
-                  >
-                    Approve
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      handleStatusUpdate(selectedVisitor.id, "Rejected");
-                      setDetailDialogOpen(false);
-                    }}
-                    variant="contained"
-                    className="bg-reject hover:bg-red-800 text-white"
-                    startIcon={<Close />}
-                  >
-                    Reject
-                  </Button>
-                </>
-              )}
             </DialogActions>
           </>
         )}

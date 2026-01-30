@@ -227,7 +227,6 @@ const Broadcast = () => {
     }
   };
 
-  // In the fetchBuildingsForSociety function, update the query:
   const fetchBuildingsForSociety = async (societyId) => {
     if (!societyId) return;
 
@@ -259,7 +258,6 @@ const Broadcast = () => {
     }
   };
 
-  // Fetch buildings for newly selected societies
   useEffect(() => {
     selectedSocieties.forEach((society) => {
       if (!allBuildings[society.id]) {
@@ -347,7 +345,7 @@ const Broadcast = () => {
 
   const addFiles = (newFiles) => {
     const validFiles = newFiles.filter((file) => {
-      const maxSize = 10 * 1024 * 1024; // 10MB
+      const maxSize = 10 * 1024 * 1024;
       const allowedTypes = [
         "image/jpeg",
         "image/png",
@@ -585,27 +583,6 @@ const Broadcast = () => {
       return total + society.selectedBuildings.length;
     }, 0);
   };
-  // if (isNotificationSending) {
-  //   return (
-  //     <div className="fixed top-4 right-4 bg-white p-6 shadow-2xl rounded-xl z-50 border border-gray-200 max-w-sm">
-  //       <div className="flex items-center gap-2 mb-2">
-  //         <CircularProgress size={20} />
-  //         <Typography variant="subtitle2" fontWeight={600}>
-  //           Sending notifications...
-  //         </Typography>
-  //       </div>
-  //       <div className="text-sm text-gray-600 mb-3">
-  //         {Math.round(progress)}% complete
-  //       </div>
-  //       <div className="w-full bg-gray-200 rounded-full h-2">
-  //         <div
-  //           className="bg-gradient-to-r from-green-500 to-green-600 h-2 rounded-full transition-all duration-300"
-  //           style={{ width: `${progress}%` }}
-  //         />
-  //       </div>
-  //     </div>
-  //   );
-  // }
 
   return (
     <motion.div

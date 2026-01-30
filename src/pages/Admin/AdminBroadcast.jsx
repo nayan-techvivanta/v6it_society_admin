@@ -195,6 +195,8 @@ const AdminBroadcast = () => {
   const [buildings, setBuildings] = useState([]);
   const [loadingBuildings, setLoadingBuildings] = useState(false);
   const fileInputRef = useRef(null);
+  const userId = Number(localStorage.getItem("profileId"));
+
   const {
     sendBulkNotification,
     isSending: isNotificationSending,
@@ -519,15 +521,13 @@ const AdminBroadcast = () => {
     if (error) throw error;
     return data;
   };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validation (same as before)
     if (!formData.title.trim()) {
       setSnackbar({
         open: true,
-        message: "Please enter a title for the broadcast",
+        message: "Please enter a title",
         severity: "error",
       });
       return;
@@ -554,7 +554,17 @@ const AdminBroadcast = () => {
     if (!societyId) {
       setSnackbar({
         open: true,
-        message: "Society ID not found. Please login again.",
+        message: "Society ID not found",
+        severity: "error",
+      });
+      return;
+    }
+
+    const userId = Number(localStorage.getItem("profileId"));
+    if (!userId) {
+      setSnackbar({
+        open: true,
+        message: "User ID not found",
         severity: "error",
       });
       return;
@@ -563,15 +573,17 @@ const AdminBroadcast = () => {
     setLoading(true);
 
     try {
+      // ---------------- FILE UPLOAD ----------------
       let fileUrls = [];
       if (files.length > 0) {
-        const uploadPromises = files.map((file) =>
-          uploadFileToSupabase(file.file),
+        fileUrls = await Promise.all(
+          files.map((file) => uploadFileToSupabase(file.file)),
         );
-        fileUrls = await Promise.all(uploadPromises);
       }
+
       const imageUrl = fileUrls.length > 0 ? fileUrls[0] : null;
 
+      // ---------------- BUILDING IDS ----------------
       let buildingIds = [];
 
       if (formData.broadcastType === "society") {
@@ -580,49 +592,73 @@ const AdminBroadcast = () => {
         buildingIds = [formData.buildingId];
       }
 
-      if (buildingIds.length > 0) {
-        await sendBulkNotification({
-          buildingIds,
-          title: formData.title.trim(),
-          body: formData.description.trim(),
-          imageUrl,
-          notificationType: "Admin",
-          data: { screen: "admin-broadcast" },
-          societyName: "Admin Society Broadcast",
+      // ---------------- SEND NOTIFICATION ----------------
+      await sendBulkNotification({
+        buildingIds,
+        title: formData.title.trim(),
+        body: formData.description.trim(),
+        imageUrl,
+        notificationType: "Admin",
+        data: { screen: "admin-broadcast" },
+
+        // 🔥 IMPORTANT FOR NOTIFICATION TABLE
+        society_id: societyId,
+        building_id:
+          formData.broadcastType === "building" ? formData.buildingId : null,
+      });
+
+      // ---------------- SAVE BROADCAST (PER BUILDING) ----------------
+      const broadcastInsertPromises = [];
+
+      if (formData.broadcastType === "society") {
+        buildingIds.forEach((buildingId) => {
+          broadcastInsertPromises.push(
+            saveBroadcastToDatabase({
+              title: formData.title.trim(),
+              message: formData.description.trim(),
+              socity_id: String(societyId),
+              building_id: String(buildingId),
+              document: fileUrls.length > 0 ? fileUrls.join(",") : null,
+
+              // 🔥 REQUIRED
+              user_id: userId,
+              created_at: new Date().toISOString(),
+            }),
+          );
         });
+      } else {
+        broadcastInsertPromises.push(
+          saveBroadcastToDatabase({
+            title: formData.title.trim(),
+            message: formData.description.trim(),
+            socity_id: String(societyId),
+            building_id: String(formData.buildingId),
+            document: fileUrls.length > 0 ? fileUrls.join(",") : null,
+
+            // 🔥 REQUIRED
+            user_id: userId,
+            created_at: new Date().toISOString(),
+          }),
+        );
       }
 
-      const broadcastData = {
-        title: formData.title.trim(),
-        message: formData.description.trim(),
-        socity_id: String(societyId),
-        building_id:
-          formData.broadcastType === "building"
-            ? String(formData.buildingId)
-            : null,
-        document: fileUrls.length > 0 ? fileUrls.join(",") : null,
-        created_at: new Date().toISOString(),
-      };
+      await Promise.all(broadcastInsertPromises);
 
-      await saveBroadcastToDatabase(broadcastData);
-
-      const successMessage =
-        formData.broadcastType === "society"
-          ? "Broadcast sent successfully to entire society!"
-          : "Broadcast sent successfully to selected building!";
-
+      // ---------------- SUCCESS ----------------
       setSnackbar({
         open: true,
-        message: successMessage,
+        message:
+          formData.broadcastType === "society"
+            ? "Broadcast sent to entire society!"
+            : "Broadcast sent to selected building!",
         severity: "success",
       });
 
       resetCreateForm();
-
       setViewMode("list");
       fetchBroadcasts();
     } catch (error) {
-      console.error("Error sending broadcast:", error);
+      console.error(error);
       setSnackbar({
         open: true,
         message: `Failed to send broadcast: ${error.message}`,

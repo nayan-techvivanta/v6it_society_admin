@@ -44,6 +44,7 @@ import SaveIcon from "@mui/icons-material/Save";
 import SendIcon from "@mui/icons-material/Send";
 import AttachFileIcon from "@mui/icons-material/AttachFile";
 import EditNoteIcon from "@mui/icons-material/EditNote";
+import TitleIcon from "@mui/icons-material/Title";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
 import ImageIcon from "@mui/icons-material/Image";
@@ -101,6 +102,8 @@ export default function AdminTicket() {
   const [attachedFiles, setAttachedFiles] = useState([]);
   const [uploadProgress, setUploadProgress] = useState({});
   const [uploadErrors, setUploadErrors] = useState([]);
+  const [replyTitle, setReplyTitle] = useState("");
+  const [originalTicketDetails, setOriginalTicketDetails] = useState("");
 
   const statusConfig = {
     open: {
@@ -129,13 +132,11 @@ export default function AdminTicket() {
     },
   };
 
-  // Use useMemo for filtered tickets
   const filteredTickets = useMemo(() => {
     if (!tickets.length) return [];
 
     let filtered = [...tickets];
 
-    // Apply search filter
     if (searchTerm.trim()) {
       const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter((ticket) => {
@@ -150,28 +151,23 @@ export default function AdminTicket() {
       });
     }
 
-    // Apply building filter
     if (selectedBuilding !== "all") {
       filtered = filtered.filter(
         (ticket) => String(ticket.building_id) === String(selectedBuilding),
       );
     }
 
-    // Apply status filter (simplified since no status columns)
     if (statusFilter !== "all") {
-      // For now, all tickets are considered "open"
       filtered = filtered.filter(() => statusFilter === "open");
     }
 
     return filtered;
   }, [tickets, searchTerm, selectedBuilding, statusFilter, users]);
 
-  // Fetch all related data
   const fetchRelatedData = async (ticketsData) => {
     try {
       if (!ticketsData || ticketsData.length === 0) return;
 
-      // Get unique IDs
       const userIds = [
         ...new Set(ticketsData.map((t) => t.user_id).filter(Boolean)),
       ];
@@ -182,7 +178,6 @@ export default function AdminTicket() {
         ...new Set(ticketsData.map((t) => t.building_id).filter(Boolean)),
       ];
 
-      // Fetch users
       if (userIds.length > 0) {
         const { data: usersData, error: usersError } = await supabase
           .from("users")
@@ -198,7 +193,6 @@ export default function AdminTicket() {
         }
       }
 
-      // Fetch societies
       if (societyIds.length > 0) {
         const { data: societiesData, error: societiesError } = await supabase
           .from("societies")
@@ -214,7 +208,6 @@ export default function AdminTicket() {
         }
       }
 
-      // Fetch buildings
       if (buildingIds.length > 0) {
         const { data: buildingsData, error: buildingsError } = await supabase
           .from("buildings")
@@ -239,12 +232,9 @@ export default function AdminTicket() {
     }
   };
 
-  // Fetch all tickets
   const fetchTickets = async () => {
     try {
       setLoading(true);
-
-      // Get society ID from localStorage
       const societyIdStr = localStorage.getItem("societyId");
       const societyId = societyIdStr ? parseInt(societyIdStr) : null;
 
@@ -278,10 +268,8 @@ export default function AdminTicket() {
       console.log("Fetched tickets:", data?.length || 0);
       setTickets(data || []);
 
-      // Calculate stats
       calculateStats(data || []);
 
-      // Fetch related data
       if (data && data.length > 0) {
         await fetchRelatedData(data);
       }
@@ -303,21 +291,17 @@ export default function AdminTicket() {
       closed: 0,
     };
 
-    // If you add status columns later, update this function
     setStats(stats);
   };
 
-  // Handle file attachment
   const handleFileAttach = (event) => {
     const files = Array.from(event.target.files);
 
-    // Validate file count
     if (attachedFiles.length + files.length > 5) {
       alert("Maximum 5 files allowed");
       return;
     }
 
-    // Validate file sizes (10MB each)
     const oversizedFiles = files.filter((file) => file.size > 10 * 1024 * 1024);
     if (oversizedFiles.length > 0) {
       alert(
@@ -340,15 +324,12 @@ export default function AdminTicket() {
 
     setAttachedFiles((prev) => [...prev, ...newFiles]);
 
-    // Upload each file
     newFiles.forEach(async (fileObj) => {
       try {
         setUploadProgress((prev) => ({ ...prev, [fileObj.id]: 0 }));
 
-        // Upload the file using your uploadImage function
         const result = await uploadImage(fileObj.file);
 
-        // Update file status
         setAttachedFiles((prev) =>
           prev.map((f) =>
             f.id === fileObj.id
@@ -379,7 +360,6 @@ export default function AdminTicket() {
       }
     });
 
-    // Reset file input
     event.target.value = "";
   };
 
@@ -406,212 +386,8 @@ export default function AdminTicket() {
     return (bytes / (1024 * 1024)).toFixed(1) + " MB";
   };
 
-  // const handleSendReply = async () => {
-  //   if (!replyText.trim() || !selectedTicket) return;
-
-  //   try {
-  //     setReplyLoading(true);
-
-  //     const uploadedFiles = attachedFiles.filter(
-  //       (f) => f.status === "uploaded" && f.url,
-  //     );
-  //     const fileUrls = uploadedFiles.map((f) => f.url);
-
-  //     const { error: ticketUpdateError } = await supabase
-  //       .from("ticket")
-  //       .update({
-  //         is_ticket_status: true,
-  //         admin_reply: replyText.trim(),
-  //         admin_attachments: fileUrls.length > 0 ? fileUrls : null,
-  //         replied_at: new Date().toISOString(),
-  //       })
-  //       .eq("id", selectedTicket.id);
-
-  //     if (ticketUpdateError) throw ticketUpdateError;
-
-  //     /* 2️⃣ Get user FCM token */
-  //     const { data: userData, error: userError } = await supabase
-  //       .from("users")
-  //       .select("id, fcm_token")
-  //       .eq("id", selectedTicket.user_id)
-  //       .single();
-
-  //     if (userError) throw userError;
-
-  //     const { error: notificationError } = await supabase
-  //       .from("notifications")
-  //       .insert({
-  //         user_id: selectedTicket.user_id,
-  //         title: `Ticket #${selectedTicket.id} Reply`,
-  //         body: replyText.trim(),
-  //         type: "Admin",
-  //         society_id: selectedTicket.society_id,
-  //         building_id: selectedTicket.building_id,
-  //         flat_id: selectedTicket.flat_id,
-  //         document:
-  //           uploadedFiles.length > 0
-  //             ? JSON.stringify(uploadedFiles.map((f) => f.url))
-  //             : null,
-  //       });
-
-  //     if (notificationError) throw notificationError;
-
-  //     if (userData?.fcm_token) {
-  //       const { error: fcmError } = await supabase.functions.invoke(
-  //         "send-notification",
-  //         {
-  //           body: {
-  //             tokens: [userData.fcm_token],
-  //             title: `Ticket #${selectedTicket.id} Reply`,
-  //             body: replyText.trim(),
-  //             type: "Admin",
-  //             data: {
-  //               screen: "ticket",
-  //               ticket_id: selectedTicket.id,
-  //             },
-  //           },
-  //         },
-  //       );
-
-  //       if (fcmError) throw fcmError;
-  //     }
-
-  //     /* 5️⃣ Update local UI */
-  //     setTickets((prev) =>
-  //       prev.map((t) =>
-  //         t.id === selectedTicket.id
-  //           ? {
-  //               ...t,
-  //               is_ticket_status: true,
-  //               admin_reply: replyText.trim(),
-  //               admin_attachments: fileUrls,
-  //               replied_at: new Date().toISOString(),
-  //             }
-  //           : t,
-  //       ),
-  //     );
-
-  //     /* 6️⃣ Reset UI */
-  //     setReplyText("");
-  //     setAttachedFiles([]);
-  //     setUploadProgress({});
-  //     setUploadErrors([]);
-  //     setReplyDialogOpen(false);
-  //     setDetailDialogOpen(false);
-  //   } catch (err) {
-  //     console.error("Reply error:", err);
-  //     alert("Failed to send reply");
-  //   } finally {
-  //     setReplyLoading(false);
-  //   }
-  // };
-  // const handleSendReply = async () => {
-  //   if (!replyText.trim() || !selectedTicket) return;
-
-  //   try {
-  //     setReplyLoading(true);
-
-  //     const uploadedFiles = attachedFiles.filter(
-  //       (f) => f.status === "uploaded" && f.url
-  //     );
-  //     const fileUrls = uploadedFiles.map((f) => f.url);
-
-  //     /* 1️⃣ UPDATE TICKET: only set is_ticket_status */
-  //     const { error: ticketUpdateError } = await supabase
-  //       .from("ticket")
-  //       .update({
-  //         is_ticket_status: true,
-  //       })
-  //       .eq("id", selectedTicket.id);
-
-  //     if (ticketUpdateError) throw ticketUpdateError;
-
-  //     /* 2️⃣ GET USER FCM TOKEN */
-  //     const { data: userData, error: userError } = await supabase
-  //       .from("users")
-  //       .select("id, fcm_token")
-  //       .eq("id", selectedTicket.user_id)
-  //       .single();
-
-  //     if (userError) throw userError;
-
-  //     /* 3️⃣ GET flat_id FROM user_flats using user_id */
-  //     const { data: userFlatData, error: userFlatError } = await supabase
-  //       .from("user_flats")
-  //       .select("flat_id")
-  //       .eq("user_id", selectedTicket.user_id)
-  //       .limit(1) // in case user has multiple flats, get one
-  //       .single();
-
-  //     if (userFlatError) throw userFlatError;
-
-  //     const flatId = userFlatData?.flat_id || null;
-
-  //     /* 4️⃣ INSERT NOTIFICATION */
-  //     const { error: notificationError } = await supabase
-  //       .from("notifications")
-  //       .insert({
-  //         user_id: selectedTicket.user_id,
-  //         title: `Ticket #${selectedTicket.id} Reply`,
-  //         body: replyText.trim(),
-  //         type: "Admin",
-  //         society_id: selectedTicket.society_id,
-  //         building_id: selectedTicket.building_id,
-  //         flat_id: flatId,
-  //         document: fileUrls.length ? JSON.stringify(fileUrls) : null,
-  //       });
-
-  //     if (notificationError) throw notificationError;
-
-  //     /* 5️⃣ SEND FCM */
-  //     if (userData?.fcm_token) {
-  //       const { error: fcmError } = await supabase.functions.invoke(
-  //         "send-notification",
-  //         {
-  //           body: {
-  //             tokens: [userData.fcm_token],
-  //             title: `Ticket #${selectedTicket.id} Reply`,
-  //             body: replyText.trim(),
-  //             type: "Admin",
-  //             data: {
-  //               screen: "ticket",
-  //               ticket_id: selectedTicket.id,
-  //             },
-  //           },
-  //         }
-  //       );
-
-  //       if (fcmError) throw fcmError;
-  //     }
-
-  //     /* 6️⃣ UPDATE LOCAL STATE */
-  //     setTickets((prev) =>
-  //       prev.map((t) =>
-  //         t.id === selectedTicket.id
-  //           ? {
-  //               ...t,
-  //               is_ticket_status: true,
-  //             }
-  //           : t
-  //       )
-  //     );
-
-  //     /* 7️⃣ RESET UI */
-  //     setReplyText("");
-  //     setAttachedFiles([]);
-  //     setUploadProgress({});
-  //     setUploadErrors([]);
-  //     setReplyDialogOpen(false);
-  //     setDetailDialogOpen(false);
-  //   } catch (err) {
-  //     console.error("Reply error:", err);
-  //     alert("Failed to send reply");
-  //   } finally {
-  //     setReplyLoading(false);
-  //   }
-  // };
   const handleSendReply = async () => {
-    if (!replyText.trim() || !selectedTicket) return;
+    if (!replyTitle.trim() || !replyText.trim() || !selectedTicket) return;
 
     try {
       setReplyLoading(true);
@@ -621,17 +397,6 @@ export default function AdminTicket() {
       );
       const fileUrls = uploadedFiles.map((f) => f.url);
 
-      /* 1️⃣ UPDATE TICKET: only set is_ticket_status */
-      const { error: ticketUpdateError } = await supabase
-        .from("ticket")
-        .update({
-          is_ticket_status: true,
-        })
-        .eq("id", selectedTicket.id);
-
-      if (ticketUpdateError) throw ticketUpdateError;
-
-      /* 2️⃣ GET USER FCM TOKEN */
       const { data: userData, error: userError } = await supabase
         .from("users")
         .select("id, fcm_token")
@@ -640,33 +405,44 @@ export default function AdminTicket() {
 
       if (userError) throw userError;
 
-      /* 3️⃣ GET flat_id FROM user_flats using user_id */
-      const { data: userFlatData, error: userFlatError } = await supabase
-        .from("user_flats")
-        .select("flat_id")
-        .eq("user_id", selectedTicket.user_id)
-        .limit(1) // in case user has multiple flats, get one
-        .single();
+      let flatId = selectedTicket.flat_id || null;
 
-      if (userFlatError) throw userFlatError;
+      if (!flatId) {
+        const { data: userFlatData, error: userFlatError } = await supabase
+          .from("user_flats")
+          .select("flat_id")
+          .eq("user_id", selectedTicket.user_id)
+          .eq("society_id", selectedTicket.society_id)
+          .limit(1)
+          .single();
 
-      const flatId = userFlatData?.flat_id || null;
+        if (!userFlatError && userFlatData) {
+          flatId = userFlatData.flat_id;
+        }
+      }
 
-      /* 4️⃣ INSERT NOTIFICATION */
+      /* 3️⃣ INSERT NOTIFICATION */
       const { error: notificationError } = await supabase
         .from("notifications")
         .insert({
           user_id: selectedTicket.user_id,
-          title: `Ticket #${selectedTicket.id} Reply`,
+          title: replyTitle.trim(),
           body: replyText.trim(),
           type: "Admin",
           society_id: selectedTicket.society_id,
-          building_id: selectedTicket.building_id,
+          building_id: selectedTicket.building_id ?? null,
           flat_id: flatId,
-          document: fileUrls.length ? JSON.stringify(fileUrls) : null,
+          document: fileUrls.length ? fileUrls[0] : null,
         });
 
       if (notificationError) throw notificationError;
+
+      const { error: ticketUpdateError } = await supabase
+        .from("ticket")
+        .update({ is_ticket_status: true })
+        .eq("id", Number(selectedTicket.id));
+
+      if (ticketUpdateError) throw ticketUpdateError;
 
       /* 5️⃣ SEND FCM */
       if (userData?.fcm_token) {
@@ -675,7 +451,7 @@ export default function AdminTicket() {
           {
             body: {
               tokens: [userData.fcm_token],
-              title: `Ticket #${selectedTicket.id} Reply`,
+              title: replyTitle.trim(),
               body: replyText.trim(),
               type: "Admin",
               data: {
@@ -692,16 +468,12 @@ export default function AdminTicket() {
       /* 6️⃣ UPDATE LOCAL STATE */
       setTickets((prev) =>
         prev.map((t) =>
-          t.id === selectedTicket.id
-            ? {
-                ...t,
-                is_ticket_status: true,
-              }
-            : t,
+          t.id === selectedTicket.id ? { ...t, is_ticket_status: true } : t,
         ),
       );
 
       /* 7️⃣ RESET UI */
+      setReplyTitle("");
       setReplyText("");
       setAttachedFiles([]);
       setUploadProgress({});
@@ -730,10 +502,8 @@ export default function AdminTicket() {
 
         if (error) throw error;
 
-        // Update local state
         setTickets((prev) => prev.filter((ticket) => ticket.id !== ticketId));
 
-        // Show success message
         console.log("Ticket deleted successfully");
       } catch (error) {
         console.error("Error deleting ticket:", error);
@@ -751,12 +521,15 @@ export default function AdminTicket() {
     if (!dateTime) return "N/A";
     return dayjs(dateTime).fromNow();
   };
-
+  const handleOpenReplyDialog = (ticket) => {
+    setSelectedTicket(ticket);
+    setOriginalTicketDetails(ticket.details || "No description provided");
+    setReplyDialogOpen(true);
+  };
   useEffect(() => {
     fetchTickets();
   }, []);
 
-  // Log for debugging
   useEffect(() => {
     console.log("Tickets state updated:", tickets.length);
     console.log("Filtered tickets:", filteredTickets.length);
@@ -1073,10 +846,7 @@ export default function AdminTicket() {
                             <Tooltip title="Reply & Close">
                               <IconButton
                                 size="small"
-                                onClick={() => {
-                                  setSelectedTicket(ticket);
-                                  setReplyDialogOpen(true);
-                                }}
+                                onClick={() => handleOpenReplyDialog(ticket)}
                                 className="text-green-600 hover:bg-green-50"
                               >
                                 <ChatIcon fontSize="small" />
@@ -1265,6 +1035,7 @@ export default function AdminTicket() {
       </Dialog>
 
       {/* Reply Dialog */}
+      {/* Reply Dialog */}
       <Dialog
         open={replyDialogOpen}
         onClose={() => !replyLoading && setReplyDialogOpen(false)}
@@ -1291,12 +1062,8 @@ export default function AdminTicket() {
           }}
         >
           <ChatBubbleOutlineIcon sx={{ color: "primary.main" }} />
-          <Typography
-            variant="h6"
-            component="span"
-            sx={{ color: "primary.main", fontWeight: 600 }}
-          >
-            Reply to Ticket #{selectedTicket?.id}
+          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+            Compose Reply
           </Typography>
           <Chip
             label="Reply"
@@ -1317,10 +1084,112 @@ export default function AdminTicket() {
           />
         </DialogTitle>
 
-        <DialogContent sx={{ py: 3 }}>
+        <DialogContent sx={{ mt: "10px", py: 1 }}>
+          {/* Original Ticket Message Section */}
+          <Box
+            sx={{
+              mb: 3,
+              p: 2,
+              borderRadius: 2,
+              backgroundColor: "rgba(0, 0, 0, 0.02)",
+              border: "1px solid",
+              borderColor: "divider",
+            }}
+          >
+            <Typography
+              variant="subtitle2"
+              sx={{
+                mb: 1,
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                color: "text.secondary",
+                fontWeight: 600,
+              }}
+            >
+              <DescriptionIcon fontSize="small" />
+              Original Ticket Message
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{
+                whiteSpace: "pre-wrap",
+                color: "text.primary",
+                fontStyle: "normal",
+                lineHeight: 1.6,
+              }}
+            >
+              {originalTicketDetails}
+            </Typography>
+            {selectedTicket?.image && (
+              <Box
+                sx={{ mt: 1, display: "flex", alignItems: "center", gap: 1 }}
+              >
+                <ImageIcon fontSize="small" sx={{ color: "primary.main" }} />
+                <Typography variant="caption" color="primary.main">
+                  Ticket includes an attached image
+                </Typography>
+              </Box>
+            )}
+          </Box>
+
+          {/* Divider */}
+          <Box sx={{ mb: 3, display: "flex", alignItems: "center", gap: 1 }}>
+            <Box
+              sx={{ flexGrow: 1, height: "1px", backgroundColor: "divider" }}
+            />
+            <Typography variant="caption" color="text.secondary">
+              Your Response
+            </Typography>
+            <Box
+              sx={{ flexGrow: 1, height: "1px", backgroundColor: "divider" }}
+            />
+          </Box>
+
+          {/* Title Field */}
+          <TextField
+            fullWidth
+            placeholder="Reply title..."
+            value={replyTitle}
+            onChange={(e) => setReplyTitle(e.target.value)}
+            variant="outlined"
+            sx={{
+              mb: 3,
+              "& .MuiOutlinedInput-root": {
+                borderRadius: 2,
+                "&:hover": {
+                  "& .MuiOutlinedInput-notchedOutline": {
+                    borderColor: "primary.main",
+                    borderWidth: 2,
+                  },
+                },
+                "&.Mui-focused": {
+                  "& .MuiOutlinedInput-notchedOutline": {
+                    borderColor: "primary.main",
+                    borderWidth: 2,
+                  },
+                },
+              },
+              "& .MuiOutlinedInput-notchedOutline": {
+                borderColor: "rgba(111, 11, 20, 0.2)",
+              },
+            }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <TitleIcon
+                    sx={{ color: replyTitle ? "primary.main" : "#A29EB6" }}
+                  />
+                </InputAdornment>
+              ),
+            }}
+            disabled={replyLoading}
+          />
+
+          {/* Description/Message Field */}
           <TextField
             multiline
-            rows={8}
+            rows={6}
             fullWidth
             placeholder="Write your reply here...
       
@@ -1331,7 +1200,7 @@ export default function AdminTicket() {
             onChange={(e) => setReplyText(e.target.value)}
             variant="outlined"
             sx={{
-              mt: "10px",
+              mb: 2,
               "& .MuiOutlinedInput-root": {
                 borderRadius: 2,
                 "&:hover": {
@@ -1362,6 +1231,20 @@ export default function AdminTicket() {
             }}
             disabled={replyLoading}
           />
+
+          {/* Character Counter */}
+          <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 3 }}>
+            <Typography
+              variant="caption"
+              sx={{
+                color:
+                  replyText.length > 5000 ? "error.main" : "text.secondary",
+                fontWeight: replyText.length > 4500 ? 600 : 400,
+              }}
+            >
+              {replyText.length}/5000 characters
+            </Typography>
+          </Box>
 
           {/* Attach Files Section */}
           <Box
@@ -1408,18 +1291,6 @@ export default function AdminTicket() {
             <Typography variant="caption" color="text.secondary">
               Max 5 files, 10MB each
             </Typography>
-            <Box sx={{ ml: "auto" }}>
-              <Typography
-                variant="caption"
-                sx={{
-                  color:
-                    replyText.length > 5000 ? "error.main" : "text.secondary",
-                  fontWeight: replyText.length > 4500 ? 600 : 400,
-                }}
-              >
-                {replyText.length}/5000 characters
-              </Typography>
-            </Box>
           </Box>
 
           {/* Attached Files List */}
@@ -1519,52 +1390,6 @@ export default function AdminTicket() {
               ))}
             </Alert>
           )}
-
-          {/* Preview Section */}
-          <Box
-            sx={{
-              mt: 3,
-              p: 2,
-              borderRadius: 2,
-              backgroundColor: "rgba(111, 11, 20, 0.03)",
-              border: "1px solid",
-              borderColor: "rgba(111, 11, 20, 0.1)",
-            }}
-          >
-            <Typography
-              variant="subtitle2"
-              sx={{
-                mb: 1,
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
-                color: "primary.main",
-                fontWeight: 600,
-              }}
-            >
-              <VisibilityIcon fontSize="small" />
-              Preview
-            </Typography>
-            <Typography
-              variant="body2"
-              sx={{
-                minHeight: 60,
-                whiteSpace: "pre-wrap",
-                fontStyle: replyText ? "normal" : "italic",
-                color: replyText ? "text.primary" : "text.secondary",
-              }}
-            >
-              {replyText || "Your reply will appear here..."}
-            </Typography>
-            {attachedFiles.some((f) => f.status === "uploaded") && (
-              <Box sx={{ mt: 2 }}>
-                <Typography variant="caption" color="text.secondary">
-                  {attachedFiles.filter((f) => f.status === "uploaded").length}{" "}
-                  file(s) will be attached
-                </Typography>
-              </Box>
-            )}
-          </Box>
         </DialogContent>
 
         <DialogActions
@@ -1580,9 +1405,12 @@ export default function AdminTicket() {
             onClick={() => {
               if (!replyLoading) {
                 setReplyDialogOpen(false);
+                setReplyTitle("");
+                setReplyText("");
                 setAttachedFiles([]);
                 setUploadProgress({});
                 setUploadErrors([]);
+                setOriginalTicketDetails(""); // Clear the original message
               }
             }}
             disabled={replyLoading}
@@ -1603,6 +1431,7 @@ export default function AdminTicket() {
             variant="contained"
             onClick={handleSendReply}
             disabled={
+              !replyTitle.trim() ||
               !replyText.trim() ||
               replyLoading ||
               attachedFiles.some((f) => f.status === "pending")

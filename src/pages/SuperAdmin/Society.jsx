@@ -177,6 +177,20 @@ const SocietyRow = ({
             {society.country}
           </Typography>
         </TableCell>
+        <TableCell className="p-4" align="center">
+          <Chip
+            label={society.is_card_facility ? "Yes" : "No"}
+            size="small"
+            sx={{
+              backgroundColor: society.is_card_facility
+                ? "rgba(34,197,94,0.15)"
+                : "rgba(239,68,68,0.15)",
+              color: society.is_card_facility ? "#15803D" : "#B91C1C",
+              fontWeight: 600,
+              fontSize: "0.75rem",
+            }}
+          />
+        </TableCell>
 
         <TableCell className="p-4">
           <Chip
@@ -965,6 +979,7 @@ export default function Society() {
     "City",
     "State",
     "Country",
+    "Card Facility",
     "Pincode",
     "Status",
     "Actions",

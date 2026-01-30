@@ -13,6 +13,8 @@ import {
   Alert,
   alpha,
   InputAdornment,
+  FormControlLabel,
+  Switch,
 } from "@mui/material";
 import {
   Close,
@@ -44,13 +46,13 @@ const AddSocietyDialog = ({
     country: "",
     pincode: "",
     location: "",
+    is_card_facility: false,
   });
 
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [touched, setTouched] = useState({});
 
-  // Initialize form data
   useEffect(() => {
     if (open) {
       if (isEdit && society) {
@@ -62,6 +64,7 @@ const AddSocietyDialog = ({
           country: society.country || "",
           pincode: society.pincode || "",
           location: society.location || "",
+          is_card_facility: society.is_card_facility ?? false,
         });
       } else {
         setFormData({
@@ -72,6 +75,7 @@ const AddSocietyDialog = ({
           country: "",
           pincode: "",
           location: "",
+          is_card_facility: false,
         });
       }
       setErrors({});
@@ -88,6 +92,7 @@ const AddSocietyDialog = ({
     if (!formData.state.trim()) newErrors.state = "State is required";
     if (!formData.country.trim()) newErrors.country = "Country is required";
     if (!formData.pincode.trim()) newErrors.pincode = "Pincode is required";
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -531,7 +536,38 @@ const AddSocietyDialog = ({
                 size="small"
               />
             </Box>
+            <Box sx={{ mb: 3 }}>
+              <Typography
+                component="label"
+                variant="caption"
+                fontWeight={600}
+                display="block"
+                mb={1}
+                color="#6F0B14"
+              >
+                Card Facility Available
+              </Typography>
 
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={formData.is_card_facility}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        is_card_facility: e.target.checked,
+                      }))
+                    }
+                    color="success"
+                  />
+                }
+                label={
+                  <Typography fontWeight={600}>
+                    {formData.is_card_facility ? "Yes" : "No"}
+                  </Typography>
+                }
+              />
+            </Box>
             {/* Dialog Actions */}
             <DialogActions
               sx={{
