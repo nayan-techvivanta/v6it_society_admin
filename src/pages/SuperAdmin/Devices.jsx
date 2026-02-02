@@ -260,25 +260,25 @@ export default function Devices() {
       setLoading(true);
 
       // Fetch devices with joined data from societies and buildings
-      const { data: devicesData, error } = await supabase
+      const { data, error } = await supabase
         .from("devices")
         .select(
           `
     id,
     device_serial_number,
     created_at,
-    society_id,
-    building_id,
-    flat_id,
-    societies (
+
+    societies!devices_society_id_fkey (
       id,
       name
     ),
-    buildings (
+
+    buildings!devices_building_id_fkey (
       id,
       name
     ),
-    flats (
+
+    flats!devices_flat_id_fkey (
       id,
       flat_number,
       floor_number,
@@ -291,29 +291,17 @@ export default function Devices() {
       if (error) throw error;
 
       // Format the data
-      // const formattedDevices = devicesData.map((device) => ({
-      //   id: device.id,
-      //   device_serial_number: device.device_serial_number,
-      //   society_name: device.societies?.name || null,
-      //   building_name: device.buildings?.name || null,
-      //   society_id: device.societies?.id || null,
-      //   building_id: device.buildings?.id || null,
-      //   flat_id: device.flats?.id || null,
-      //   created_at: device.created_at,
-      //   avatar:
-      //     device.device_serial_number?.substring(0, 2).toUpperCase() || "DV",
-      //   last_seen: new Date().toISOString(), // You might want to fetch this from another table
-      // }));
-      const formattedDevices = devicesData.map((device) => ({
+
+      const formattedDevices = data.map((device) => ({
         id: device.id,
         device_serial_number: device.device_serial_number,
 
-        society_id: device.societies?.id || null,
-        building_id: device.buildings?.id || null,
-        flat_id: device.flats?.id || null,
+        society_id: device.societies?.id ?? null,
+        building_id: device.buildings?.id ?? null,
+        flat_id: device.flats?.id ?? null,
 
-        society_name: device.societies?.name || "Not Assigned",
-        building_name: device.buildings?.name || "Not Assigned",
+        society_name: device.societies?.name ?? "Not Assigned",
+        building_name: device.buildings?.name ?? "Not Assigned",
 
         flat_name: device.flats
           ? `${device.flats.flat_number} (Floor ${device.flats.floor_number})`
