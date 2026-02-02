@@ -1,302 +1,191 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
+  Card,
+  CardContent,
   Typography,
-  Paper,
+  Grid,
+  Chip,
+  IconButton,
+  TextField,
+  MenuItem,
+  Select,
+  FormControl,
+  InputLabel,
+  Button,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  Chip,
-  IconButton,
-  Button,
-  CircularProgress,
-  Alert,
-  TextField,
-  InputAdornment,
+  Paper,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  MenuItem,
-  Select,
-  FormControl,
-  InputLabel,
-  Card,
-  CardContent,
-  Grid,
   Avatar,
-  TablePagination,
+  InputAdornment,
   Tooltip,
+  CircularProgress,
   Badge,
-  Skeleton,
+  Tabs,
+  Tab,
+  Collapse,
+  CardMedia,
 } from "@mui/material";
-import ExitToAppIcon from "@mui/icons-material/ExitToApp";
-import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import {
-  Search as SearchIcon,
-  Visibility as VisibilityIcon,
-  CheckCircle as CheckCircleIcon,
-  Cancel as CancelIcon,
-  Schedule as ScheduleIcon,
-  Refresh as RefreshIcon,
-  DirectionsCar as CarIcon,
-  LocalShipping as DeliveryIcon,
-  Person as PersonIcon,
-  Build as MaintenanceIcon,
-  MoreHoriz as OtherIcon,
-  AccessTime as InTimeIcon,
-  ExitToApp as OutTimeIcon,
-  Home as HomeIcon,
-  Business as BuildingIcon,
-  Apartment as ApartmentIcon,
-  Download as DownloadIcon,
-  FilterAlt as FilterAltIcon,
+  Search,
+  Refresh,
+  Visibility,
+  CheckCircle,
+  Cancel,
+  Schedule,
+  DirectionsWalk,
+  DirectionsCar,
+  LocalShipping,
+  Build,
+  MoreVert,
+  Person,
+  Phone,
+  Home,
+  CreditCard,
+  Apartment,
+  Domain,
+  AccessTime,
   Image as ImageIcon,
-  Margin,
+  Security,
+  ScheduleSend,
+  ExitToApp,
+  DriveEta,
+  EventNote,
+  CreditCardOff,
+  RadioButtonUnchecked,
+  Warning,
+  ExpandMore,
+  ExpandLess,
 } from "@mui/icons-material";
-import { motion, AnimatePresence } from "framer-motion";
-import { styled } from "@mui/material/styles";
 import { supabase } from "../../api/supabaseClient";
+import { fetchSocietyVisitors } from "../../api/visitors";
+import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
+import "dayjs/locale/en";
 
-// Styled components
-const GradientButton = styled(Button)(({ theme }) => ({
-  background: "linear-gradient(135deg, #6F0B14 0%, #8A0F1B 60%, #6F0B14 100%)",
-  color: "#FFFFFF",
-  fontFamily: "'Roboto', sans-serif",
-  fontWeight: 600,
-  borderRadius: "10px",
-  textTransform: "none",
-  fontSize: "15px",
-  letterSpacing: "0.4px",
-  boxShadow: "0 6px 18px rgba(111, 11, 20, 0.25)",
-  "&:hover": {
-    background:
-      "linear-gradient(135deg, #8A0F1B 0%, #A51423 60%, #8A0F1B 100%)",
-    boxShadow: "0 10px 26px rgba(111, 11, 20, 0.35)",
-    transform: "translateY(-1px)",
-  },
-  "&:active": { transform: "translateY(0)" },
-  "&:disabled": {
-    background: "#E5E7EB",
-    color: "#9CA3AF",
-    boxShadow: "none",
-    transform: "none",
-  },
-}));
-
-const StyledCard = styled(Card)(({ theme }) => ({
-  borderRadius: "12px",
-  boxShadow: "0 4px 20px rgba(111, 11, 20, 0.08)",
-  background: "linear-gradient(135deg, #ffffff 0%, #fef2f3 100%)",
-  border: "1px solid rgba(111, 11, 20, 0.1)",
-}));
-
-const StatusChip = styled(Chip)(({ status }) => ({
-  fontFamily: "'Roboto', sans-serif",
-  fontWeight: 500,
-  ...(status === "Approved" && {
-    backgroundColor: "#E6F4E6",
-    color: "#008000",
-  }),
-  ...(status === "Pending" && {
-    backgroundColor: "#FFF8E1",
-    color: "#DBA400",
-  }),
-  ...(status === "Rejected" && {
-    backgroundColor: "#FDE8E8",
-    color: "#B31B1B",
-  }),
-  ...(status === "Reschedule" && {
-    backgroundColor: "#FFE5CC",
-    color: "#E86100",
-  }),
-  ...(status === "Checkout" && {
-    backgroundColor: "#E3F2FD",
-    color: "#1565C0",
-  }),
-  ...(status === "PartialCheckout" && {
-    backgroundColor: "#E8EAF6",
-    color: "#3F51B5",
-  }),
-}));
-
-const VisitorTypeIcon = ({ type }) => {
-  switch (type) {
-    case "Delivery":
-      return <DeliveryIcon fontSize="small" />;
-    case "Cab":
-      return <CarIcon fontSize="small" />;
-    case "Maintenance":
-      return <MaintenanceIcon fontSize="small" />;
-    case "Other":
-      return <OtherIcon fontSize="small" />;
-    default:
-      return <PersonIcon fontSize="small" />;
-  }
-};
-
-// Animation variants
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1,
-    },
-  },
-};
-
-const itemVariants = {
-  hidden: { y: 20, opacity: 0 },
-  visible: {
-    y: 0,
-    opacity: 1,
-    transition: {
-      type: "spring",
-      stiffness: 100,
-      damping: 12,
-    },
-  },
-};
-
-// Helper function to get image URL
-const getImageUrl = (imageUrl) => {
-  if (!imageUrl) return null;
-
-  // If it's already a full URL
-  if (imageUrl.startsWith("http")) {
-    return imageUrl;
-  }
-
-  // If it's a Supabase storage path, construct the URL
-  if (imageUrl.startsWith("visitors/")) {
-    const { data } = supabase.storage.from("images").getPublicUrl(imageUrl);
-    return data?.publicUrl || null;
-  }
-
-  return null;
-};
-
-// Helper function to format date
-const formatDate = (dateString) => {
-  if (!dateString) return "N/A";
-  try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return "Invalid Date";
-
-    const day = date.getDate().toString().padStart(2, "0");
-    const month = date.toLocaleString("default", { month: "short" });
-    const year = date.getFullYear();
-    const hours = date.getHours() % 12 || 12;
-    const minutes = date.getMinutes().toString().padStart(2, "0");
-    const ampm = date.getHours() >= 12 ? "PM" : "AM";
-
-    return `${day} ${month} ${year}, ${hours}:${minutes} ${ampm}`;
-  } catch {
-    return "Invalid Date";
-  }
-};
-
-// Helper function to format time difference
-const formatTimeAgo = (dateString) => {
-  if (!dateString) return "N/A";
-  try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return "Invalid Date";
-
-    const now = new Date();
-    const diffMs = now - date;
-    const diffSec = Math.floor(diffMs / 1000);
-    const diffMin = Math.floor(diffSec / 60);
-    const diffHour = Math.floor(diffMin / 60);
-    const diffDay = Math.floor(diffHour / 24);
-
-    if (diffDay > 0) {
-      return `${diffDay} day${diffDay === 1 ? "" : "s"} ago`;
-    } else if (diffHour > 0) {
-      return `${diffHour} hour${diffHour === 1 ? "" : "s"} ago`;
-    } else if (diffMin > 0) {
-      return `${diffMin} minute${diffMin === 1 ? "" : "s"} ago`;
-    } else {
-      return "just now";
-    }
-  } catch {
-    return "Invalid Date";
-  }
-};
+dayjs.extend(relativeTime);
 
 export default function PmVisitors() {
-  // State variables
-  const [visitors, setVisitors] = useState([]);
+  const [visitorGroups, setVisitorGroups] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [pmId, setPmId] = useState(null);
-  const [assignedSocieties, setAssignedSocieties] = useState([]);
-  const [filteredVisitors, setFilteredVisitors] = useState([]);
-  const [imageLoading, setImageLoading] = useState({});
-
-  // Filters
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [visitorTypeFilter, setVisitorTypeFilter] = useState("all");
-  const [societyFilter, setSocietyFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");
-
-  // Pagination
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-
-  // Dialog states
+  const [societyFilter, setSocietyFilter] = useState("all");
   const [selectedVisitor, setSelectedVisitor] = useState(null);
-  const [viewDialogOpen, setViewDialogOpen] = useState(false);
-
-  // Stats
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [assignedSocieties, setAssignedSocieties] = useState([]);
   const [stats, setStats] = useState({
     total: 0,
     pending: 0,
     approved: 0,
-    rejected: 0,
-    checkout: 0,
-    today: 0,
+    checkedOut: 0,
+    societies: 0,
   });
+  const [tabValue, setTabValue] = useState(0);
+  const [expandedVisitors, setExpandedVisitors] = useState({});
+  const [pmId, setPmId] = useState(null);
 
-  // Fetch PM ID and assigned societies
-  useEffect(() => {
-    const fetchPMData = async () => {
+  const statusConfig = {
+    Pending: {
+      color: "#DBA400",
+      bgColor: "rgba(219, 164, 0, 0.1)",
+      icon: <Schedule />,
+      label: "Pending",
+    },
+    Approved: {
+      color: "#008000",
+      bgColor: "rgba(0, 128, 0, 0.1)",
+      icon: <CheckCircle />,
+      label: "Approved",
+    },
+    Rejected: {
+      color: "#B31B1B",
+      bgColor: "rgba(179, 27, 27, 0.1)",
+      icon: <Cancel />,
+      label: "Rejected",
+    },
+    Reschedule: {
+      color: "#E86100",
+      bgColor: "rgba(232, 97, 0, 0.1)",
+      icon: <ScheduleSend />,
+      label: "Reschedule",
+    },
+    Checkout: {
+      color: "#6F0B14",
+      bgColor: "rgba(111, 11, 20, 0.1)",
+      icon: <ExitToApp />,
+      label: "Checked Out",
+    },
+  };
+
+  const visitorTypeConfig = {
+    Guest: {
+      icon: <DirectionsWalk />,
+      color: "#6F0B14",
+      label: "Guest",
+    },
+    Delivery: {
+      icon: <LocalShipping />,
+      color: "#E86100",
+      label: "Delivery",
+    },
+    Cab: {
+      icon: <DirectionsCar />,
+      color: "#008000",
+      label: "Cab",
+    },
+    Maintenance: {
+      icon: <Build />,
+      color: "#DBA400",
+      label: "Maintenance",
+    },
+    Other: {
+      icon: <MoreVert />,
+      color: "#A29EB6",
+      label: "Other",
+    },
+  };
+
+  // Fetch PM's assigned societies
+  const fetchAssignedSocieties = async () => {
+    try {
+      // Get PM profile ID from localStorage
       const profileId = localStorage.getItem("profileId");
       if (!profileId) {
-        setError("Please login to access visitor data.");
+        console.error("No profile ID found in localStorage");
         setLoading(false);
         return;
       }
-      setPmId(profileId);
-      await fetchAssignedSocieties(profileId);
-    };
-    fetchPMData();
-  }, []);
 
-  // Fetch assigned societies
-  const fetchAssignedSocieties = async (pmId) => {
-    try {
+      setPmId(profileId);
+
+      // Fetch PM's assigned societies
       const { data: pmSocieties, error: pmError } = await supabase
         .from("pm_society")
         .select("society_id")
-        .eq("pm_id", pmId);
+        .eq("pm_id", profileId);
 
       if (pmError) throw pmError;
 
       if (!pmSocieties || pmSocieties.length === 0) {
         setAssignedSocieties([]);
-        setError("No societies are assigned to you yet.");
         setLoading(false);
         return;
       }
 
       const societyIds = pmSocieties.map((item) => item.society_id);
 
+      // Fetch society details
       const { data: societiesData, error: societiesError } = await supabase
         .from("societies")
         .select("id, name")
@@ -308,1469 +197,1157 @@ export default function PmVisitors() {
       setAssignedSocieties(societiesData || []);
 
       // Fetch visitors for these societies
-      await fetchVisitors(societyIds);
+      await fetchAllVisitors(societiesData);
     } catch (error) {
       console.error("Error fetching assigned societies:", error);
-      setError("Failed to load your assigned societies.");
       setLoading(false);
     }
   };
 
-  // Fetch visitors for assigned societies
-  const fetchVisitors = async (societyIds) => {
-    setLoading(true);
+  // Fetch visitors for all assigned societies
+  const fetchAllVisitors = async (societies) => {
     try {
-      const { data, error } = await supabase
-        .from("visitors")
-        .select(
-          `
-          *,
-          buildings(name),
-          societies(name),
-          flats(flat_number)
-        `,
-        )
-        .in("society_id", societyIds)
-        .eq("is_delete", false)
-        .order("created_at", { ascending: false });
+      setLoading(true);
+      const allGroups = [];
+      const allVisitors = [];
 
-      if (error) throw error;
+      // Fetch visitors for each assigned society
+      for (const society of societies) {
+        try {
+          const result = await fetchSocietyVisitors(society.id.toString());
 
-      // Process image URLs
-      const processedVisitors = data.map((visitor) => ({
-        ...visitor,
-        imageUrl: getImageUrl(visitor.image_url),
-        idProofImageUrl: getImageUrl(visitor.id_proof_image),
-      }));
+          if (result.success && result.visitors) {
+            const groupsWithSocietyInfo = result.visitors.map((group) => ({
+              ...group,
+              society_id: society.id,
+              society_name: society.name,
+              all_visitors: (group.all_visitors || []).map((visitor) => ({
+                ...visitor,
+                society_id: society.id,
+                society_name: society.name,
+                flat_number: visitor.flat_number || group.flat_number || null,
+              })),
+            }));
 
-      setVisitors(processedVisitors || []);
-      setFilteredVisitors(processedVisitors || []);
-      updateStats(processedVisitors || []);
-      setError(null);
+            allGroups.push(...groupsWithSocietyInfo);
+
+            const flattenedVisitors = result.visitors.flatMap(
+              (group) => group.all_visitors || [],
+            );
+            allVisitors.push(...flattenedVisitors);
+          }
+        } catch (error) {
+          console.error(
+            `Error fetching visitors for society ${society.name}:`,
+            error,
+          );
+        }
+      }
+
+      setVisitorGroups(allGroups);
+      calculateStats(allVisitors);
     } catch (error) {
-      console.error("Error fetching visitors:", error);
-      setError("Failed to load visitor data.");
-      setVisitors([]);
-      setFilteredVisitors([]);
+      console.error("Error fetching all visitors:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  // Update statistics
-  const updateStats = (visitorsData) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+  // Fetch visitors for specific society
+  const fetchSocietyVisitorsData = async (societyId) => {
+    try {
+      const result = await fetchSocietyVisitors(societyId);
 
-    const statsData = {
+      if (result.success && result.visitors) {
+        const societyInfo = assignedSocieties.find(
+          (s) => s.id === parseInt(societyId),
+        );
+        return result.visitors.map((group) => ({
+          ...group,
+          society_id: societyInfo?.id,
+          society_name: societyInfo?.name,
+          all_visitors: (group.all_visitors || []).map((visitor) => ({
+            ...visitor,
+            society_id: societyInfo?.id,
+            society_name: societyInfo?.name,
+            flat_number: visitor.flat_number || group.flat_number || null,
+          })),
+        }));
+      }
+      return [];
+    } catch (error) {
+      console.error(`Error fetching visitors for society ${societyId}:`, error);
+      return [];
+    }
+  };
+
+  const calculateStats = (visitorsData) => {
+    const societyCount = new Set(visitorsData.map((v) => v.society_id)).size;
+
+    setStats({
       total: visitorsData.length,
       pending: visitorsData.filter((v) => v.approved_status === "Pending")
         .length,
       approved: visitorsData.filter((v) => v.approved_status === "Approved")
         .length,
-      rejected: visitorsData.filter((v) => v.approved_status === "Rejected")
+      checkedOut: visitorsData.filter((v) => v.approved_status === "Checkout")
         .length,
-      checkout: visitorsData.filter((v) => v.approved_status === "Checkout")
-        .length,
-      today: visitorsData.filter((v) => {
-        const visitDate = new Date(v.created_at);
-        visitDate.setHours(0, 0, 0, 0);
-        return visitDate.getTime() === today.getTime();
-      }).length,
-    };
-    setStats(statsData);
+      societies: societyCount,
+    });
   };
 
-  // Apply filters
-  useEffect(() => {
-    let result = [...visitors];
+  const toggleVisitorExpand = (visitorId) => {
+    setExpandedVisitors((prev) => ({
+      ...prev,
+      [visitorId]: !prev[visitorId],
+    }));
+  };
 
-    // Search filter
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      result = result.filter(
-        (visitor) =>
-          visitor.visitor_name.toLowerCase().includes(term) ||
-          visitor.phone_number?.toLowerCase().includes(term) ||
-          visitor.vehicle_number?.toLowerCase().includes(term) ||
-          visitor.flat_number?.toLowerCase().includes(term) ||
-          visitor.card_number?.toLowerCase().includes(term),
-      );
-    }
+  // Filter groups based on search and filters
+  const filteredGroups = visitorGroups.filter((group) => {
+    const searchLower = searchTerm.toLowerCase();
+    const mainVisitor = group.all_visitors?.[0] || group;
 
-    // Status filter
-    if (statusFilter !== "all") {
-      result = result.filter(
-        (visitor) => visitor.approved_status === statusFilter,
+    // Check if any visitor in the group matches the search
+    const groupMatchesSearch = group.all_visitors?.some((visitor) => {
+      return (
+        visitor.visitor_name?.toLowerCase().includes(searchLower) ||
+        visitor.phone_number?.toLowerCase().includes(searchLower) ||
+        visitor.flat_number?.toLowerCase().includes(searchLower) ||
+        visitor.vehicle_number?.toLowerCase().includes(searchLower) ||
+        visitor.purpose?.toLowerCase().includes(searchLower) ||
+        group.society_name?.toLowerCase().includes(searchLower)
       );
-    }
-
-    // Visitor type filter
-    if (visitorTypeFilter !== "all") {
-      result = result.filter(
-        (visitor) => visitor.visitor_type === visitorTypeFilter,
-      );
-    }
+    });
 
     // Society filter
-    if (societyFilter !== "all") {
-      result = result.filter(
-        (visitor) => visitor.society_id.toString() === societyFilter,
+    if (
+      societyFilter !== "all" &&
+      group.society_id !== parseInt(societyFilter)
+    ) {
+      return false;
+    }
+
+    if (statusFilter !== "all" && visitorTypeFilter !== "all") {
+      return (
+        groupMatchesSearch &&
+        group.all_visitors?.some((v) => v.approved_status === statusFilter) &&
+        group.all_visitors?.some((v) => v.visitor_type === visitorTypeFilter)
       );
     }
 
-    // Date filter
-    if (dateFilter !== "all") {
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-      switch (dateFilter) {
-        case "today":
-          result = result.filter((visitor) => {
-            const visitDate = new Date(visitor.created_at);
-            visitDate.setHours(0, 0, 0, 0);
-            return visitDate.getTime() === today.getTime();
-          });
-          break;
-        case "week":
-          const weekAgo = new Date(today);
-          weekAgo.setDate(weekAgo.getDate() - 7);
-          result = result.filter((visitor) => {
-            const visitDate = new Date(visitor.created_at);
-            return visitDate >= weekAgo;
-          });
-          break;
-        case "month":
-          const monthAgo = new Date(today);
-          monthAgo.setMonth(monthAgo.getMonth() - 1);
-          result = result.filter((visitor) => {
-            const visitDate = new Date(visitor.created_at);
-            return visitDate >= monthAgo;
-          });
-          break;
-      }
+    if (statusFilter !== "all") {
+      return (
+        groupMatchesSearch &&
+        group.all_visitors?.some((v) => v.approved_status === statusFilter)
+      );
     }
 
-    setFilteredVisitors(result);
-    setPage(0);
-  }, [
-    visitors,
-    searchTerm,
-    statusFilter,
-    visitorTypeFilter,
-    societyFilter,
-    dateFilter,
-  ]);
+    if (visitorTypeFilter !== "all") {
+      return (
+        groupMatchesSearch &&
+        group.all_visitors?.some((v) => v.visitor_type === visitorTypeFilter)
+      );
+    }
 
-  // Handle view visitor details
-  const handleViewVisitor = (visitor) => {
+    return groupMatchesSearch;
+  });
+
+  const handleViewDetails = (visitor) => {
     setSelectedVisitor(visitor);
-    setViewDialogOpen(true);
+    setDetailDialogOpen(true);
+  };
+
+  const formatDateTime = (dateTime) => {
+    if (!dateTime) return "N/A";
+    return dayjs(dateTime).format("DD MMM YYYY, hh:mm A");
+  };
+
+  const getTimeAgo = (dateTime) => {
+    if (!dateTime) return "N/A";
+    return dayjs(dateTime).fromNow();
+  };
+
+  const getLatestVisitTime = (allVisitors) => {
+    if (!allVisitors || allVisitors.length === 0) return null;
+    return allVisitors.reduce((latest, visitor) => {
+      const currentTime = visitor.in_time || visitor.created_at;
+      return currentTime > latest ? currentTime : latest;
+    }, allVisitors[0].in_time || allVisitors[0].created_at);
+  };
+
+  const getVisitorType = (allVisitors) => {
+    if (!allVisitors || allVisitors.length === 0) return "Guest";
+    return allVisitors[0].visitor_type || "Guest";
+  };
+
+  const getCardScanStatus = (status) => {
+    switch (status) {
+      case "Scan":
+        return "Scanned";
+      case "WrongScan":
+        return "Wrong Scan";
+      case "NotScan":
+        return "Not Scanned";
+      default:
+        return "Unknown";
+    }
+  };
+
+  const handleTabChange = (event, newValue) => {
+    setTabValue(newValue);
+    switch (newValue) {
+      case 0: // All
+        setStatusFilter("all");
+        break;
+      case 1: // Pending
+        setStatusFilter("Pending");
+        break;
+      case 2: // Approved
+        setStatusFilter("Approved");
+        break;
+      case 3: // Checkout
+        setStatusFilter("Checkout");
+        break;
+      case 4: // Reschedule
+        setStatusFilter("Reschedule");
+        break;
+      default:
+        setStatusFilter("all");
+    }
   };
 
   // Handle refresh
-  const handleRefresh = async () => {
-    if (pmId) {
-      await fetchAssignedSocieties(pmId);
+  const handleRefresh = () => {
+    if (assignedSocieties.length > 0) {
+      if (societyFilter === "all") {
+        fetchAllVisitors(assignedSocieties);
+      } else {
+        fetchSocietyVisitorsData(societyFilter).then((groups) => {
+          setVisitorGroups(groups);
+          const flattenedVisitors = groups.flatMap(
+            (group) => group.all_visitors || [],
+          );
+          calculateStats(flattenedVisitors);
+        });
+      }
     }
   };
 
-  // Handle page change
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage);
-  };
+  // Initial load - fetch assigned societies
+  useEffect(() => {
+    fetchAssignedSocieties();
+  }, []);
 
-  // Handle rows per page change
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
+  // Apply date filter
+  useEffect(() => {
+    if (visitorGroups.length > 0) {
+      let filtered = [...visitorGroups];
 
-  // Handle image load
-  const handleImageLoad = (id) => {
-    setImageLoading((prev) => ({ ...prev, [id]: false }));
-  };
+      if (dateFilter !== "all") {
+        const today = dayjs().startOf("day");
+        filtered = filtered.filter((group) => {
+          const latestVisitTime = getLatestVisitTime(group.all_visitors);
+          if (!latestVisitTime) return false;
 
-  // Handle image error
-  const handleImageError = (id) => {
-    setImageLoading((prev) => ({ ...prev, [id]: false }));
-  };
+          const visitDate = dayjs(latestVisitTime);
+          switch (dateFilter) {
+            case "today":
+              return visitDate.isSame(today, "day");
+            case "week":
+              return visitDate.isAfter(today.subtract(7, "day"));
+            case "month":
+              return visitDate.isAfter(today.subtract(30, "day"));
+            default:
+              return true;
+          }
+        });
+      }
 
-  // Render loading state
+      // Calculate stats from filtered groups
+      const flattenedVisitors = filtered.flatMap(
+        (group) => group.all_visitors || [],
+      );
+      calculateStats(flattenedVisitors);
+    }
+  }, [visitorGroups, dateFilter]);
+
+  // Show loading state
   if (loading) {
     return (
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        minHeight="60vh"
-      >
-        <CircularProgress sx={{ color: "#6F0B14" }} />
-      </Box>
+      <div className="p-6">
+        <div className="flex justify-center items-center h-64">
+          <CircularProgress />
+        </div>
+      </div>
     );
   }
 
-  // Render error state
-  if (error) {
+  // Show no societies assigned message
+  if (assignedSocieties.length === 0 && !loading) {
     return (
-      <Box maxWidth="md" mx="auto" p={3}>
-        <Alert
-          severity="error"
-          action={
-            <Button color="inherit" size="small" onClick={handleRefresh}>
-              RETRY
-            </Button>
-          }
-        >
-          {error}
-        </Alert>
-      </Box>
+      <div className="p-6">
+        <Card className="border border-gray-200 shadow-sm">
+          <CardContent className="text-center py-12">
+            <Domain className="text-gray-400 text-6xl mb-4 mx-auto" />
+            <Typography variant="h5" className="text-gray-600 mb-2">
+              No Societies Assigned
+            </Typography>
+            <Typography variant="body2" className="text-gray-400">
+              You are not assigned to any societies yet. Please contact your
+              administrator.
+            </Typography>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   return (
-    <Box sx={{ p: 3, backgroundColor: "#f8f9fa", minHeight: "100vh" }}>
+    <div className="p-6 font-roboto">
       {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
-        <Box
-          display="flex"
-          justifyContent="space-between"
-          alignItems="center"
-          mb={3}
-        >
-          <Box>
-            <Typography
-              variant="h4"
-              sx={{
-                color: "#6F0B14",
-                fontFamily: "'Roboto', sans-serif",
-                fontWeight: 400,
-                mb: 1,
-              }}
-            >
-              Visitor Log
-            </Typography>
-            <Typography
-              variant="subtitle1"
-              sx={{ color: "#A29EB6", fontFamily: "'Roboto', sans-serif" }}
-            >
-              Manage visitors for your assigned societies
-            </Typography>
-          </Box>
-          <Box display="flex" gap={2}>
-            <Button
-              startIcon={<RefreshIcon />}
-              onClick={handleRefresh}
-              sx={{
-                color: "#6F0B14",
-                fontFamily: "'Roboto', sans-serif",
-                fontWeight: 500,
-                backgroundColor: "rgba(111, 11, 20, 0.08)",
-                "&:hover": {
-                  backgroundColor: "rgba(111, 11, 20, 0.12)",
-                },
-                borderRadius: "8px",
-                px: 3,
-              }}
-            >
-              Refresh
-            </Button>
-          </Box>
-        </Box>
-      </motion.div>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+        <div>
+          <Typography variant="h4" className="font-bold text-primary">
+            PM Visitor Management
+          </Typography>
+          <Typography variant="body2" className="text-hintText">
+            Manage visitors for your assigned societies
+          </Typography>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outlined"
+            startIcon={<Refresh />}
+            onClick={handleRefresh}
+            disabled={loading}
+          >
+            Refresh
+          </Button>
+          <Typography variant="caption" className="text-hintText">
+            {visitorGroups.length} visitor groups
+          </Typography>
+        </div>
+      </div>
 
       {/* Stats Cards */}
-      {/* <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-      >
-        <Grid container spacing={3}>
-          {[
-            {
-              label: "Total Visitors",
-              value: stats.total,
-              color: "#6F0B14",
-              icon: <PersonIcon />,
-              description: "All time visitors",
-            },
-            {
-              label: "Pending",
-              value: stats.pending,
-              color: "#DBA400",
-              icon: <ScheduleIcon />,
-              description: "Awaiting approval",
-            },
-            {
-              label: "Approved",
-              value: stats.approved,
-              color: "#008000",
-              icon: <CheckCircleIcon />,
-              description: "Active visits",
-            },
-            {
-              label: "Today",
-              value: stats.today,
-              color: "#1565C0",
-              icon: <AccessTimeIcon />,
-              description: "Visitors today",
-            },
-            {
-              label: "Rejected",
-              value: stats.rejected,
-              color: "#B31B1B",
-              icon: <CancelIcon />,
-              description: "Rejected visits",
-            },
-            {
-              label: "Checked Out",
-              value: stats.checkout,
-              color: "#3F51B5",
-              icon: <ExitToAppIcon />,
-              description: "Completed visits",
-            },
-          ].map((stat, index) => (
-            <Grid item xs={12} sm={6} md={4} lg={2} key={index}>
-              <motion.div variants={itemVariants}>
-                <StyledCard>
-                  <CardContent sx={{ p: 2.5 }}>
-                    <Box
-                      display="flex"
-                      alignItems="center"
-                      justifyContent="space-between"
-                    >
-                      <Box>
-                        <Typography
-                          variant="h5"
-                          sx={{
-                            color: stat.color,
-                            fontFamily: "'Roboto', sans-serif",
-                            fontWeight: 700,
-                            mb: 0.5,
-                          }}
-                        >
-                          {stat.value}
-                        </Typography>
-                        <Typography
-                          variant="subtitle2"
-                          sx={{
-                            color: "#6F0B14",
-                            fontFamily: "'Roboto', sans-serif",
-                            fontWeight: 600,
-                            mb: 0.5,
-                          }}
-                        >
-                          {stat.label}
-                        </Typography>
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            color: "#A29EB6",
-                            fontFamily: "'Roboto', sans-serif",
-                          }}
-                        >
-                          {stat.description}
-                        </Typography>
-                      </Box>
-                      <Box
-                        sx={{
-                          backgroundColor: `${stat.color}15`,
-                          borderRadius: "12px",
-                          p: 1.5,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        {React.cloneElement(stat.icon, {
-                          sx: {
-                            color: stat.color,
-                            fontSize: 28,
-                          },
-                        })}
-                      </Box>
-                    </Box>
-                  </CardContent>
-                </StyledCard>
-              </motion.div>
-            </Grid>
-          ))}
+      <Grid container spacing={2} className="mb-6">
+        <Grid item xs={6} sm={3}>
+          <Card className="border border-gray-200 shadow-sm">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Typography variant="caption" className="text-gray-500">
+                    Total Visitors
+                  </Typography>
+                  <Typography variant="h5" className="font-bold text-gray-800">
+                    {stats.total}
+                  </Typography>
+                </div>
+                <Avatar className="bg-blue-100 text-blue-600">
+                  <Person />
+                </Avatar>
+              </div>
+            </CardContent>
+          </Card>
         </Grid>
-      </motion.div> */}
+        <Grid item xs={6} sm={3}>
+          <Card className="border border-gray-200 shadow-sm">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Typography variant="caption" className="text-gray-500">
+                    Societies
+                  </Typography>
+                  <Typography variant="h5" className="font-bold text-gray-800">
+                    {stats.societies}
+                  </Typography>
+                </div>
+                <Avatar className="bg-green-100 text-green-600">
+                  <Domain />
+                </Avatar>
+              </div>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={6} sm={3}>
+          <Card className="border border-gray-200 shadow-sm">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Typography variant="caption" className="text-gray-500">
+                    Pending
+                  </Typography>
+                  <Typography
+                    variant="h5"
+                    className="font-bold text-yellow-600"
+                  >
+                    {stats.pending}
+                  </Typography>
+                </div>
+                <Avatar className="bg-yellow-100 text-yellow-600">
+                  <Schedule />
+                </Avatar>
+              </div>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={6} sm={3}>
+          <Card className="border border-gray-200 shadow-sm">
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Typography variant="caption" className="text-gray-500">
+                    Approved
+                  </Typography>
+                  <Typography variant="h5" className="font-bold text-green-600">
+                    {stats.approved}
+                  </Typography>
+                </div>
+                <Avatar className="bg-green-100 text-green-600">
+                  <CheckCircle />
+                </Avatar>
+              </div>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
 
-      {/* Filters Card */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
-        sx={{ mb: 3 }}
-        style={{ marginBottom: "50px" }}
-      >
-        <StyledCard>
-          <CardContent sx={{ p: 2.5 }}>
-            <Typography
-              variant="subtitle1"
-              sx={{
-                color: "#6F0B14",
-                fontFamily: "'Roboto', sans-serif",
-                fontWeight: 600,
-                mb: 2,
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
+      {/* Tabs */}
+      <Paper className="mb-6">
+        <Tabs
+          value={tabValue}
+          onChange={handleTabChange}
+          variant="scrollable"
+          scrollButtons="auto"
+          className="border-b"
+        >
+          <Tab
+            label={
+              <div className="flex items-center gap-2">
+                <span>All Visitors</span>
+                {stats.total > 0 && (
+                  <Badge
+                    badgeContent={stats.total}
+                    color="primary"
+                    className="ml-2"
+                  />
+                )}
+              </div>
+            }
+          />
+          <Tab
+            label={
+              <div className="flex items-center gap-2">
+                <Schedule className="text-yellow-600" fontSize="small" />
+                <span>Pending</span>
+                {stats.pending > 0 && (
+                  <Badge
+                    badgeContent={stats.pending}
+                    color="warning"
+                    className="ml-2"
+                  />
+                )}
+              </div>
+            }
+          />
+          <Tab
+            label={
+              <div className="flex items-center gap-2">
+                <CheckCircle className="text-green-600" fontSize="small" />
+                <span>Approved</span>
+                {stats.approved > 0 && (
+                  <Badge
+                    badgeContent={stats.approved}
+                    color="success"
+                    className="ml-2"
+                  />
+                )}
+              </div>
+            }
+          />
+          <Tab
+            label={
+              <div className="flex items-center gap-2">
+                <ExitToApp className="text-blue-600" fontSize="small" />
+                <span>Checked Out</span>
+                {stats.checkedOut > 0 && (
+                  <Badge
+                    badgeContent={stats.checkedOut}
+                    color="info"
+                    className="ml-2"
+                  />
+                )}
+              </div>
+            }
+          />
+        </Tabs>
+      </Paper>
+
+      {/* Filters Section */}
+      <Paper className="p-4 mb-6 shadow-sm border border-gray-100">
+        <Grid container spacing={2} alignItems="center">
+          <Grid item xs={12} md={4}>
+            <TextField
+              fullWidth
+              variant="outlined"
+              size="small"
+              placeholder="Search visitors..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Search className="text-gray-400" />
+                  </InputAdornment>
+                ),
               }}
-            >
-              <FilterAltIcon /> Filters
-            </Typography>
-            <Grid container spacing={2} alignItems="center">
-              <Grid item xs={12} md={4}>
-                <TextField
-                  fullWidth
-                  placeholder="Search by name, phone, vehicle..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <SearchIcon sx={{ color: "#6F0B14" }} />
-                      </InputAdornment>
-                    ),
-                    sx: {
-                      fontFamily: "'Roboto', sans-serif",
-                      borderRadius: "8px",
-                      backgroundColor: "rgba(111, 11, 20, 0.03)",
-                    },
-                  }}
-                  size="small"
-                />
-              </Grid>
-              <Grid item xs={6} md={2}>
-                <FormControl fullWidth size="small">
-                  <InputLabel
-                    sx={{
-                      fontFamily: "'Roboto', sans-serif",
-                      color: "#6F0B14",
-                    }}
-                  >
-                    Status
-                  </InputLabel>
-                  <Select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    label="Status"
-                    sx={{
-                      fontFamily: "'Roboto', sans-serif",
-                      borderRadius: "8px",
-                      backgroundColor: "rgba(111, 11, 20, 0.03)",
-                    }}
-                  >
-                    <MenuItem value="all">All Status</MenuItem>
-                    <MenuItem value="Pending">Pending</MenuItem>
-                    <MenuItem value="Approved">Approved</MenuItem>
-                    <MenuItem value="Rejected">Rejected</MenuItem>
-                    <MenuItem value="Reschedule">Reschedule</MenuItem>
-                    <MenuItem value="Checkout">Checkout</MenuItem>
-                    <MenuItem value="PartialCheckout">
-                      Partial Checkout
-                    </MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={6} md={2}>
-                <FormControl fullWidth size="small">
-                  <InputLabel
-                    sx={{
-                      fontFamily: "'Roboto', sans-serif",
-                      color: "#6F0B14",
-                    }}
-                  >
-                    Visitor Type
-                  </InputLabel>
-                  <Select
-                    value={visitorTypeFilter}
-                    onChange={(e) => setVisitorTypeFilter(e.target.value)}
-                    label="Visitor Type"
-                    sx={{
-                      fontFamily: "'Roboto', sans-serif",
-                      borderRadius: "8px",
-                      backgroundColor: "rgba(111, 11, 20, 0.03)",
-                    }}
-                  >
-                    <MenuItem value="all">All Types</MenuItem>
-                    <MenuItem value="Guest">Guest</MenuItem>
-                    <MenuItem value="Delivery">Delivery</MenuItem>
-                    <MenuItem value="Cab">Cab</MenuItem>
-                    <MenuItem value="Maintenance">Maintenance</MenuItem>
-                    <MenuItem value="Other">Other</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={6} md={2}>
-                <FormControl fullWidth size="small">
-                  <InputLabel
-                    sx={{
-                      fontFamily: "'Roboto', sans-serif",
-                      color: "#6F0B14",
-                    }}
-                  >
-                    Society
-                  </InputLabel>
-                  <Select
-                    value={societyFilter}
-                    onChange={(e) => setSocietyFilter(e.target.value)}
-                    label="Society"
-                    sx={{
-                      fontFamily: "'Roboto', sans-serif",
-                      borderRadius: "8px",
-                      backgroundColor: "rgba(111, 11, 20, 0.03)",
-                    }}
-                  >
-                    <MenuItem value="all">All Societies</MenuItem>
-                    {assignedSocieties.map((society) => (
-                      <MenuItem key={society.id} value={society.id.toString()}>
-                        {society.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={6} md={2}>
-                <FormControl fullWidth size="small">
-                  <InputLabel
-                    sx={{
-                      fontFamily: "'Roboto', sans-serif",
-                      color: "#6F0B14",
-                    }}
-                  >
-                    Date Range
-                  </InputLabel>
-                  <Select
-                    value={dateFilter}
-                    onChange={(e) => setDateFilter(e.target.value)}
-                    label="Date Range"
-                    sx={{
-                      fontFamily: "'Roboto', sans-serif",
-                      borderRadius: "8px",
-                      backgroundColor: "rgba(111, 11, 20, 0.03)",
-                    }}
-                  >
-                    <MenuItem value="all">All Time</MenuItem>
-                    <MenuItem value="today">Today</MenuItem>
-                    <MenuItem value="week">Last 7 Days</MenuItem>
-                    <MenuItem value="month">Last 30 Days</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-            </Grid>
-            <Box
-              sx={{ mt: 2, display: "flex", justifyContent: "space-between" }}
-            >
-              <Typography
-                variant="caption"
-                sx={{
-                  color: "#A29EB6",
-                  fontFamily: "'Roboto', sans-serif",
-                  fontStyle: "italic",
-                }}
-              >
-                Showing {filteredVisitors.length} of {visitors.length} visitors
-              </Typography>
-              <Button
-                variant="text"
-                onClick={() => {
-                  setSearchTerm("");
-                  setStatusFilter("all");
-                  setVisitorTypeFilter("all");
-                  setSocietyFilter("all");
-                  setDateFilter("all");
-                }}
-                sx={{
-                  fontFamily: "'Roboto', sans-serif",
-                  color: "#6F0B14",
-                  textTransform: "none",
-                }}
-              >
-                Clear all filters
-              </Button>
-            </Box>
-          </CardContent>
-        </StyledCard>
-      </motion.div>
+            />
+          </Grid>
 
-      {/* Visitors Table */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.3 }}
-      >
-        <StyledCard>
-          <CardContent sx={{ p: 0 }}>
-            <TableContainer>
-              <Table>
-                <TableHead>
-                  <TableRow
-                    sx={{
-                      backgroundColor: "rgba(111, 11, 20, 0.05)",
-                      "& th": {
-                        borderBottom: "2px solid rgba(111, 11, 20, 0.1)",
-                      },
-                    }}
-                  >
-                    <TableCell
-                      sx={{
-                        fontFamily: "'Roboto', sans-serif",
-                        fontWeight: 700,
-                        color: "#6F0B14",
-                        fontSize: "0.95rem",
-                      }}
-                    >
-                      Visitor Details
-                    </TableCell>
-                    <TableCell
-                      sx={{
-                        fontFamily: "'Roboto', sans-serif",
-                        fontWeight: 700,
-                        color: "#6F0B14",
-                        fontSize: "0.95rem",
-                      }}
-                    >
-                      Location
-                    </TableCell>
-                    <TableCell
-                      sx={{
-                        fontFamily: "'Roboto', sans-serif",
-                        fontWeight: 700,
-                        color: "#6F0B14",
-                        fontSize: "0.95rem",
-                      }}
-                    >
-                      Visit Info
-                    </TableCell>
-                    <TableCell
-                      sx={{
-                        fontFamily: "'Roboto', sans-serif",
-                        fontWeight: 700,
-                        color: "#6F0B14",
-                        fontSize: "0.95rem",
-                      }}
-                    >
-                      Status
-                    </TableCell>
-                    <TableCell
-                      sx={{
-                        fontFamily: "'Roboto', sans-serif",
-                        fontWeight: 700,
-                        color: "#6F0B14",
-                        fontSize: "0.95rem",
-                      }}
-                    >
-                      Timeline
-                    </TableCell>
-                    <TableCell
-                      sx={{
-                        fontFamily: "'Roboto', sans-serif",
-                        fontWeight: 700,
-                        color: "#6F0B14",
-                        fontSize: "0.95rem",
-                        textAlign: "center",
-                      }}
-                    >
-                      Actions
-                    </TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  <AnimatePresence>
-                    {filteredVisitors.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
-                          <Box sx={{ textAlign: "center", py: 4 }}>
-                            <PersonIcon
-                              sx={{
-                                fontSize: 64,
-                                color: "#A29EB6",
-                                mb: 2,
-                              }}
-                            />
-                            <Typography
-                              variant="h6"
-                              sx={{
-                                color: "#666",
-                                fontFamily: "'Roboto', sans-serif",
-                                mb: 1,
-                              }}
-                            >
-                              No visitors found
+          <Grid item xs={12} sm={6} md={3}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Society</InputLabel>
+              <Select
+                value={societyFilter}
+                label="Society"
+                onChange={(e) => setSocietyFilter(e.target.value)}
+              >
+                <MenuItem value="all">All Societies</MenuItem>
+                {assignedSocieties.map((society) => (
+                  <MenuItem key={society.id} value={society.id}>
+                    {society.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+
+          <Grid item xs={12} sm={6} md={2}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Visitor Type</InputLabel>
+              <Select
+                value={visitorTypeFilter}
+                label="Visitor Type"
+                onChange={(e) => setVisitorTypeFilter(e.target.value)}
+              >
+                <MenuItem value="all">All Types</MenuItem>
+                <MenuItem value="Guest">Guest</MenuItem>
+                <MenuItem value="Delivery">Delivery</MenuItem>
+                <MenuItem value="Cab">Cab</MenuItem>
+                <MenuItem value="Maintenance">Maintenance</MenuItem>
+                <MenuItem value="Other">Other</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+
+          <Grid item xs={12} sm={6} md={2}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Date Range</InputLabel>
+              <Select
+                value={dateFilter}
+                label="Date Range"
+                onChange={(e) => setDateFilter(e.target.value)}
+              >
+                <MenuItem value="all">All Time</MenuItem>
+                <MenuItem value="today">Today</MenuItem>
+                <MenuItem value="week">Last 7 Days</MenuItem>
+                <MenuItem value="month">Last 30 Days</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+
+          <Grid item xs={12} sm={6} md={1} className="text-right">
+            <Typography variant="caption" className="text-gray-500">
+              {filteredGroups.length} groups
+            </Typography>
+          </Grid>
+        </Grid>
+      </Paper>
+
+      {/* Visitors List with Grouping */}
+      {loading ? (
+        <div className="flex justify-center items-center py-12">
+          <CircularProgress />
+          <Typography className="ml-3">Loading visitors...</Typography>
+        </div>
+      ) : filteredGroups.length === 0 ? (
+        <Paper className="p-8 text-center">
+          <Person className="text-gray-400 text-6xl mb-4 mx-auto" />
+          <Typography variant="h6" className="text-gray-500 mb-2">
+            {searchTerm ? "No visitor groups found" : "No visitors yet"}
+          </Typography>
+          <Typography variant="body2" className="text-gray-400">
+            {searchTerm
+              ? "Try adjusting your search criteria"
+              : "Visitors will appear here once registered"}
+          </Typography>
+        </Paper>
+      ) : (
+        <div className="space-y-4">
+          {filteredGroups.map((group) => {
+            const allVisitors = group.all_visitors || [];
+            const mainVisitor = allVisitors[0] || group;
+            const isExpanded = expandedVisitors[group.id] || false;
+            const latestVisitTime = getLatestVisitTime(allVisitors);
+
+            return (
+              <Card key={group.id} className="border border-gray-200 shadow-sm">
+                <CardContent className="p-4">
+                  {/* Main Group Header */}
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center space-x-3 flex-1">
+                      <Avatar className="bg-blue-100 text-blue-600">
+                        {visitorTypeConfig[getVisitorType(allVisitors)]?.icon ||
+                          visitorTypeConfig.Other.icon}
+                      </Avatar>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <Typography variant="h6" className="font-bold">
+                              {mainVisitor.visitor_name || "Unknown Visitor"}
                             </Typography>
                             <Typography
                               variant="body2"
-                              sx={{
-                                color: "#A29EB6",
-                                fontFamily: "'Roboto', sans-serif",
-                              }}
+                              className="text-gray-500"
                             >
-                              {searchTerm
-                                ? `No visitors match "${searchTerm}"`
-                                : "No visitor records available"}
+                              {mainVisitor.phone_number || "No phone"}
                             </Typography>
-                          </Box>
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredVisitors
-                        .slice(
-                          page * rowsPerPage,
-                          page * rowsPerPage + rowsPerPage,
-                        )
-                        .map((visitor) => (
-                          <motion.tr
-                            key={visitor.id}
-                            initial={{ opacity: 0, scale: 0.98 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.98 }}
-                            transition={{ duration: 0.2 }}
-                            sx={{
-                              "&:hover": {
-                                backgroundColor: "rgba(111, 11, 20, 0.02)",
-                              },
-                              "& td": {
-                                borderBottom:
-                                  "1px solid rgba(111, 11, 20, 0.08)",
-                              },
-                            }}
-                          >
-                            <TableCell>
-                              <Box display="flex" alignItems="center" gap={2}>
-                                <Badge
-                                  overlap="circular"
-                                  anchorOrigin={{
-                                    vertical: "bottom",
-                                    horizontal: "right",
-                                  }}
-                                  badgeContent={
-                                    <Box
-                                      sx={{
-                                        backgroundColor: visitor.imageUrl
-                                          ? "#6F0B14"
-                                          : "transparent",
-                                        width: 12,
-                                        height: 12,
-                                        borderRadius: "50%",
-                                        border: "2px solid white",
-                                      }}
-                                    />
-                                  }
-                                >
-                                  {imageLoading[visitor.id] ? (
-                                    <Skeleton
-                                      variant="circular"
-                                      width={48}
-                                      height={48}
-                                      sx={{
-                                        bgcolor: "rgba(111, 11, 20, 0.08)",
-                                      }}
-                                    />
-                                  ) : (
-                                    <Avatar
-                                      src={visitor.imageUrl}
-                                      onLoad={() => handleImageLoad(visitor.id)}
-                                      onError={() =>
-                                        handleImageError(visitor.id)
-                                      }
-                                      sx={{
-                                        width: 55,
-                                        height: 55,
-                                        bgcolor: visitor.imageUrl
-                                          ? "transparent"
-                                          : "rgba(111, 11, 20, 0.1)",
-                                        fontSize: "1.25rem",
-                                      }}
-                                    >
-                                      {!visitor.imageUrl &&
-                                        visitor.visitor_name.charAt(0)}
-                                    </Avatar>
-                                  )}
-                                </Badge>
-                                <Box>
-                                  <Typography
-                                    variant="subtitle2"
-                                    sx={{
-                                      fontFamily: "'Roboto', sans-serif",
-                                      fontWeight: 600,
-                                      color: "#333",
-                                      mb: 0.5,
-                                    }}
-                                  >
-                                    {visitor.visitor_name}
-                                  </Typography>
-                                  <Typography
-                                    variant="caption"
-                                    sx={{
-                                      color: "#A29EB6",
-                                      fontFamily: "'Roboto', sans-serif",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 0.5,
-                                    }}
-                                  >
-                                    <PersonIcon fontSize="small" />
-                                    {visitor.phone_number || "No phone"}
-                                  </Typography>
-                                </Box>
-                              </Box>
-                            </TableCell>
-                            <TableCell>
-                              <Box>
-                                <Box
-                                  display="flex"
-                                  alignItems="center"
-                                  gap={1}
-                                  mb={1}
-                                >
-                                  <ApartmentIcon
-                                    fontSize="small"
-                                    sx={{ color: "#6F0B14" }}
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Chip
+                              label={`${group.total_entries || allVisitors.length} visits`}
+                              size="small"
+                              className="bg-blue-100 text-blue-600"
+                            />
+                            <IconButton
+                              size="small"
+                              onClick={() => toggleVisitorExpand(group.id)}
+                            >
+                              {isExpanded ? <ExpandLess /> : <ExpandMore />}
+                            </IconButton>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Quick Info Row */}
+                  <Grid container spacing={2} className="mb-3">
+                    <Grid item xs={12} sm={4}>
+                      <div className="flex items-center space-x-2">
+                        <Domain className="text-gray-400" fontSize="small" />
+                        <Typography variant="body2">
+                          {group.society_name || "Unknown Society"}
+                        </Typography>
+                      </div>
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <div className="flex items-center space-x-2">
+                        <Home className="text-gray-400" fontSize="small" />
+                        <Typography variant="body2">
+                          Flat: {mainVisitor.flat_number || "N/A"}
+                        </Typography>
+                      </div>
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <div className="flex items-center space-x-2">
+                        <AccessTime
+                          className="text-gray-400"
+                          fontSize="small"
+                        />
+                        <Typography variant="body2">
+                          {formatDateTime(latestVisitTime)}
+                        </Typography>
+                      </div>
+                    </Grid>
+                  </Grid>
+
+                  {/* Status Row */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Chip
+                        icon={statusConfig[mainVisitor.approved_status]?.icon}
+                        label={mainVisitor.approved_status}
+                        size="small"
+                        style={{
+                          backgroundColor:
+                            statusConfig[mainVisitor.approved_status]?.bgColor,
+                          color:
+                            statusConfig[mainVisitor.approved_status]?.color,
+                        }}
+                      />
+                      {mainVisitor.vehicle_number && (
+                        <Chip
+                          label={`Vehicle: ${mainVisitor.vehicle_number}`}
+                          size="small"
+                          variant="outlined"
+                          icon={<DriveEta fontSize="small" />}
+                        />
+                      )}
+                    </div>
+                    <div className="flex space-x-1">
+                      <Tooltip title="View Details">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleViewDetails(mainVisitor)}
+                        >
+                          <Visibility fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </div>
+                  </div>
+
+                  {/* Expanded Details */}
+                  <Collapse in={isExpanded}>
+                    <div className="mt-4 pt-4 border-t border-gray-200">
+                      <Typography
+                        variant="subtitle2"
+                        className="font-semibold mb-3"
+                      >
+                        All Visits ({allVisitors.length})
+                      </Typography>
+
+                      <TableContainer component={Paper} variant="outlined">
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell>Visit #</TableCell>
+                              <TableCell>Visit Type</TableCell>
+                              <TableCell>Flat</TableCell>
+                              <TableCell>Check-in Time</TableCell>
+                              <TableCell>Status</TableCell>
+                              <TableCell>Card Scan</TableCell>
+                              <TableCell align="right">Actions</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {allVisitors.map((visit, index) => (
+                              <TableRow key={visit.id}>
+                                <TableCell>#{index + 1}</TableCell>
+                                <TableCell>
+                                  <Chip
+                                    label={
+                                      visit.visit_type === "previsitor"
+                                        ? "Pre-Registered"
+                                        : "Normal"
+                                    }
+                                    size="small"
+                                    className={
+                                      visit.visit_type === "previsitor"
+                                        ? "bg-purple-100 text-purple-600"
+                                        : "bg-gray-100 text-gray-600"
+                                    }
                                   />
-                                  <Typography
-                                    variant="body2"
-                                    sx={{
-                                      fontFamily: "'Roboto', sans-serif",
-                                      fontWeight: 500,
-                                      color: "#333",
-                                    }}
-                                  >
-                                    {visitor.societies?.name ||
-                                      "Unknown Society"}
+                                </TableCell>
+                                <TableCell>
+                                  {visit.flat_number || "N/A"}
+                                </TableCell>
+                                <TableCell>
+                                  <Typography variant="body2">
+                                    {formatDateTime(
+                                      visit.in_time || visit.created_at,
+                                    )}
                                   </Typography>
-                                </Box>
-                                <Box>
-                                  {visitor.buildings && (
-                                    <Typography
-                                      variant="caption"
-                                      sx={{
-                                        color: "#666",
-                                        fontFamily: "'Roboto', sans-serif",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: 0.5,
-                                        mb: 0.5,
-                                      }}
-                                    >
-                                      <BuildingIcon fontSize="small" />
-                                      {visitor.buildings.name}
-                                    </Typography>
-                                  )}
-                                  {visitor.flat_number && (
-                                    <Typography
-                                      variant="caption"
-                                      sx={{
-                                        color: "#666",
-                                        fontFamily: "'Roboto', sans-serif",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: 0.5,
-                                      }}
-                                    >
-                                      <HomeIcon fontSize="small" />
-                                      Flat: {visitor.flat_number}
-                                    </Typography>
-                                  )}
-                                </Box>
-                              </Box>
-                            </TableCell>
-                            <TableCell>
-                              <Box>
-                                <Box
-                                  display="flex"
-                                  alignItems="center"
-                                  gap={1}
-                                  mb={1}
-                                >
-                                  <VisitorTypeIcon
-                                    type={visitor.visitor_type}
-                                  />
-                                  <Typography
-                                    variant="body2"
-                                    sx={{
-                                      fontFamily: "'Roboto', sans-serif",
-                                      fontWeight: 500,
-                                      color: "#333",
-                                    }}
-                                  >
-                                    {visitor.visitor_type || "Guest"}
-                                  </Typography>
-                                </Box>
-                                <Typography
-                                  variant="caption"
-                                  sx={{
-                                    color: "#666",
-                                    fontFamily: "'Roboto', sans-serif",
-                                    fontStyle: "italic",
-                                    display: "block",
-                                    mb: 0.5,
-                                  }}
-                                >
-                                  {visitor.purpose || "No purpose specified"}
-                                </Typography>
-                                {visitor.vehicle_number && (
                                   <Typography
                                     variant="caption"
-                                    sx={{
-                                      color: "#666",
-                                      fontFamily: "'Roboto', sans-serif",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 0.5,
-                                    }}
+                                    className="text-gray-500"
                                   >
-                                    <CarIcon fontSize="small" />
-                                    {visitor.vehicle_number}
+                                    {getTimeAgo(
+                                      visit.in_time || visit.created_at,
+                                    )}
                                   </Typography>
-                                )}
-                              </Box>
-                            </TableCell>
-                            <TableCell>
-                              <Box>
-                                <StatusChip
-                                  label={visitor.approved_status || "Pending"}
-                                  status={visitor.approved_status}
-                                  size="small"
-                                  sx={{ mb: 1 }}
-                                />
-                                {visitor.visitor_otp && (
-                                  <Typography
-                                    variant="caption"
-                                    sx={{
-                                      fontFamily: "'Roboto', sans-serif",
-                                      color: "#6F0B14",
-                                      fontWeight: 500,
-                                      display: "block",
-                                    }}
-                                  >
-                                    OTP: {visitor.visitor_otp}
-                                  </Typography>
-                                )}
-                              </Box>
-                            </TableCell>
-                            <TableCell>
-                              <Box>
-                                <Typography
-                                  variant="caption"
-                                  sx={{
-                                    fontFamily: "'Roboto', sans-serif",
-                                    fontWeight: 500,
-                                    color: "#333",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 0.5,
-                                    mb: 0.5,
-                                  }}
-                                >
-                                  <InTimeIcon fontSize="small" />
-                                  In: {formatDate(visitor.in_time)}
-                                </Typography>
-                                <Typography
-                                  variant="caption"
-                                  sx={{
-                                    color: "#A29EB6",
-                                    fontFamily: "'Roboto', sans-serif",
-                                    fontStyle: "italic",
-                                    display: "block",
-                                    mb: 1,
-                                  }}
-                                >
-                                  {formatTimeAgo(visitor.in_time)}
-                                </Typography>
-                                {visitor.checkout_at && (
-                                  <Typography
-                                    variant="caption"
-                                    sx={{
-                                      color: "#1565C0",
-                                      fontFamily: "'Roboto', sans-serif",
-                                      fontWeight: 500,
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 0.5,
-                                    }}
-                                  >
-                                    <OutTimeIcon fontSize="small" />
-                                    Out: {formatDate(visitor.checkout_at)}
-                                  </Typography>
-                                )}
-                              </Box>
-                            </TableCell>
-                            <TableCell align="center">
-                              <Tooltip title="View Details" arrow>
-                                <IconButton
-                                  size="small"
-                                  onClick={() => handleViewVisitor(visitor)}
-                                  sx={{
-                                    color: "#6F0B14",
-                                    backgroundColor: "rgba(111, 11, 20, 0.08)",
-                                    "&:hover": {
+                                </TableCell>
+                                <TableCell>
+                                  <Chip
+                                    label={visit.approved_status}
+                                    size="small"
+                                    style={{
                                       backgroundColor:
-                                        "rgba(111, 11, 20, 0.15)",
-                                    },
-                                  }}
-                                >
-                                  <VisibilityIcon />
-                                </IconButton>
-                              </Tooltip>
-                            </TableCell>
-                          </motion.tr>
-                        ))
-                    )}
-                  </AnimatePresence>
-                </TableBody>
-              </Table>
-            </TableContainer>
+                                        statusConfig[visit.approved_status]
+                                          ?.bgColor,
+                                      color:
+                                        statusConfig[visit.approved_status]
+                                          ?.color,
+                                    }}
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Chip
+                                    label={getCardScanStatus(
+                                      visit.is_card_scan,
+                                    )}
+                                    size="small"
+                                    className={
+                                      visit.is_card_scan === "Scan"
+                                        ? "bg-green-100 text-green-600"
+                                        : visit.is_card_scan === "WrongScan"
+                                          ? "bg-yellow-100 text-yellow-600"
+                                          : "bg-gray-100 text-gray-600"
+                                    }
+                                  />
+                                </TableCell>
+                                <TableCell align="right">
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleViewDetails(visit)}
+                                  >
+                                    <Visibility fontSize="small" />
+                                  </IconButton>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    </div>
+                  </Collapse>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
 
-            {/* Pagination */}
-            {filteredVisitors.length > 0 && (
-              <TablePagination
-                rowsPerPageOptions={[10, 25, 50]}
-                component="div"
-                count={filteredVisitors.length}
-                rowsPerPage={rowsPerPage}
-                page={page}
-                onPageChange={handleChangePage}
-                onRowsPerPageChange={handleChangeRowsPerPage}
-                sx={{
-                  fontFamily: "'Roboto', sans-serif",
-                  borderTop: "1px solid rgba(111, 11, 20, 0.1)",
-                  "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows":
-                    {
-                      fontFamily: "'Roboto', sans-serif",
-                    },
-                }}
-              />
-            )}
-          </CardContent>
-        </StyledCard>
-      </motion.div>
-
-      {/* Visitor Details Dialog */}
+      {/* Visitor Detail Dialog */}
       <Dialog
-        open={viewDialogOpen}
-        onClose={() => setViewDialogOpen(false)}
-        maxWidth="md"
+        open={detailDialogOpen}
+        onClose={() => setDetailDialogOpen(false)}
+        maxWidth="lg"
         fullWidth
         PaperProps={{
-          sx: {
-            borderRadius: "12px",
-            overflow: "hidden",
-          },
+          className: "rounded-2xl",
+          sx: { maxHeight: "90vh" },
         }}
       >
         {selectedVisitor && (
           <>
-            <DialogTitle
-              sx={{
-                fontFamily: "'Roboto', sans-serif",
-                color: "#6F0B14",
-                backgroundColor: "rgba(111, 11, 20, 0.05)",
-                borderBottom: "1px solid rgba(111, 11, 20, 0.1)",
-                fontWeight: 600,
-              }}
-            >
-              <Box display="flex" alignItems="center" gap={1}>
-                <PersonIcon />
-                Visitor Details
-              </Box>
+            <DialogTitle className="bg-gradient-to-r from-primary to-primary/90 text-white p-6">
+              <div className="flex justify-between items-center">
+                <div>
+                  <Typography variant="h5" className="font-bold">
+                    Visitor Details
+                  </Typography>
+                  <Typography variant="body2" className="text-white/90 mt-1">
+                    Complete visitor information and tracking
+                  </Typography>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Chip
+                    label={selectedVisitor.visitor_type}
+                    size="small"
+                    className="bg-white/20 text-white border-white/30 font-medium"
+                    icon={visitorTypeConfig[selectedVisitor.visitor_type]?.icon}
+                  />
+                  <Chip
+                    label={`Total Entries: ${selectedVisitor.total_entries || "1"}`}
+                    size="small"
+                    className="bg-white/20 text-white border-white/30 font-medium"
+                  />
+                </div>
+              </div>
             </DialogTitle>
-            <DialogContent sx={{ p: 3 }}>
-              <Grid container spacing={3} sx={{ mt: 1 }}>
-                <Grid item xs={12} md={4}>
-                  <Box
-                    display="flex"
-                    flexDirection="column"
-                    alignItems="center"
-                    gap={2}
-                  >
-                    <Box sx={{ position: "relative" }}>
-                      <Avatar
-                        src={selectedVisitor.imageUrl}
-                        sx={{
-                          width: 140,
-                          height: 140,
-                          bgcolor: selectedVisitor.imageUrl
-                            ? "transparent"
-                            : "rgba(111, 11, 20, 0.1)",
-                          fontSize: "2.5rem",
-                          border: "3px solid rgba(111, 11, 20, 0.1)",
-                        }}
-                      >
-                        {!selectedVisitor.imageUrl &&
-                          selectedVisitor.visitor_name.charAt(0)}
-                      </Avatar>
-                      {!selectedVisitor.imageUrl && (
-                        <Box
-                          sx={{
-                            position: "absolute",
-                            top: 8,
-                            right: 8,
-                            backgroundColor: "#6F0B14",
-                            color: "white",
-                            borderRadius: "50%",
-                            p: 0.5,
-                          }}
+
+            <DialogContent className="p-0 overflow-hidden">
+              <div className="p-6">
+                <Grid container spacing={3}>
+                  {/* Left Column - Images */}
+                  <Grid item xs={12} md={4}>
+                    {/* Profile Photo */}
+                    <Card className="mb-4 overflow-hidden">
+                      <div className="p-3 bg-gray-50 border-b border-gray-200">
+                        <Typography
+                          variant="subtitle1"
+                          className="font-medium flex items-center"
                         >
-                          <ImageIcon fontSize="small" />
-                        </Box>
-                      )}
-                    </Box>
-                    <Box textAlign="center">
+                          <ImageIcon className="mr-2" fontSize="small" />
+                          Profile Photo
+                        </Typography>
+                      </div>
+                      <CardMedia
+                        component="img"
+                        image={
+                          selectedVisitor.image_url ||
+                          "/api/placeholder/400/300"
+                        }
+                        alt="Visitor Profile"
+                        className="h-72 object-cover bg-gray-100"
+                      />
+                    </Card>
+
+                    {/* ID Proof Document */}
+                    {selectedVisitor.id_proof_image && (
+                      <Card className="overflow-hidden">
+                        <div className="p-3 bg-gray-50 border-b border-gray-200">
+                          <Typography
+                            variant="subtitle1"
+                            className="font-medium flex items-center"
+                          >
+                            <Badge className="mr-2" fontSize="small" />
+                            ID Proof Document
+                          </Typography>
+                        </div>
+                        <CardMedia
+                          component="img"
+                          image={selectedVisitor.id_proof_image}
+                          alt="ID Proof"
+                          className="h-56 object-cover bg-gray-100"
+                        />
+                      </Card>
+                    )}
+                  </Grid>
+
+                  {/* Right Column - Details */}
+                  <Grid item xs={12} md={8}>
+                    {/* Visitor Header */}
+                    <div className="mb-6">
                       <Typography
-                        variant="h6"
-                        sx={{
-                          fontFamily: "'Roboto', sans-serif",
-                          fontWeight: 600,
-                        }}
+                        variant="h4"
+                        className="font-bold text-gray-900 mb-3"
                       >
                         {selectedVisitor.visitor_name}
                       </Typography>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          color: "#666",
-                          fontFamily: "'Roboto', sans-serif",
-                        }}
-                      >
-                        {selectedVisitor.phone_number || "No phone number"}
-                      </Typography>
-                    </Box>
-                  </Box>
-                </Grid>
-                <Grid item xs={12} md={8}>
-                  <Grid container spacing={2}>
-                    {/* Row 1: Society & Building */}
-                    <Grid item xs={12} sm={6}>
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          color: "#A29EB6",
-                          fontFamily: "'Roboto', sans-serif",
-                          fontWeight: 500,
-                          display: "block",
-                          mb: 0.5,
-                        }}
-                      >
-                        Society
-                      </Typography>
-                      <Box display="flex" alignItems="center" gap={1}>
-                        <ApartmentIcon
-                          fontSize="small"
-                          sx={{ color: "#6F0B14" }}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Chip
+                          label={selectedVisitor.visitor_type}
+                          size="medium"
+                          className="font-medium"
+                          style={{
+                            backgroundColor: `${visitorTypeConfig[selectedVisitor.visitor_type]?.color}15`,
+                            color:
+                              visitorTypeConfig[selectedVisitor.visitor_type]
+                                ?.color,
+                          }}
+                          icon={
+                            visitorTypeConfig[selectedVisitor.visitor_type]
+                              ?.icon
+                          }
                         />
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            fontFamily: "'Roboto', sans-serif",
-                            fontWeight: 500,
+                        <Chip
+                          icon={
+                            statusConfig[selectedVisitor.approved_status]?.icon
+                          }
+                          label={selectedVisitor.approved_status}
+                          size="medium"
+                          className="font-medium"
+                          style={{
+                            backgroundColor:
+                              statusConfig[selectedVisitor.approved_status]
+                                ?.bgColor,
+                            color:
+                              statusConfig[selectedVisitor.approved_status]
+                                ?.color,
                           }}
-                        >
-                          {selectedVisitor.societies?.name || "Unknown"}
-                        </Typography>
-                      </Box>
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          color: "#A29EB6",
-                          fontFamily: "'Roboto', sans-serif",
-                          fontWeight: 500,
-                          display: "block",
-                          mb: 0.5,
-                        }}
-                      >
-                        Building
-                      </Typography>
-                      <Box display="flex" alignItems="center" gap={1}>
-                        <BuildingIcon
-                          fontSize="small"
-                          sx={{ color: "#6F0B14" }}
                         />
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            fontFamily: "'Roboto', sans-serif",
-                            fontWeight: 500,
-                          }}
-                        >
-                          {selectedVisitor.buildings?.name || "Not specified"}
-                        </Typography>
-                      </Box>
-                    </Grid>
+                        {selectedVisitor.visitor_otp && (
+                          <Chip
+                            label={`OTP: ${selectedVisitor.visitor_otp}`}
+                            size="medium"
+                            className="bg-primary/10 text-primary font-bold"
+                            icon={<Security fontSize="small" />}
+                          />
+                        )}
+                      </div>
+                    </div>
 
-                    {/* Row 2: Flat & Visitor Type */}
-                    <Grid item xs={12} sm={6}>
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          color: "#A29EB6",
-                          fontFamily: "'Roboto', sans-serif",
-                          fontWeight: 500,
-                          display: "block",
-                          mb: 0.5,
-                        }}
-                      >
-                        Flat Number
-                      </Typography>
-                      <Box display="flex" alignItems="center" gap={1}>
-                        <HomeIcon fontSize="small" sx={{ color: "#6F0B14" }} />
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            fontFamily: "'Roboto', sans-serif",
-                            fontWeight: 500,
-                          }}
-                        >
-                          {selectedVisitor.flat_number || "Not specified"}
-                        </Typography>
-                      </Box>
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          color: "#A29EB6",
-                          fontFamily: "'Roboto', sans-serif",
-                          fontWeight: 500,
-                          display: "block",
-                          mb: 0.5,
-                        }}
-                      >
-                        Visitor Type
-                      </Typography>
-                      <Box display="flex" alignItems="center" gap={1}>
-                        <VisitorTypeIcon type={selectedVisitor.visitor_type} />
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            fontFamily: "'Roboto', sans-serif",
-                            fontWeight: 500,
-                          }}
-                        >
-                          {selectedVisitor.visitor_type || "Guest"}
-                        </Typography>
-                      </Box>
-                    </Grid>
-
-                    {/* Row 3: Purpose */}
-                    <Grid item xs={12}>
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          color: "#A29EB6",
-                          fontFamily: "'Roboto', sans-serif",
-                          fontWeight: 500,
-                          display: "block",
-                          mb: 0.5,
-                        }}
-                      >
-                        Purpose of Visit
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          fontFamily: "'Roboto', sans-serif",
-                          backgroundColor: "rgba(111, 11, 20, 0.05)",
-                          p: 1.5,
-                          borderRadius: "8px",
-                        }}
-                      >
-                        {selectedVisitor.purpose || "Not specified"}
-                      </Typography>
-                    </Grid>
-
-                    {/* Row 4: Vehicle & Card */}
-                    <Grid item xs={12} sm={6}>
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          color: "#A29EB6",
-                          fontFamily: "'Roboto', sans-serif",
-                          fontWeight: 500,
-                          display: "block",
-                          mb: 0.5,
-                        }}
-                      >
-                        Vehicle Number
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          fontFamily: "'Roboto', sans-serif",
-                          fontWeight: 500,
-                        }}
-                      >
-                        {selectedVisitor.vehicle_number || "No vehicle"}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          color: "#A29EB6",
-                          fontFamily: "'Roboto', sans-serif",
-                          fontWeight: 500,
-                          display: "block",
-                          mb: 0.5,
-                        }}
-                      >
-                        Card Number
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          fontFamily: "'Roboto', sans-serif",
-                          fontWeight: 500,
-                        }}
-                      >
-                        {selectedVisitor.card_number || "No card issued"}
-                      </Typography>
-                    </Grid>
-
-                    {/* Row 5: Time Information */}
-                    <Grid item xs={12} sm={6}>
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          color: "#A29EB6",
-                          fontFamily: "'Roboto', sans-serif",
-                          fontWeight: 500,
-                          display: "block",
-                          mb: 0.5,
-                        }}
-                      >
-                        Entry Time
-                      </Typography>
-                      <Box display="flex" alignItems="center" gap={1}>
-                        <InTimeIcon
-                          fontSize="small"
-                          sx={{ color: "#6F0B14" }}
-                        />
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            fontFamily: "'Roboto', sans-serif",
-                            fontWeight: 500,
-                          }}
-                        >
-                          {formatDate(selectedVisitor.in_time)}
-                        </Typography>
-                      </Box>
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          color: "#A29EB6",
-                          fontFamily: "'Roboto', sans-serif",
-                          fontWeight: 500,
-                          display: "block",
-                          mb: 0.5,
-                        }}
-                      >
-                        Checkout Time
-                      </Typography>
-                      <Box display="flex" alignItems="center" gap={1}>
-                        <OutTimeIcon
-                          fontSize="small"
-                          sx={{ color: "#6F0B14" }}
-                        />
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            fontFamily: "'Roboto', sans-serif",
-                            fontWeight: 500,
-                            color: selectedVisitor.checkout_at
-                              ? "#1565C0"
-                              : "#666",
-                          }}
-                        >
-                          {selectedVisitor.checkout_at
-                            ? formatDate(selectedVisitor.checkout_at)
-                            : "Not checked out"}
-                        </Typography>
-                      </Box>
-                    </Grid>
-
-                    {/* Row 6: Status */}
-                    <Grid item xs={12}>
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          color: "#A29EB6",
-                          fontFamily: "'Roboto', sans-serif",
-                          fontWeight: 500,
-                          display: "block",
-                          mb: 0.5,
-                        }}
-                      >
-                        Status
-                      </Typography>
-                      <StatusChip
-                        label={selectedVisitor.approved_status || "Pending"}
-                        status={selectedVisitor.approved_status}
-                        sx={{ fontSize: "0.9rem", px: 2 }}
-                      />
-                    </Grid>
-
-                    {/* Row 7: Reason (if available) */}
-                    {selectedVisitor.rejected_reschedule_reason && (
-                      <Grid item xs={12}>
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            color: "#A29EB6",
-                            fontFamily: "'Roboto', sans-serif",
-                            fontWeight: 500,
-                            display: "block",
-                            mb: 0.5,
-                          }}
-                        >
-                          Reason
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            fontFamily: "'Roboto', sans-serif",
-                            color: "#B31B1B",
-                            backgroundColor: "rgba(179, 27, 27, 0.05)",
-                            p: 1.5,
-                            borderRadius: "8px",
-                            fontStyle: "italic",
-                          }}
-                        >
-                          {selectedVisitor.rejected_reschedule_reason}
-                        </Typography>
+                    {/* Contact + Vehicle */}
+                    <Grid container spacing={2} className="mb-4">
+                      <Grid item xs={12} sm={6}>
+                        <Card className="h-full">
+                          <CardContent>
+                            <Typography
+                              variant="subtitle1"
+                              className="font-medium mb-3 flex items-center text-gray-700"
+                            >
+                              <Phone
+                                className="mr-2 text-primary"
+                                fontSize="small"
+                              />
+                              Contact Information
+                            </Typography>
+                            <Typography
+                              variant="h6"
+                              className="font-bold text-gray-900 mb-1"
+                            >
+                              {selectedVisitor.phone_number || "Not provided"}
+                            </Typography>
+                          </CardContent>
+                        </Card>
                       </Grid>
-                    )}
+                      <Grid item xs={12} sm={6}>
+                        <Card className="h-full">
+                          <CardContent>
+                            <Typography
+                              variant="subtitle1"
+                              className="font-medium mb-3 flex items-center text-gray-700"
+                            >
+                              <DirectionsCar
+                                className="mr-2 text-primary"
+                                fontSize="small"
+                              />
+                              Vehicle Information
+                            </Typography>
+                            <Typography
+                              variant="h6"
+                              className="font-bold text-gray-900"
+                            >
+                              {selectedVisitor.vehicle_number || "No vehicle"}
+                            </Typography>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    </Grid>
+
+                    {/* Society Information */}
+                    <Card className="mb-4">
+                      <CardContent>
+                        <Typography
+                          variant="subtitle1"
+                          className="font-medium mb-3 flex items-center text-gray-700"
+                        >
+                          <Domain
+                            className="mr-2 text-primary"
+                            fontSize="small"
+                          />
+                          Society Information
+                        </Typography>
+                        <Typography
+                          variant="h6"
+                          className="font-bold text-gray-900 mb-1"
+                        >
+                          {selectedVisitor.society_name}
+                        </Typography>
+                        <Typography variant="caption" className="text-gray-500">
+                          Society ID: {selectedVisitor.society_id}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+
+                    {/* Purpose */}
+                    <Card className="mb-4">
+                      <CardContent>
+                        <Typography
+                          variant="subtitle1"
+                          className="font-medium mb-3 flex items-center text-gray-700"
+                        >
+                          <EventNote
+                            className="mr-2 text-primary"
+                            fontSize="small"
+                          />
+                          Purpose of Visit
+                        </Typography>
+                        <Typography variant="body1" className="text-gray-800">
+                          {selectedVisitor.purpose || "No purpose specified"}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+
+                    {/* Timing Information */}
+                    <Card className="mb-4">
+                      <CardContent>
+                        <Typography
+                          variant="subtitle1"
+                          className="font-medium mb-3 flex items-center text-gray-700"
+                        >
+                          <AccessTime
+                            className="mr-2 text-primary"
+                            fontSize="small"
+                          />
+                          Timing Information
+                        </Typography>
+                        <Grid container spacing={2}>
+                          <Grid item xs={12} sm={6}>
+                            <Typography
+                              variant="body2"
+                              className="text-gray-500 mb-1"
+                            >
+                              Check-in Time
+                            </Typography>
+                            <Typography
+                              variant="body1"
+                              className="font-bold text-gray-900"
+                            >
+                              {formatDateTime(selectedVisitor.in_time)}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              className="text-gray-500"
+                            >
+                              {getTimeAgo(selectedVisitor.in_time)}
+                            </Typography>
+                          </Grid>
+                          <Grid item xs={12} sm={6}>
+                            <Typography
+                              variant="body2"
+                              className="text-gray-500 mb-1"
+                            >
+                              Visit Type
+                            </Typography>
+                            <Chip
+                              label={
+                                selectedVisitor.visit_type === "previsitor"
+                                  ? "Pre-Registered"
+                                  : "Normal"
+                              }
+                              size="small"
+                              className={
+                                selectedVisitor.visit_type === "previsitor"
+                                  ? "bg-purple-100 text-purple-600"
+                                  : "bg-gray-100 text-gray-600"
+                              }
+                            />
+                          </Grid>
+                        </Grid>
+                      </CardContent>
+                    </Card>
+
+                    {/* Card Scan Status */}
+                    <Card className="mb-4">
+                      <CardContent>
+                        <Typography
+                          variant="subtitle1"
+                          className="font-medium mb-3 flex items-center text-gray-700"
+                        >
+                          <CreditCardOff
+                            className="mr-2 text-primary"
+                            fontSize="small"
+                          />
+                          Card Scan Status
+                        </Typography>
+                        <Chip
+                          label={getCardScanStatus(
+                            selectedVisitor.is_card_scan,
+                          )}
+                          size="medium"
+                          className={
+                            selectedVisitor.is_card_scan === "Scan"
+                              ? "bg-green-100 text-green-600"
+                              : selectedVisitor.is_card_scan === "WrongScan"
+                                ? "bg-yellow-100 text-yellow-600"
+                                : "bg-gray-100 text-gray-600"
+                          }
+                          icon={
+                            selectedVisitor.is_card_scan === "Scan" ? (
+                              <CheckCircle fontSize="small" />
+                            ) : selectedVisitor.is_card_scan === "WrongScan" ? (
+                              <Warning fontSize="small" />
+                            ) : (
+                              <RadioButtonUnchecked fontSize="small" />
+                            )
+                          }
+                        />
+                      </CardContent>
+                    </Card>
                   </Grid>
                 </Grid>
-              </Grid>
+              </div>
             </DialogContent>
-            <DialogActions
-              sx={{
-                p: 2,
-                backgroundColor: "rgba(111, 11, 20, 0.02)",
-                borderTop: "1px solid rgba(111, 11, 20, 0.1)",
-              }}
-            >
+
+            <DialogActions className="p-4 bg-gray-50 border-t border-gray-200">
               <Button
-                onClick={() => setViewDialogOpen(false)}
-                sx={{
-                  fontFamily: "'Roboto', sans-serif",
-                  color: "#6F0B14",
-                  borderRadius: "8px",
-                  px: 3,
-                }}
+                onClick={() => setDetailDialogOpen(false)}
+                variant="outlined"
+                className="border-gray-300 text-gray-700"
               >
                 Close
               </Button>
@@ -1778,6 +1355,6 @@ export default function PmVisitors() {
           </>
         )}
       </Dialog>
-    </Box>
+    </div>
   );
 }

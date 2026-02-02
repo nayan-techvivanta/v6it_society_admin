@@ -29,7 +29,6 @@ import {
   TableHead,
   TableRow,
   Avatar,
-  AvatarGroup,
   Tooltip,
   Dialog,
   DialogTitle,
@@ -149,16 +148,16 @@ const containerVariants = {
 };
 
 const itemVariants = {
-  hidden: { y: 20, opacity: 0 },
-  visible: {
-    y: 0,
-    opacity: 1,
-    transition: {
-      type: "spring",
-      stiffness: 100,
-      damping: 12,
-    },
-  },
+  // hidden: { y: 20, opacity: 0 },
+  // visible: {
+  //   y: 0,
+  //   opacity: 1,
+  //   transition: {
+  //     type: "spring",
+  //     stiffness: 100,
+  //     damping: 12,
+  //   },
+  // },
 };
 
 const PMBroadCast = () => {
@@ -177,7 +176,6 @@ const PMBroadCast = () => {
   const [formData, setFormData] = useState({
     title: "",
     description: "",
-    category: "general",
     scheduleForLater: false,
     scheduledDate: "",
     scheduledTime: "",
@@ -202,12 +200,15 @@ const PMBroadCast = () => {
   const [loadingSocieties, setLoadingSocieties] = useState(false);
   const [loadingBuildings, setLoadingBuildings] = useState(false);
   const fileInputRef = useRef(null);
+
   const {
     sendBulkNotification,
     isSending: isNotificationSending,
     progress,
     getSocietyBuildingIds,
   } = useBulkNotification();
+
+  // Initialize PM data and assigned societies
   useEffect(() => {
     const fetchPMData = async () => {
       const profileId = localStorage.getItem("profileId");
@@ -227,6 +228,7 @@ const PMBroadCast = () => {
     fetchPMData();
   }, []);
 
+  // Fetch societies assigned to this PM
   const fetchAssignedSocieties = async (pmId) => {
     setLoadingSocieties(true);
     try {
@@ -278,6 +280,7 @@ const PMBroadCast = () => {
     }
   };
 
+  // Fetch buildings for selected society
   const fetchBuildingsForSociety = async (societyId) => {
     if (!societyId) return;
 
@@ -285,8 +288,10 @@ const PMBroadCast = () => {
     try {
       const { data, error } = await supabase
         .from("buildings")
-        .select("id, name")
+        .select("id, name, is_active, is_delete")
         .eq("society_id", societyId)
+        .eq("is_active", true)
+        .eq("is_delete", false)
         .order("name");
 
       if (error) throw error;
@@ -311,6 +316,7 @@ const PMBroadCast = () => {
     }
   };
 
+  // Fetch broadcasts sent by this PM
   const fetchBroadcasts = async () => {
     if (!pmId) {
       setSnackbar({
@@ -322,7 +328,9 @@ const PMBroadCast = () => {
     }
 
     setLoadingBroadcasts(true);
+
     try {
+      // 1️⃣ Get societies assigned to this PM
       const { data: pmSocieties, error: pmError } = await supabase
         .from("pm_society")
         .select("society_id")
@@ -332,20 +340,30 @@ const PMBroadCast = () => {
 
       if (!pmSocieties || pmSocieties.length === 0) {
         setBroadcasts([]);
+        setLoadingBroadcasts(false);
         return;
       }
 
       const societyIds = pmSocieties.map((item) => item.society_id);
 
+      // 2️⃣ Fetch broadcasts created by this PM for assigned societies
       const { data, error } = await supabase
         .from("broadcast")
         .select(
           `
-          *,
-          buildings(name),
-          societies(name)
-        `,
+        id,
+        title,
+        message,
+        document,
+        created_at,
+        socity_id,
+        building_id,
+        societies ( id, name ),
+        buildings ( id, name ),
+        users ( id, full_name )
+      `,
         )
+        .eq("user_id", pmId)
         .in("socity_id", societyIds)
         .order("created_at", { ascending: false });
 
@@ -406,6 +424,185 @@ const PMBroadCast = () => {
     }));
   };
 
+  // Form input change handler
+  const handleInputChange = (e) => {
+    const { name, value, checked, type } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+  };
+
+  // Save broadcast to database
+  const saveBroadcastToDatabase = async (broadcastData) => {
+    try {
+      const { data, error } = await supabase
+        .from("broadcast")
+        .insert([broadcastData])
+        .select();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error("Error saving broadcast:", error);
+      throw new Error(`Failed to save broadcast: ${error.message}`);
+    }
+  };
+
+  // Get society name by ID
+  const getSocietyName = (societyId) => {
+    const society = assignedSocieties.find((s) => s.id === societyId);
+    return society ? society.name : "Unknown Society";
+  };
+
+  // Main submit handler
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    // Validation
+    if (!formData.title.trim()) {
+      setSnackbar({
+        open: true,
+        message: "Please enter a title for the broadcast",
+        severity: "error",
+      });
+      return;
+    }
+
+    if (!formData.description.trim()) {
+      setSnackbar({
+        open: true,
+        message: "Please enter a description",
+        severity: "error",
+      });
+      return;
+    }
+
+    if (!formData.societyId) {
+      setSnackbar({
+        open: true,
+        message: "Please select a society",
+        severity: "error",
+      });
+      return;
+    }
+
+    if (formData.broadcastType === "building" && !formData.buildingId) {
+      setSnackbar({
+        open: true,
+        message: "Please select a building",
+        severity: "error",
+      });
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      let fileUrls = [];
+      if (files.length > 0) {
+        fileUrls = await Promise.all(
+          files.map((file) => uploadFileToSupabase(file.file)),
+        );
+      }
+      const imageUrl = fileUrls.length > 0 ? fileUrls[0] : null;
+
+      const broadcastData = {
+        title: formData.title.trim(),
+        message: formData.description.trim(),
+        socity_id: String(formData.societyId),
+        building_id:
+          formData.broadcastType === "building"
+            ? String(formData.buildingId)
+            : null,
+        document: fileUrls.length > 0 ? fileUrls.join(",") : null,
+        user_id: pmId,
+        created_at: new Date().toISOString(),
+      };
+
+      const society = assignedSocieties.find(
+        (s) => s.id === formData.societyId,
+      );
+      const societyName = society ? society.name : "Unknown Society";
+
+      let buildingIds = [];
+      let buildingName = "";
+
+      if (formData.broadcastType === "society") {
+        buildingIds = await getSocietyBuildingIds(formData.societyId);
+
+        if (buildingIds.length === 0) {
+          throw new Error("No active buildings found in this society");
+        }
+
+        // Send to all buildings in society
+        await sendBulkNotification({
+          buildingIds,
+          title: formData.title.trim(),
+          body: formData.description.trim(),
+          imageUrl,
+          notificationType: "Property Manager",
+          data: { screen: "broadcast" },
+          societyName,
+          society_id: formData.societyId,
+          building_id: null,
+        });
+
+        // Save society-wide broadcast
+        await saveBroadcastToDatabase(broadcastData);
+      } else if (formData.broadcastType === "building") {
+        buildingIds = [formData.buildingId];
+
+        const building = buildings.find((b) => b.id === formData.buildingId);
+        buildingName = building ? building.name : "Selected Building";
+
+        // Send to specific building
+        await sendBulkNotification({
+          buildingIds,
+          title: formData.title.trim(),
+          body: formData.description.trim(),
+          imageUrl,
+          notificationType: "Property Manager",
+          data: { screen: "broadcast" },
+          societyName,
+          society_id: formData.societyId,
+          building_id: formData.buildingId,
+        });
+
+        // Save building-specific broadcast
+        await saveBroadcastToDatabase(broadcastData);
+      }
+
+      // Success message
+      const successMessage =
+        formData.broadcastType === "building"
+          ? `Broadcast sent successfully to ${buildingName} in ${societyName}!`
+          : `Broadcast sent successfully to entire ${societyName}!`;
+
+      setSnackbar({
+        open: true,
+        message: successMessage,
+        severity: "success",
+      });
+
+      // Reset form
+      resetCreateForm();
+
+      // Switch to list view and refresh
+      setViewMode("list");
+      await fetchBroadcasts();
+    } catch (error) {
+      console.error("Error sending broadcast:", error);
+      setSnackbar({
+        open: true,
+        message: error.message || "Failed to send broadcast",
+        severity: "error",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // View broadcast details
   const handleViewBroadcast = (broadcast) => {
     setSelectedBroadcast(broadcast);
@@ -455,13 +652,14 @@ const PMBroadCast = () => {
     });
   };
 
+  // Reset create form
   const resetCreateForm = useCallback(() => {
     const defaultSocietyId =
       assignedSocieties.length > 0 ? assignedSocieties[0].id : null;
+
     setFormData({
       title: "",
       description: "",
-      category: "general",
       scheduleForLater: false,
       scheduledDate: "",
       scheduledTime: "",
@@ -469,6 +667,12 @@ const PMBroadCast = () => {
       societyId: defaultSocietyId,
       buildingId: null,
     });
+
+    // Fetch buildings for the default society
+    if (defaultSocietyId) {
+      fetchBuildingsForSociety(defaultSocietyId);
+    }
+
     setFiles([]);
     setLoading(false);
     setIsDragging(false);
@@ -490,15 +694,7 @@ const PMBroadCast = () => {
     document.body.removeChild(link);
   };
 
-  // Form handlers
-  const handleInputChange = (e) => {
-    const { name, value, checked, type } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
-  };
-
+  // File upload handlers
   const handleFileChange = (e) => {
     const selectedFiles = Array.from(e.target.files);
     addFiles(selectedFiles);
@@ -523,7 +719,7 @@ const PMBroadCast = () => {
 
   const addFiles = (newFiles) => {
     const validFiles = newFiles.filter((file) => {
-      const maxSize = 10 * 1024 * 1024; // 10MB
+      const maxSize = 10 * 1024 * 1024;
       const allowedTypes = [
         "image/jpeg",
         "image/png",
@@ -594,244 +790,8 @@ const PMBroadCast = () => {
     }
   };
 
-  // const handleSubmit = async (e) => {
-  //   e.preventDefault();
-
-  //   // Validation
-  //   if (!formData.title.trim()) {
-  //     setSnackbar({
-  //       open: true,
-  //       message: "Please enter a title for the broadcast",
-  //       severity: "error",
-  //     });
-  //     return;
-  //   }
-
-  //   if (!formData.description.trim()) {
-  //     setSnackbar({
-  //       open: true,
-  //       message: "Please enter a description",
-  //       severity: "error",
-  //     });
-  //     return;
-  //   }
-
-  //   if (!formData.societyId) {
-  //     setSnackbar({
-  //       open: true,
-  //       message: "Please select a society",
-  //       severity: "error",
-  //     });
-  //     return;
-  //   }
-
-  //   if (formData.broadcastType === "building" && !formData.buildingId) {
-  //     setSnackbar({
-  //       open: true,
-  //       message: "Please select a building",
-  //       severity: "error",
-  //     });
-  //     return;
-  //   }
-
-  //   setLoading(true);
-
-  //   try {
-  //     // Upload files if any
-  //     let fileUrls = [];
-  //     if (files.length > 0) {
-  //       const uploadPromises = files.map((file) =>
-  //         uploadFileToSupabase(file.file),
-  //       );
-  //       fileUrls = await Promise.all(uploadPromises);
-  //     }
-
-  //     // Prepare broadcast data
-  //     const broadcastData = {
-  //       title: formData.title.trim(),
-  //       message: formData.description.trim(),
-  //       socity_id: formData.societyId,
-  //       building_id:
-  //         formData.broadcastType === "building" ? formData.buildingId : null,
-  //       document: fileUrls.length > 0 ? fileUrls.join(",") : null,
-  //       created_at: new Date().toISOString(),
-  //     };
-
-  //     // Save to database
-  //     await saveBroadcastToDatabase(broadcastData, fileUrls);
-
-  //     // Success message
-  //     const societyName =
-  //       assignedSocieties.find((s) => s.id === formData.societyId)?.name ||
-  //       "the society";
-  //     const buildingName =
-  //       formData.broadcastType === "building"
-  //         ? buildings.find((b) => b.id === formData.buildingId)?.name ||
-  //           "selected building"
-  //         : null;
-
-  //     const successMessage =
-  //       formData.broadcastType === "building"
-  //         ? `Broadcast sent successfully to ${buildingName} in ${societyName}!`
-  //         : `Broadcast sent successfully to entire ${societyName}!`;
-
-  //     setSnackbar({
-  //       open: true,
-  //       message: successMessage,
-  //       severity: "success",
-  //     });
-
-  //     // Reset form
-  //     resetCreateForm();
-
-  //     // Switch to list view and refresh
-  //     setViewMode("list");
-  //     fetchBroadcasts();
-  //   } catch (error) {
-  //     console.error("Error sending broadcast:", error);
-  //     setSnackbar({
-  //       open: true,
-  //       message: `Failed to send broadcast: ${error.message}`,
-  //       severity: "error",
-  //     });
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    // Validation (unchanged)
-    if (!formData.title.trim()) {
-      setSnackbar({
-        open: true,
-        message: "Please enter a title for the broadcast",
-        severity: "error",
-      });
-      return;
-    }
-
-    if (!formData.description.trim()) {
-      setSnackbar({
-        open: true,
-        message: "Please enter a description",
-        severity: "error",
-      });
-      return;
-    }
-
-    if (!formData.societyId) {
-      setSnackbar({
-        open: true,
-        message: "Please select a society",
-        severity: "error",
-      });
-      return;
-    }
-
-    if (formData.broadcastType === "building" && !formData.buildingId) {
-      setSnackbar({
-        open: true,
-        message: "Please select a building",
-        severity: "error",
-      });
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      // Upload files if any
-      let fileUrls = [];
-      if (files.length > 0) {
-        const uploadPromises = files.map((file) =>
-          uploadFileToSupabase(file.file),
-        );
-        fileUrls = await Promise.all(uploadPromises);
-      }
-      const imageUrl = fileUrls.length > 0 ? fileUrls[0] : null;
-
-      // 🔥 NEW: Send notifications using the reusable hook
-      let buildingIds = [];
-
-      if (formData.broadcastType === "society") {
-        // Get ALL buildings for this society
-        buildingIds = await getSocietyBuildingIds(formData.societyId);
-      } else {
-        // Single building selected
-        buildingIds = [formData.buildingId];
-      }
-
-      if (buildingIds.length > 0) {
-        await sendBulkNotification({
-          buildingIds,
-          title: formData.title.trim(),
-          body: formData.description.trim(),
-          imageUrl,
-          notificationType: "Property Manager",
-          data: { screen: "pm-broadcast" },
-          societyName: getSocietyName(formData.societyId),
-        });
-      }
-
-      const broadcastData = {
-        title: formData.title.trim(),
-        message: formData.description.trim(),
-        socity_id: String(formData.societyId),
-        building_id:
-          formData.broadcastType === "building"
-            ? String(formData.buildingId)
-            : null,
-        document: fileUrls.length > 0 ? fileUrls.join(",") : null,
-        created_at: new Date().toISOString(),
-      };
-
-      // Save to database
-      await saveBroadcastToDatabase(broadcastData, fileUrls);
-
-      const societyName = getSocietyName(formData.societyId);
-      const buildingName =
-        formData.broadcastType === "building"
-          ? buildings.find((b) => b.id === formData.buildingId)?.name ||
-            "selected building"
-          : null;
-
-      const successMessage =
-        formData.broadcastType === "building"
-          ? `Broadcast sent successfully to ${buildingName} in ${societyName}!`
-          : `Broadcast sent successfully to entire ${societyName}!`;
-
-      setSnackbar({
-        open: true,
-        message: successMessage,
-        severity: "success",
-      });
-
-      // Reset form
-      resetCreateForm();
-
-      setViewMode("list");
-      fetchBroadcasts();
-    } catch (error) {
-      console.error("Error sending broadcast:", error);
-      setSnackbar({
-        open: true,
-        message: `Failed to send broadcast: ${error.message}`,
-        severity: "error",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleCloseSnackbar = () => {
     setSnackbar((prev) => ({ ...prev, open: false }));
-  };
-
-  // Get society name by ID
-  const getSocietyName = (societyId) => {
-    const society = assignedSocieties.find((s) => s.id === societyId);
-    return society ? society.name : "Unknown Society";
   };
 
   // Render create form
@@ -922,41 +882,6 @@ const PMBroadCast = () => {
                   />
                 </motion.div>
 
-                {/* Categories */}
-                {/* <motion.div variants={itemVariants}>
-                  <FormControl fullWidth>
-                    <InputLabel
-                      sx={{
-                        fontFamily: "'Roboto', sans-serif",
-                        color: "#6F0B14",
-                      }}
-                    >
-                      Category
-                    </InputLabel>
-                    <Select
-                      name="category"
-                      value={formData.category}
-                      onChange={handleInputChange}
-                      label="Category"
-                      sx={{
-                        borderRadius: "8px",
-                        backgroundColor: "rgba(255, 255, 255, 0.8)",
-                        fontFamily: "'Roboto', sans-serif",
-                        "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                          borderColor: "#6F0B14",
-                          borderWidth: "2px",
-                        },
-                      }}
-                    >
-                      <MenuItem value="general">General Announcement</MenuItem>
-                      <MenuItem value="notice">Official Notice</MenuItem>
-                      <MenuItem value="event">Event / Celebration</MenuItem>
-                      <MenuItem value="maintenance">Maintenance Alert</MenuItem>
-                      <MenuItem value="emergency">Emergency / Urgent</MenuItem>
-                    </Select>
-                  </FormControl>
-                </motion.div> */}
-
                 <Divider sx={{ my: 1 }} />
 
                 {/* Select Society & Building */}
@@ -1026,7 +951,6 @@ const PMBroadCast = () => {
                         fullWidth
                         sx={{
                           "& .MuiToggleButton-root": {
-                            // borderRadius: "8px",
                             border: "1px solid rgba(111, 11, 20, 0.2)",
                             "&.Mui-selected": {
                               backgroundColor: "rgba(111, 11, 20, 0.1)",
@@ -1217,9 +1141,9 @@ const PMBroadCast = () => {
                   sx={{ color: "#6F0B14", fontFamily: "'Roboto', sans-serif" }}
                 >
                   Publishing Options
-                </Typography> */}
+                </Typography>
 
-                {/* <FormControlLabel
+                <FormControlLabel
                   control={
                     <Switch
                       checked={formData.scheduleForLater}
@@ -1237,7 +1161,7 @@ const PMBroadCast = () => {
                     </Typography>
                   }
                   className="mb-4"
-                /> */}
+                />
 
                 <AnimatePresence>
                   {formData.scheduleForLater && (
@@ -1269,16 +1193,16 @@ const PMBroadCast = () => {
                       />
                     </motion.div>
                   )}
-                </AnimatePresence>
+                </AnimatePresence> */}
 
                 <GradientButton
                   fullWidth
                   variant="contained"
                   size="large"
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || isNotificationSending}
                   startIcon={
-                    loading ? (
+                    loading || isNotificationSending ? (
                       <CircularProgress size={20} color="inherit" />
                     ) : formData.scheduleForLater ? (
                       <AnnouncementIcon />
@@ -1287,11 +1211,11 @@ const PMBroadCast = () => {
                     )
                   }
                 >
-                  {loading
-                    ? "Processing..."
+                  {loading || isNotificationSending
+                    ? "Sending..."
                     : formData.scheduleForLater
                       ? "Schedule Broadcast"
-                      : "Send Broadcast "}
+                      : "Send Broadcast"}
                 </GradientButton>
 
                 <div className="mt-4 text-center">
@@ -1449,7 +1373,7 @@ const PMBroadCast = () => {
                         >
                           {broadcast.title}
                         </Typography>
-                        <Chip
+                        {/* <Chip
                           label={broadcast.category || "General"}
                           size="small"
                           sx={{
@@ -1465,7 +1389,7 @@ const PMBroadCast = () => {
                                 ? "#c62828"
                                 : "#1565c0",
                           }}
-                        />
+                        /> */}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center">
@@ -1595,14 +1519,15 @@ const PMBroadCast = () => {
       style={{ minHeight: "80vh" }}
       className="p-6 max-w-7xl mx-auto space-y-8 "
     >
+      {/* Notification sending progress */}
       {isNotificationSending && (
         <div className="fixed top-20 right-4 bg-white/95 backdrop-blur-sm p-4 shadow-xl rounded-lg z-50 border max-w-sm animate-in slide-in-from-top-2 duration-300">
           <div className="flex items-center gap-2 mb-2">
-            <CircularProgress size={18} />
+            <CircularProgress size={18} sx={{ color: "#6F0B14" }} />
             <Typography
               variant="caption"
               fontWeight={600}
-              className="text-primary"
+              sx={{ color: "#6F0B14", fontFamily: "'Roboto', sans-serif" }}
             >
               Sending notifications...
             </Typography>
@@ -1618,6 +1543,7 @@ const PMBroadCast = () => {
           </div>
         </div>
       )}
+
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
         <div>
@@ -1633,14 +1559,15 @@ const PMBroadCast = () => {
               mb: 1,
             }}
           >
-            Broadcast Manager
+            PM Broadcast Manager
           </Typography>
           <Typography
             variant="subtitle1"
             className="text-gray-500"
             sx={{ fontFamily: "'Roboto', sans-serif" }}
           >
-            Create and manage announcements for societies and buildings
+            Create and manage announcements for your assigned societies and
+            buildings
           </Typography>
         </div>
 
@@ -1798,12 +1725,21 @@ const PMBroadCast = () => {
                     Sent To
                   </Typography>
                   <div className="flex items-center text-gray-700">
-                    <SocietyIcon fontSize="small" className="mr-2" />
-                    <Typography variant="body2">
-                      {selectedBroadcast.buildings?.name ||
-                        selectedBroadcast.societies?.name ||
-                        "All Members"}
-                    </Typography>
+                    {selectedBroadcast.building_id ? (
+                      <>
+                        <ApartmentIcon fontSize="small" className="mr-2" />
+                        <Typography variant="body2">
+                          {selectedBroadcast.buildings?.name || "Building"}
+                        </Typography>
+                      </>
+                    ) : (
+                      <>
+                        <SocietyIcon fontSize="small" className="mr-2" />
+                        <Typography variant="body2">
+                          {selectedBroadcast.societies?.name || "All Members"}
+                        </Typography>
+                      </>
+                    )}
                   </div>
                 </div>
                 <div>
@@ -1816,6 +1752,34 @@ const PMBroadCast = () => {
                   </Typography>
                   <Typography variant="body2" className="text-gray-700">
                     {formatDate(selectedBroadcast.created_at)}
+                  </Typography>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Typography
+                    variant="subtitle2"
+                    color="textSecondary"
+                    className="uppercase tracking-wider text-xs mb-1"
+                  >
+                    Society
+                  </Typography>
+                  <Typography variant="body2" className="text-gray-700">
+                    {selectedBroadcast.societies?.name || "Unknown Society"}
+                  </Typography>
+                </div>
+                <div>
+                  <Typography
+                    variant="subtitle2"
+                    color="textSecondary"
+                    className="uppercase tracking-wider text-xs mb-1"
+                  >
+                    Sent By
+                  </Typography>
+                  <Typography variant="body2" className="text-gray-700">
+                    {selectedBroadcast.user_profiles?.name ||
+                      "Property Manager"}
                   </Typography>
                 </div>
               </div>

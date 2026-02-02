@@ -332,6 +332,8 @@ import {
   Typography,
   CircularProgress,
 } from "@mui/material";
+import { FormControl, InputLabel, Select, MenuItem } from "@mui/material";
+
 import { supabase } from "../../../api/supabaseClient";
 import { motion, AnimatePresence } from "framer-motion";
 import HomeIcon from "@mui/icons-material/Home";
@@ -351,24 +353,53 @@ export default function AddFlatDialog({
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [buildingName, setBuildingName] = useState("");
+  const [devices, setDevices] = useState([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState("");
+
+  const fetchSocietyDevices = async () => {
+    if (!societyId) return;
+
+    const { data, error } = await supabase
+      .from("devices")
+      .select("id, device_serial_number, flat_id")
+      .eq("society_id", societyId);
+
+    if (error) {
+      console.error(error);
+      toast.error("Failed to load devices");
+      return;
+    }
+
+    setDevices(data || []);
+  };
 
   useEffect(() => {
     if (building?.name) setBuildingName(building.name);
 
-    if (!open) {
-      // Reset form on close
-      setFormData({ flat_number: "", floor_number: "" });
+    if (open) {
+      fetchSocietyDevices();
+
+      if (flat) {
+        // EDIT MODE
+        setFormData({
+          flat_number: flat.flat_number || "",
+          floor_number: flat.floor_number || "",
+        });
+
+        // find device attached to this flat
+
+        const assignedDevice = devices.find((d) => d.flat_id === flat.id);
+        const targetDeviceId = flat.device_id || assignedDevice?.id || "";
+
+        setSelectedDeviceId(targetDeviceId);
+      } else {
+        setFormData({ flat_number: "", floor_number: "" });
+        setSelectedDeviceId("");
+      }
+    } else {
       setErrors({});
     }
-
-    if (open && flat) {
-      // Pre-fill form if editing
-      setFormData({
-        flat_number: flat.flat_number || "",
-        floor_number: flat.floor_number || "",
-      });
-    }
-  }, [open, building, flat]);
+  }, [open, building, flat, societyId]);
 
   const validateForm = () => {
     const newErrors = {};
@@ -392,7 +423,7 @@ export default function AddFlatDialog({
 
     setLoading(true);
     try {
-      // Check for duplicate flat if adding or changing flat number
+      // Check for duplicate flat
       const { data: existingFlat } = await supabase
         .from("flats")
         .select("id")
@@ -406,32 +437,74 @@ export default function AddFlatDialog({
         return;
       }
 
-      if (flat?.id) {
-        // Update existing flat
-        const { error } = await supabase
+      let flatId = flat?.id;
+
+      if (flatId) {
+        // --- UPDATE EXISTING FLAT ---
+        const { error: flatError } = await supabase
           .from("flats")
           .update({
             flat_number: formData.flat_number.trim(),
             floor_number: parseInt(formData.floor_number),
+            device_id: selectedDeviceId || null,
             updated_at: new Date().toISOString(),
           })
-          .eq("id", flat.id);
+          .eq("id", flatId);
 
-        if (error) throw error;
+        if (flatError) throw flatError;
+
+        // Handle device assignment changes
+        const oldDeviceId = flat.device_id;
+        const newDeviceId = selectedDeviceId;
+
+        if (oldDeviceId !== newDeviceId) {
+          // 1. Unassign old device if it existed
+          if (oldDeviceId) {
+            await supabase
+              .from("devices")
+              .update({ flat_id: null })
+              .eq("id", oldDeviceId);
+          }
+          // 2. Assign new device if selected
+          if (newDeviceId) {
+            await supabase
+              .from("devices")
+              .update({ flat_id: flatId })
+              .eq("id", newDeviceId);
+          }
+        }
+
         toast.success(`Flat ${formData.flat_number} updated successfully!`);
       } else {
-        // Insert new flat
-        const { error } = await supabase.from("flats").insert([
-          {
-            building_id: building?.id,
-            society_id: societyId,
-            flat_number: formData.flat_number.trim(),
-            floor_number: parseInt(formData.floor_number),
-            is_active: true,
-            created_at: new Date().toISOString(),
-          },
-        ]);
-        if (error) throw error;
+        // --- INSERT NEW FLAT ---
+        const { data: newFlat, error: flatError } = await supabase
+          .from("flats")
+          .insert([
+            {
+              building_id: building?.id,
+              society_id: societyId,
+              flat_number: formData.flat_number.trim(),
+              floor_number: parseInt(formData.floor_number),
+              device_id: selectedDeviceId || null,
+              is_active: true,
+              created_at: new Date().toISOString(),
+            },
+          ])
+          .select()
+          .single();
+
+        if (flatError) throw flatError;
+
+        flatId = newFlat.id;
+
+        // If a device was selected, assign the flat to it in the devices table
+        if (selectedDeviceId) {
+          await supabase
+            .from("devices")
+            .update({ flat_id: flatId })
+            .eq("id", selectedDeviceId);
+        }
+
         toast.success(`Flat ${formData.flat_number} added successfully!`);
       }
 
@@ -525,6 +598,41 @@ export default function AddFlatDialog({
                     sx={{ mb: 2 }}
                     inputProps={{ min: 0, max: 50 }}
                   />
+                  <FormControl fullWidth sx={{ mb: 2 }}>
+                    <InputLabel id="device-select-label">
+                      Assign Device
+                    </InputLabel>
+                    <Select
+                      labelId="device-select-label"
+                      label="Assign Device"
+                      value={selectedDeviceId}
+                      onChange={(e) => setSelectedDeviceId(e.target.value)}
+                    >
+                      <MenuItem value="">
+                        <em>Select Device</em>
+                      </MenuItem>
+
+                      {/* {devices.map((device) => (
+                        <MenuItem key={device.id} value={device.id}>
+                          {device.device_serial_number}
+                        </MenuItem>
+                      ))} */}
+                      {devices.map((device) => {
+                        // Check if device is assigned to ANY flat
+                        const isAssigned =
+                          device.flat_id && device.flat_id !== flat?.id;
+
+                        // Hide if assigned to another flat
+                        if (isAssigned) return null;
+
+                        return (
+                          <MenuItem key={device.id} value={device.id}>
+                            {device.device_serial_number}
+                          </MenuItem>
+                        );
+                      })}
+                    </Select>
+                  </FormControl>
                 </Box>
               )}
             </DialogContent>

@@ -156,7 +156,7 @@ export default function Flats() {
           `
         id, flat_number, floor_number, bhk_type, area_sqft, 
         occupancy_status, is_active, created_at, updated_at,
-        building_id, society_id
+        building_id, society_id, device_id
       `,
         )
         .eq("building_id", buildingId)
@@ -725,6 +725,7 @@ export default function Flats() {
                                 size="small"
                                 onClick={(e) => {
                                   e.stopPropagation();
+                                  // setSelectedDeviceId(flat.device_id || "");
                                   setSelectedFlat(flat);
                                   setOpenDialog(true);
                                 }}

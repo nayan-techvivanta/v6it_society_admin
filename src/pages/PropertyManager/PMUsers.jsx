@@ -6,8 +6,6 @@ import {
   Card,
   CardContent,
   Grid,
-  Paper,
-  Chip,
   CircularProgress,
   Alert,
   Button,
@@ -15,12 +13,12 @@ import {
   Tab,
   Table,
   TableBody,
+  Select,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
   Avatar,
-  AvatarGroup,
   IconButton,
   Dialog,
   DialogTitle,
@@ -29,15 +27,13 @@ import {
   TextField,
   InputAdornment,
   MenuItem,
-  Select,
   FormControl,
   InputLabel,
   Tooltip,
-  Badge,
+  Chip,
 } from "@mui/material";
 import {
   Search as SearchIcon,
-  FilterList as FilterIcon,
   Refresh as RefreshIcon,
   Home as HomeIcon,
   Business as BuildingIcon,
@@ -48,7 +44,6 @@ import {
   Visibility as VisibilityIcon,
   Phone as PhoneIcon,
   Email as EmailIcon,
-  LocationOn as LocationIcon,
   CalendarToday as CalendarIcon,
 } from "@mui/icons-material";
 import { motion } from "framer-motion";
@@ -88,6 +83,7 @@ const StatsCard = styled(Card)(({ theme, color = "#6F0B14" }) => ({
 const StatusChip = styled(Chip)(({ status }) => ({
   fontFamily: "'Roboto', sans-serif",
   fontWeight: 500,
+  fontSize: "0.75rem",
   ...(status === "Occupied" && {
     backgroundColor: "#E6F4E6",
     color: "#008000",
@@ -108,6 +104,7 @@ const StatusChip = styled(Chip)(({ status }) => ({
 const RoleChip = styled(Chip)(({ role }) => ({
   fontFamily: "'Roboto', sans-serif",
   fontWeight: 500,
+  fontSize: "0.75rem",
   ...(role === "Tanent-M" && {
     backgroundColor: "rgba(111, 11, 20, 0.1)",
     color: "#6F0B14",
@@ -182,7 +179,7 @@ export default function PMUsers() {
     fetchPMData();
   }, []);
 
-  // Main data fetching function
+  // Main data fetching function - UPDATED to match your schema
   const fetchAllData = async (pmId) => {
     setLoading(true);
     try {
@@ -209,7 +206,6 @@ export default function PMUsers() {
         .in("id", societyIds);
 
       if (societiesError) throw societiesError;
-
       setSocieties(societiesData || []);
 
       // Step 3: Get buildings of those societies
@@ -221,7 +217,6 @@ export default function PMUsers() {
 
       if (buildingError) throw buildingError;
 
-      // Combine buildings with society names
       const buildingsWithSociety = buildingsData.map((building) => ({
         ...building,
         society_name:
@@ -231,91 +226,109 @@ export default function PMUsers() {
 
       setBuildings(buildingsWithSociety || []);
 
-      // Get building IDs for flats query
       const buildingIds = buildingsData.map((b) => b.id);
 
-      if (buildingIds.length > 0) {
-        // Step 4: Get flats of those buildings
-        const { data: flatsData, error: flatsError } = await supabase
-          .from("flats")
-          .select("*")
-          .eq("is_delete", false)
-          .in("building_id", buildingIds)
-          .order("building_id, flat_number");
-
-        if (flatsError) throw flatsError;
-
-        // Combine flats with building and society info
-        const flatsWithDetails = flatsData.map((flat) => {
-          const building = buildingsData.find((b) => b.id === flat.building_id);
-          const society = societiesData.find((s) => s.id === flat.society_id);
-          return {
-            ...flat,
-            building_name: building?.name || "Unknown Building",
-            society_name: society?.name || "Unknown Society",
-          };
-        });
-
-        setFlats(flatsWithDetails || []);
-
-        // Get flat IDs for members query
-        const flatIds = flatsData.map((f) => f.id);
-
-        if (flatIds.length > 0) {
-          // Step 5: Get members of those flats (Tenant-M and Tenant-O only)
-          const { data: membersData, error: membersError } = await supabase
-            .from("users")
-            .select("*")
-            .eq("is_delete", false)
-            .in("flat_id", flatIds)
-            .in("role_type", ["Tanent-M", "Tanent-O"])
-            .order("created_at", { ascending: false });
-
-          if (membersError) throw membersError;
-
-          // Combine members with flat, building, and society info
-          const membersWithDetails = membersData.map((member) => {
-            const flat = flatsData.find((f) => f.id === member.flat_id);
-            const building = buildingsData.find(
-              (b) => b.id === flat?.building_id,
-            );
-            const society = societiesData.find(
-              (s) => s.id === flat?.society_id,
-            );
-
-            return {
-              ...member,
-              flat_number: flat?.flat_number || "N/A",
-              building_name: building?.name || "N/A",
-              society_name: society?.name || "N/A",
-              floor_number: flat?.floor_number,
-              bhk_type: flat?.bhk_type,
-              area_sqft: flat?.area_sqft,
-              occupancy_status: flat?.occupancy_status,
-              building_id: flat?.building_id,
-              society_id: flat?.society_id,
-            };
-          });
-
-          setMembers(membersWithDetails || []);
-          setFilteredMembers(membersWithDetails || []);
-          updateStats(
-            membersWithDetails || [],
-            societiesData,
-            buildingsData,
-            flatsData,
-          );
-        } else {
-          setMembers([]);
-          setFilteredMembers([]);
-          updateStats([], societiesData, buildingsData, flatsData);
-        }
-      } else {
+      if (buildingIds.length === 0) {
         setFlats([]);
         setMembers([]);
         setFilteredMembers([]);
         updateStats([], societiesData, buildingsData, []);
+        setLoading(false);
+        return;
       }
+
+      // Step 4: Get flats of those buildings
+      const { data: flatsData, error: flatsError } = await supabase
+        .from("flats")
+        .select("*")
+        .eq("is_delete", false)
+        .in("building_id", buildingIds)
+        .order("building_id, flat_number");
+
+      if (flatsError) throw flatsError;
+
+      const flatsWithDetails = flatsData.map((flat) => {
+        const building = buildingsData.find((b) => b.id === flat.building_id);
+        const society = societiesData.find((s) => s.id === flat.society_id);
+        return {
+          ...flat,
+          building_name: building?.name || "Unknown Building",
+          society_name: society?.name || "Unknown Society",
+        };
+      });
+
+      setFlats(flatsWithDetails || []);
+
+      // Step 5: Get users who are in these societies (from users table directly)
+      // Your users table has society_id field
+      const { data: membersData, error: membersError } = await supabase
+        .from("users")
+        .select("*")
+        .eq("is_delete", false)
+        .in("society_id", societyIds)
+        .in("role_type", ["Tanent-M", "Tanent-O"])
+        .order("created_at", { ascending: false });
+
+      if (membersError) throw membersError;
+
+      // Step 6: Get user_flats for these users to get flat details
+      const userIds = membersData?.map((member) => member.id) || [];
+      let userFlatsData = [];
+
+      if (userIds.length > 0) {
+        const { data, error: userFlatsError } = await supabase
+          .from("user_flats")
+          .select("*")
+          .in("user_id", userIds);
+
+        if (userFlatsError) throw userFlatsError;
+        userFlatsData = data || [];
+      }
+
+      // Step 7: Combine members with flat, building, society details
+      const membersWithDetails = (membersData || []).map((member) => {
+        const userFlat = userFlatsData.find((uf) => uf.user_id === member.id);
+        const flat = flatsData.find((f) => f.id === userFlat?.flat_id);
+        const building = buildingsData.find((b) => b.id === flat?.building_id);
+        const society = societiesData.find((s) => s.id === member.society_id);
+
+        return {
+          id: member.id,
+          full_name: member.name, // Your field is 'name' not 'full_name'
+          email: member.email,
+          phone_number: member.number, // Your field is 'number' not 'phone_number'
+          role_type: member.role_type,
+          created_at: member.created_at,
+          updated_at: member.updated_at,
+          is_active: member.is_active,
+          is_delete: member.is_delete,
+          profile_url: member.profile_url,
+          registed_user_id: member.registed_user_id,
+          whatsapp_number: member.whatsapp_number,
+          move_in_date: member.move_in_date,
+          move_out_date: member.move_out_date,
+          // Flat details
+          flat_number: flat?.flat_number || "N/A",
+          building_name: building?.name || "N/A",
+          society_name: society?.name || "N/A",
+          floor_number: flat?.floor_number,
+          bhk_type: flat?.bhk_type,
+          area_sqft: flat?.area_sqft,
+          occupancy_status: flat?.occupancy_status,
+          building_id: flat?.building_id,
+          society_id: member.society_id, // Use member's society_id directly
+          flat_id: userFlat?.flat_id,
+        };
+      });
+
+      setMembers(membersWithDetails || []);
+      setFilteredMembers(membersWithDetails || []);
+      updateStats(
+        membersWithDetails || [],
+        societiesData,
+        buildingsData,
+        flatsData,
+      );
 
       setError(null);
     } catch (error) {
@@ -354,7 +367,7 @@ export default function PMUsers() {
   useEffect(() => {
     let result = [...members];
 
-    // Search filter
+    // Search filter - UPDATED to use correct field names
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       result = result.filter(
@@ -362,7 +375,7 @@ export default function PMUsers() {
           member.full_name?.toLowerCase().includes(term) ||
           member.email?.toLowerCase().includes(term) ||
           member.phone_number?.toLowerCase().includes(term) ||
-          member.flat_number?.toLowerCase().includes(term) ||
+          member.flat_number?.toString().toLowerCase().includes(term) ||
           member.building_name?.toLowerCase().includes(term) ||
           member.society_name?.toLowerCase().includes(term),
       );
@@ -520,134 +533,14 @@ export default function PMUsers() {
         </Box>
       </motion.div>
 
-      {/* Stats Cards */}
-      {/* <motion.div
-        initial="hidden"
-        animate="visible"
-        variants={fadeInUp}
-        transition={{ delay: 0.1 }}
-        sx={{ mb: 4 }}
-      >
-        <Grid container spacing={3}>
-          {[
-            {
-              label: "Societies",
-              value: stats.totalSocieties,
-              color: "#6F0B14",
-              icon: <ApartmentIcon />,
-              description: "Assigned to you",
-            },
-            {
-              label: "Buildings",
-              value: stats.totalBuildings,
-              color: "#1565C0",
-              icon: <BuildingIcon />,
-              description: "Across all societies",
-            },
-            {
-              label: "Flats",
-              value: stats.totalFlats,
-              color: "#008000",
-              icon: <HomeIcon />,
-              description: "Total flats",
-            },
-            {
-              label: "Total Members",
-              value: stats.totalMembers,
-              color: "#6F0B14",
-              icon: <PeopleIcon />,
-              description: "All tenants",
-            },
-            {
-              label: "Tenant-M",
-              value: stats.tenantM,
-              color: "#DBA400",
-              icon: <PersonIcon />,
-              description: "Main tenants",
-            },
-            {
-              label: "Tenant-O",
-              value: stats.tenantO,
-              color: "#3F51B5",
-              icon: <FamilyIcon />,
-              description: "Occupants",
-            },
-          ].map((stat, index) => (
-            <Grid item xs={12} sm={6} md={4} lg={2} key={index}>
-              <motion.div whileHover={{ y: -4 }} transition={{ duration: 0.2 }}>
-                <StatsCard color={stat.color}>
-                  <CardContent sx={{ p: 2.5 }}>
-                    <Box display="flex" alignItems="center" gap={2}>
-                      <Box
-                        sx={{
-                          backgroundColor: `${stat.color}15`,
-                          borderRadius: "10px",
-                          p: 1.5,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        {React.cloneElement(stat.icon, {
-                          sx: {
-                            color: stat.color,
-                            fontSize: 24,
-                          },
-                        })}
-                      </Box>
-                      <Box>
-                        <Typography
-                          variant="h4"
-                          sx={{
-                            color: "#111",
-                            fontFamily: "'Roboto', sans-serif",
-                            fontWeight: 700,
-                            lineHeight: 1.2,
-                            mb: 0.5,
-                          }}
-                        >
-                          {stat.value}
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            color: stat.color,
-                            fontFamily: "'Roboto', sans-serif",
-                            fontWeight: 600,
-                            mb: 0.5,
-                          }}
-                        >
-                          {stat.label}
-                        </Typography>
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            color: "#A29EB6",
-                            fontFamily: "'Roboto', sans-serif",
-                          }}
-                        >
-                          {stat.description}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </CardContent>
-                </StatsCard>
-              </motion.div>
-            </Grid>
-          ))}
-        </Grid>
-      </motion.div> */}
-
       {/* Tabs and Filters */}
       <motion.div
         initial="hidden"
         animate="visible"
         variants={fadeInUp}
         transition={{ delay: 0.2 }}
-        sx={{ mb: 3 }}
-        style={{ marginBottom: "50px" }}
       >
-        <StyledCard>
+        <StyledCard sx={{ mb: 3 }}>
           <CardContent sx={{ p: 3 }}>
             <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
               <Tabs
@@ -747,7 +640,7 @@ export default function PMUsers() {
                   >
                     <MenuItem value="all">All Societies</MenuItem>
                     {societies.map((society) => (
-                      <MenuItem key={society.id} value={society.id}>
+                      <MenuItem key={society.id} value={society.id.toString()}>
                         {society.name}
                       </MenuItem>
                     ))}
@@ -771,7 +664,10 @@ export default function PMUsers() {
                   >
                     <MenuItem value="all">All Buildings</MenuItem>
                     {buildings.map((building) => (
-                      <MenuItem key={building.id} value={building.id}>
+                      <MenuItem
+                        key={building.id}
+                        value={building.id.toString()}
+                      >
                         {building.name}
                       </MenuItem>
                     ))}
@@ -934,8 +830,16 @@ export default function PMUsers() {
                       <TableRow key={member.id} hover>
                         <TableCell>
                           <Box display="flex" alignItems="center" gap={2}>
-                            <Avatar sx={{ bgcolor: "rgba(111, 11, 20, 0.1)" }}>
-                              {member.full_name?.charAt(0) || "U"}
+                            <Avatar
+                              sx={{
+                                bgcolor: "rgba(111, 11, 20, 0.1)",
+                                width: 40,
+                                height: 40,
+                              }}
+                              src={member.profile_url || undefined}
+                            >
+                              {!member.profile_url &&
+                                (member.full_name?.charAt(0) || "U")}
                             </Avatar>
                             <Box>
                               <Typography
@@ -1034,7 +938,9 @@ export default function PMUsers() {
                               }}
                             >
                               <HomeIcon fontSize="small" />
-                              Flat {member.flat_number}
+                              {member.flat_number === "N/A"
+                                ? "No Flat Assigned"
+                                : `Flat ${member.flat_number}`}
                               {member.floor_number &&
                                 ` (Floor ${member.floor_number})`}
                             </Typography>
@@ -1132,8 +1038,10 @@ export default function PMUsers() {
                         bgcolor: "rgba(111, 11, 20, 0.1)",
                         fontSize: "3rem",
                       }}
+                      src={selectedMember.profile_url || undefined}
                     >
-                      {selectedMember.full_name?.charAt(0) || "U"}
+                      {!selectedMember.profile_url &&
+                        (selectedMember.full_name?.charAt(0) || "U")}
                     </Avatar>
                     <Box textAlign="center">
                       <Typography
@@ -1214,6 +1122,27 @@ export default function PMUsers() {
                             {selectedMember.email || "No email"}
                           </Typography>
                         </Grid>
+                        {selectedMember.whatsapp_number && (
+                          <Grid item xs={12} sm={6}>
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                color: "#A29EB6",
+                                fontFamily: "'Roboto', sans-serif",
+                              }}
+                            >
+                              WhatsApp Number
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                fontFamily: "'Roboto', sans-serif",
+                              }}
+                            >
+                              {selectedMember.whatsapp_number}
+                            </Typography>
+                          </Grid>
+                        )}
                       </Grid>
                     </Grid>
 
@@ -1296,7 +1225,9 @@ export default function PMUsers() {
                             }}
                           >
                             <HomeIcon fontSize="small" />
-                            Flat {selectedMember.flat_number}
+                            {selectedMember.flat_number === "N/A"
+                              ? "No Flat Assigned"
+                              : `Flat ${selectedMember.flat_number}`}
                           </Typography>
                         </Grid>
                       </Grid>
@@ -1464,6 +1395,44 @@ export default function PMUsers() {
                             {formatDate(selectedMember.created_at)}
                           </Typography>
                         </Grid>
+                        {selectedMember.move_in_date && (
+                          <Grid item xs={6} sm={4}>
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                color: "#A29EB6",
+                                fontFamily: "'Roboto', sans-serif",
+                              }}
+                            >
+                              Move-in Date
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              sx={{ fontFamily: "'Roboto', sans-serif" }}
+                            >
+                              {formatDate(selectedMember.move_in_date)}
+                            </Typography>
+                          </Grid>
+                        )}
+                        {selectedMember.move_out_date && (
+                          <Grid item xs={6} sm={4}>
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                color: "#A29EB6",
+                                fontFamily: "'Roboto', sans-serif",
+                              }}
+                            >
+                              Move-out Date
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              sx={{ fontFamily: "'Roboto', sans-serif" }}
+                            >
+                              {formatDate(selectedMember.move_out_date)}
+                            </Typography>
+                          </Grid>
+                        )}
                       </Grid>
                     </Grid>
                   </Grid>
