@@ -524,9 +524,6 @@ export default function PmVisitors() {
           >
             Refresh
           </Button>
-          <Typography variant="caption" className="text-hintText">
-            {visitorGroups.length} visitor groups
-          </Typography>
         </div>
       </div>
 

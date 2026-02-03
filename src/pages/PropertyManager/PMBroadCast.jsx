@@ -59,7 +59,6 @@ import { styled } from "@mui/material/styles";
 import { supabase } from "../../api/supabaseClient";
 import { uploadImage } from "../../api/uploadImage";
 
-// Styled components for custom design
 const VisuallyHiddenInput = styled("input")({
   clip: "rect(0 0 0 0)",
   clipPath: "inset(50%)",
@@ -208,7 +207,6 @@ const PMBroadCast = () => {
     getSocietyBuildingIds,
   } = useBulkNotification();
 
-  // Initialize PM data and assigned societies
   useEffect(() => {
     const fetchPMData = async () => {
       const profileId = localStorage.getItem("profileId");
@@ -346,21 +344,30 @@ const PMBroadCast = () => {
 
       const societyIds = pmSocieties.map((item) => item.society_id);
 
-      // 2️⃣ Fetch broadcasts created by this PM for assigned societies
       const { data, error } = await supabase
         .from("broadcast")
         .select(
           `
         id,
         title,
-        message,
+         message,
         document,
         created_at,
         socity_id,
-        building_id,
-        societies ( id, name ),
-        buildings ( id, name ),
-        users ( id, full_name )
+       building_id,
+       user_id,
+        societies (
+        id,
+       name
+      ),
+       buildings (
+      id,
+      name
+     ),
+      users:user_id (
+      id,
+      name
+      )
       `,
         )
         .eq("user_id", pmId)
@@ -369,7 +376,19 @@ const PMBroadCast = () => {
 
       if (error) throw error;
 
-      setBroadcasts(data || []);
+      // Transform data if needed
+      const formattedBroadcasts = data.map((broadcast) => ({
+        ...broadcast,
+        // Ensure we have proper fallbacks
+        societies: broadcast.societies || { id: null, name: "Unknown Society" },
+        buildings: broadcast.buildings || { id: null, name: null },
+        user_profiles: broadcast.users || {
+          id: null,
+          full_name: "Property Manager",
+        },
+      }));
+
+      setBroadcasts(formattedBroadcasts);
     } catch (error) {
       console.error("Error fetching broadcasts:", error);
       setSnackbar({
@@ -456,11 +475,149 @@ const PMBroadCast = () => {
   };
 
   // Main submit handler
+  // const handleSubmit = async (e) => {
+  //   e.preventDefault();
+
+  //   // Validation
+  //   if (!formData.title.trim()) {
+  //     setSnackbar({
+  //       open: true,
+  //       message: "Please enter a title for the broadcast",
+  //       severity: "error",
+  //     });
+  //     return;
+  //   }
+
+  //   if (!formData.description.trim()) {
+  //     setSnackbar({
+  //       open: true,
+  //       message: "Please enter a description",
+  //       severity: "error",
+  //     });
+  //     return;
+  //   }
+
+  //   if (!formData.societyId) {
+  //     setSnackbar({
+  //       open: true,
+  //       message: "Please select a society",
+  //       severity: "error",
+  //     });
+  //     return;
+  //   }
+
+  //   if (formData.broadcastType === "building" && !formData.buildingId) {
+  //     setSnackbar({
+  //       open: true,
+  //       message: "Please select a building",
+  //       severity: "error",
+  //     });
+  //     return;
+  //   }
+
+  //   setLoading(true);
+
+  //   try {
+  //     let fileUrls = [];
+  //     if (files.length > 0) {
+  //       fileUrls = await Promise.all(
+  //         files.map((file) => uploadFileToSupabase(file.file)),
+  //       );
+  //     }
+  //     const imageUrl = fileUrls.length > 0 ? fileUrls[0] : null;
+
+  //     const broadcastData = {
+  //       title: formData.title.trim(),
+  //       message: formData.description.trim(),
+  //       socity_id: String(formData.societyId),
+  //       building_id:
+  //         formData.broadcastType === "building"
+  //           ? String(formData.buildingId)
+  //           : null,
+  //       document: fileUrls.length > 0 ? fileUrls.join(",") : null,
+  //       user_id: pmId,
+  //       created_at: new Date().toISOString(),
+  //     };
+
+  //     const society = assignedSocieties.find(
+  //       (s) => s.id === formData.societyId,
+  //     );
+  //     const societyName = society ? society.name : "Unknown Society";
+
+  //     let buildingIds = [];
+  //     let buildingName = "";
+
+  //     if (formData.broadcastType === "society") {
+  //       buildingIds = await getSocietyBuildingIds(formData.societyId);
+
+  //       if (buildingIds.length === 0) {
+  //         throw new Error("No active buildings found in this society");
+  //       }
+
+  //       await sendBulkNotification({
+  //         buildingIds,
+  //         title: formData.title.trim(),
+  //         body: formData.description.trim(),
+  //         imageUrl,
+  //         notificationType: "Property Manager",
+  //         data: { screen: "broadcast" },
+  //         societyName,
+  //         society_id: formData.societyId,
+  //         building_id: null,
+  //       });
+
+  //       await saveBroadcastToDatabase(broadcastData);
+  //     } else if (formData.broadcastType === "building") {
+  //       buildingIds = [formData.buildingId];
+
+  //       const building = buildings.find((b) => b.id === formData.buildingId);
+  //       buildingName = building ? building.name : "Selected Building";
+
+  //       await sendBulkNotification({
+  //         buildingIds,
+  //         title: formData.title.trim(),
+  //         body: formData.description.trim(),
+  //         imageUrl,
+  //         notificationType: "Property Manager",
+  //         data: { screen: "broadcast" },
+  //         societyName,
+  //         society_id: formData.societyId,
+  //         building_id: formData.buildingId,
+  //       });
+
+  //       await saveBroadcastToDatabase(broadcastData);
+  //     }
+
+  //     const successMessage =
+  //       formData.broadcastType === "building"
+  //         ? `Broadcast sent successfully to ${buildingName} in ${societyName}!`
+  //         : `Broadcast sent successfully to entire ${societyName}!`;
+
+  //     setSnackbar({
+  //       open: true,
+  //       message: successMessage,
+  //       severity: "success",
+  //     });
+
+  //     resetCreateForm();
+
+  //     setViewMode("list");
+  //     await fetchBroadcasts();
+  //   } catch (error) {
+  //     console.error("Error sending broadcast:", error);
+  //     setSnackbar({
+  //       open: true,
+  //       message: error.message || "Failed to send broadcast",
+  //       severity: "error",
+  //     });
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validation
-    if (!formData.title.trim()) {
+    if (!formData.title?.trim()) {
       setSnackbar({
         open: true,
         message: "Please enter a title for the broadcast",
@@ -469,7 +626,7 @@ const PMBroadCast = () => {
       return;
     }
 
-    if (!formData.description.trim()) {
+    if (!formData.description?.trim()) {
       setSnackbar({
         open: true,
         message: "Please enter a description",
@@ -500,11 +657,12 @@ const PMBroadCast = () => {
 
     try {
       let fileUrls = [];
-      if (files.length > 0) {
+      if (files?.length > 0) {
         fileUrls = await Promise.all(
           files.map((file) => uploadFileToSupabase(file.file)),
         );
       }
+
       const imageUrl = fileUrls.length > 0 ? fileUrls[0] : null;
 
       const broadcastData = {
@@ -516,26 +674,26 @@ const PMBroadCast = () => {
             ? String(formData.buildingId)
             : null,
         document: fileUrls.length > 0 ? fileUrls.join(",") : null,
-        user_id: pmId,
+        user_id: Number(pmId),
         created_at: new Date().toISOString(),
       };
 
       const society = assignedSocieties.find(
-        (s) => s.id === formData.societyId,
+        (s) => String(s.id) === String(formData.societyId),
       );
-      const societyName = society ? society.name : "Unknown Society";
+      const societyName = society?.name || "Selected Society";
 
       let buildingIds = [];
       let buildingName = "";
 
+      // 3️⃣ Society Broadcast
       if (formData.broadcastType === "society") {
         buildingIds = await getSocietyBuildingIds(formData.societyId);
 
-        if (buildingIds.length === 0) {
+        if (!buildingIds?.length) {
           throw new Error("No active buildings found in this society");
         }
 
-        // Send to all buildings in society
         await sendBulkNotification({
           buildingIds,
           title: formData.title.trim(),
@@ -544,36 +702,71 @@ const PMBroadCast = () => {
           notificationType: "Property Manager",
           data: { screen: "broadcast" },
           societyName,
-          society_id: formData.societyId,
+          society_id: Number(formData.societyId),
           building_id: null,
+          user_id: Number(pmId),
         });
 
-        // Save society-wide broadcast
         await saveBroadcastToDatabase(broadcastData);
-      } else if (formData.broadcastType === "building") {
-        buildingIds = [formData.buildingId];
 
-        const building = buildings.find((b) => b.id === formData.buildingId);
-        buildingName = building ? building.name : "Selected Building";
+        const { error: notifyError } = await supabase
+          .from("notifications")
+          .insert([
+            {
+              title: formData.title.trim(),
+              body: formData.description.trim(),
+              type: "broadcast",
+              user_id: Number(pmId),
+              society_id: Number(formData.societyId),
+              building_id: null,
+              document: fileUrls.length > 0 ? fileUrls.join(",") : null,
+            },
+          ]);
 
-        // Send to specific building
-        await sendBulkNotification({
-          buildingIds,
-          title: formData.title.trim(),
-          body: formData.description.trim(),
-          imageUrl,
-          notificationType: "Property Manager",
-          data: { screen: "broadcast" },
-          societyName,
-          society_id: formData.societyId,
-          building_id: formData.buildingId,
-        });
-
-        // Save building-specific broadcast
-        await saveBroadcastToDatabase(broadcastData);
+        if (notifyError) throw notifyError;
       }
 
-      // Success message
+      // 4️⃣ Building Broadcast
+      if (formData.broadcastType === "building") {
+        buildingIds = [Number(formData.buildingId)];
+
+        const building = buildings.find(
+          (b) => String(b.id) === String(formData.buildingId),
+        );
+        buildingName = building?.name || "Selected Building";
+
+        await sendBulkNotification({
+          buildingIds,
+          title: formData.title.trim(),
+          body: formData.description.trim(),
+          imageUrl,
+          notificationType: "Property Manager",
+          data: { screen: "broadcast" },
+          societyName,
+          society_id: Number(formData.societyId),
+          building_id: Number(formData.buildingId),
+          user_id: Number(pmId),
+        });
+
+        await saveBroadcastToDatabase(broadcastData);
+
+        const { error: notifyError } = await supabase
+          .from("notifications")
+          .insert([
+            {
+              title: formData.title.trim(),
+              body: formData.description.trim(),
+              type: "broadcast",
+              user_id: Number(pmId),
+              society_id: Number(formData.societyId),
+              building_id: Number(formData.buildingId),
+              document: fileUrls.length > 0 ? fileUrls.join(",") : null,
+            },
+          ]);
+
+        if (notifyError) throw notifyError;
+      }
+
       const successMessage =
         formData.broadcastType === "building"
           ? `Broadcast sent successfully to ${buildingName} in ${societyName}!`
@@ -585,17 +778,14 @@ const PMBroadCast = () => {
         severity: "success",
       });
 
-      // Reset form
       resetCreateForm();
-
-      // Switch to list view and refresh
       setViewMode("list");
       await fetchBroadcasts();
     } catch (error) {
       console.error("Error sending broadcast:", error);
       setSnackbar({
         open: true,
-        message: error.message || "Failed to send broadcast",
+        message: error?.message || "Failed to send broadcast",
         severity: "error",
       });
     } finally {
