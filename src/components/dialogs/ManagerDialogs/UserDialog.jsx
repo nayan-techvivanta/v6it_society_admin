@@ -120,6 +120,12 @@ const UserDialog = ({
 
     if (!formData.contact.trim()) {
       newErrors.contact = "Phone number is required";
+    } else if (!/^\d{10}$/.test(formData.contact)) {
+      newErrors.contact = "Phone number must be exactly 10 digits";
+    }
+
+    if (formData.whatsapp && !/^\d{10}$/.test(formData.whatsapp)) {
+      newErrors.whatsapp = "WhatsApp number must be exactly 10 digits";
     }
 
     if (!isEdit && !formData.password) {
@@ -289,7 +295,13 @@ const UserDialog = ({
   };
 
   const handleChange = (field) => (e) => {
-    const value = e.target.value;
+    let value = e.target.value;
+
+    // ✅ Allow only numbers & max 10 digits for phone fields
+    if (field === "contact" || field === "whatsapp") {
+      value = value.replace(/[^0-9]/g, "").slice(0, 10);
+    }
+
     setFormData((prev) => ({ ...prev, [field]: value }));
 
     if (errors[field]) {
@@ -304,6 +316,7 @@ const UserDialog = ({
       setErrors((prev) => ({ ...prev, submit: "" }));
     }
   };
+
   const togglePasswordVisibility = (field) => {
     setShowPassword((prev) => ({
       ...prev,
@@ -505,6 +518,11 @@ const UserDialog = ({
                       onChange={handleChange("contact")}
                       error={!!errors.contact}
                       helperText={errors.contact || "Primary contact number"}
+                      inputProps={{
+                        inputMode: "numeric",
+                        pattern: "[0-9]*",
+                        maxLength: 10,
+                      }}
                       InputProps={{
                         startAdornment: (
                           <InputAdornment position="start">
@@ -535,6 +553,11 @@ const UserDialog = ({
                       value={formData.whatsapp}
                       onChange={handleChange("whatsapp")}
                       helperText="Optional - for WhatsApp communication"
+                      inputProps={{
+                        inputMode: "numeric",
+                        pattern: "[0-9]*",
+                        maxLength: 10,
+                      }}
                       InputProps={{
                         startAdornment: (
                           <InputAdornment position="start">

@@ -403,7 +403,14 @@ const CollapsibleRow = ({ user, onEdit, onDelete, onAssign, societyName }) => {
 };
 
 // Assign/Edit Society Dialog Component
-const AssignSocietyDialog = ({ open, onClose, onSubmit, societies, user }) => {
+const AssignSocietyDialog = ({
+  open,
+  onClose,
+  onSubmit,
+  societies,
+  user,
+  users,
+}) => {
   const [selectedSociety, setSelectedSociety] = useState(
     user?.society_id || "",
   );
@@ -413,6 +420,9 @@ const AssignSocietyDialog = ({ open, onClose, onSubmit, societies, user }) => {
     // Initialize with user's current society
     setSelectedSociety(user?.society_id || "");
   }, [user]);
+  const isSocietyAssigned = (societyId) => {
+    return users.some((u) => u.society_id === societyId && u.id !== user?.id);
+  };
 
   const handleSubmit = async () => {
     if (!selectedSociety) {
@@ -500,11 +510,29 @@ const AssignSocietyDialog = ({ open, onClose, onSubmit, societies, user }) => {
             <MenuItem value="">
               <em>No society (Unassigned)</em>
             </MenuItem>
-            {societies.map((society) => (
+            {/* {societies.map((society) => (
               <MenuItem key={society.id} value={society.id}>
                 {society.name}
               </MenuItem>
-            ))}
+            ))} */}
+            {societies.map((society) => {
+              const alreadyAssigned = isSocietyAssigned(society.id);
+
+              return (
+                <MenuItem
+                  key={society.id}
+                  value={society.id}
+                  disabled={alreadyAssigned}
+                  sx={{
+                    opacity: alreadyAssigned ? 0.5 : 1,
+                    cursor: alreadyAssigned ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {society.name}
+                  {alreadyAssigned && " (Already Assigned)"}
+                </MenuItem>
+              );
+            })}
           </Select>
         </FormControl>
       </DialogContent>
@@ -587,104 +615,53 @@ export default function AdminPage() {
     society: "all",
     status: "all",
   });
-  // const propertyManagerId = localStorage.getItem("profileId");
-  // // Fetch Admins and Societies from Supabase
-  // const fetchData = async () => {
-  //   try {
-  //     setLoading(true);
 
-  //     // Fetch Admins (role_type = "Admin")
-  //     const { data: usersData, error: usersError } = await supabase
-  //       .from("users")
-  //       .select("*")
-  //       .eq("role_type", "Admin")
-  //       .order("created_at", { ascending: false });
-
-  //     if (usersError) throw usersError;
-
-  //     // Fetch Societies
-  //     const { data: societiesData, error: societiesError } = await supabase
-  //       .from("societies")
-  //       .select("id, name")
-  //       .order("name");
-
-  //     if (societiesError) throw societiesError;
-  //     setSocieties(societiesData || []);
-
-  //     setUsers(usersData || []);
-  //   } catch (error) {
-  //     console.error("Error fetching data:", error);
-  //     toast.error("Failed to load data");
-  //     setUsers([]);
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
-  const propertyManagerId = localStorage.getItem("profileId");
-
-  // const fetchData = async () => {
-  //   try {
-  //     setLoading(true);
-
-  //     // 1️⃣ pm_society se pm_id nikalo
-  //     const { data: pmSocietyData, error: pmSocietyError } = await supabase
-  //       .from("pm_society")
-  //       .select("pm_id")
-  //       .eq("pm_id", propertyManagerId)
-  //       .single();
-
-  //     if (pmSocietyError) throw pmSocietyError;
-
-  //     const pmId = pmSocietyData?.pm_id;
-
-  //     if (!pmId) {
-  //       setUsers([]);
-  //       return;
-  //     }
-
-  //     // 2️⃣ users table se PM ka data lao
-  //     const { data: usersData, error: usersError } = await supabase
-  //       .from("users")
-  //       .select("*")
-  //       .eq("id", pmId)
-  //       .single();
-
-  //     if (usersError) throw usersError;
-
-  //     setUsers(usersData ? [usersData] : []);
-  //   } catch (error) {
-  //     console.error("Error fetching PM data:", error);
-  //     toast.error("Failed to load data");
-  //     setUsers([]);
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
   const fetchData = async () => {
     try {
       setLoading(true);
 
-      /* ===============================
-       1️⃣ PM ki assigned societies
-       =============================== */
-      const { data: pmSocietyRows, error: pmSocietyError } = await supabase
+      const authUuid = localStorage.getItem("userId");
+
+      if (!authUuid) return;
+
+      // 1️⃣ Fetch PM bigint id
+      const { data: pmUser, error: pmError } = await supabase
+        .from("users")
+        .select("id")
+        .eq("registed_user_id", authUuid)
+        .single();
+
+      if (pmError) throw pmError;
+
+      const pmId = pmUser.id;
+
+      // 2️⃣ Fetch Admins created by PM
+      const { data: usersData, error: usersError } = await supabase
+        .from("users")
+        .select("*")
+        .eq("role_type", "Admin")
+        .eq("created_by", authUuid)
+        .order("created_at", { ascending: false });
+
+      if (usersError) throw usersError;
+
+      setUsers(usersData || []);
+
+      // 3️⃣ Fetch Societies assigned to PM
+      const { data: pmSocieties, error: pmSocietyError } = await supabase
         .from("pm_society")
         .select("society_id")
-        .eq("pm_id", propertyManagerId);
+        .eq("pm_id", pmId);
 
       if (pmSocietyError) throw pmSocietyError;
 
-      const societyIds = pmSocietyRows?.map((row) => row.society_id) || [];
+      const societyIds = pmSocieties.map((s) => s.society_id);
 
-      if (societyIds.length === 0) {
-        setUsers([]);
+      if (!societyIds.length) {
         setSocieties([]);
         return;
       }
 
-      /* ===============================
-       2️⃣ Society dropdown data
-       =============================== */
       const { data: societiesData, error: societiesError } = await supabase
         .from("societies")
         .select("id, name")
@@ -694,25 +671,9 @@ export default function AdminPage() {
       if (societiesError) throw societiesError;
 
       setSocieties(societiesData || []);
-
-      /* ===============================
-       3️⃣ Admins of those societies
-       =============================== */
-      const { data: usersData, error: usersError } = await supabase
-        .from("users")
-        .select("*")
-        .eq("role_type", "Admin")
-        .in("society_id", societyIds)
-        .order("created_at", { ascending: false });
-
-      if (usersError) throw usersError;
-
-      setUsers(usersData || []);
     } catch (error) {
-      console.error("Error fetching data:", error);
+      console.error("Error fetching PM data:", error);
       toast.error("Failed to load data");
-      setUsers([]);
-      setSocieties([]);
     } finally {
       setLoading(false);
     }
@@ -1410,6 +1371,7 @@ export default function AdminPage() {
           onSubmit={handleAssignToSociety}
           societies={societies}
           user={userToAssign}
+          users={users}
         />
       </Container>
     </Box>
