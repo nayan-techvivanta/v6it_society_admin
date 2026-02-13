@@ -8,19 +8,23 @@ const AuthRoute = ({ children }) => {
     return children;
   }
 
-  let role = storedRole.toLowerCase();
-  if (role === "super") role = "superadmin";
-  if (role === "Manager") role = "propertymanager";
+  let role = storedRole.toLowerCase().replace("-", "");
 
+  if (role === "super") role = "superadmin";
+  if (role === "manager") role = "propertymanager";
+  if (role === "tanento") role = "tenantowner";
+  if (role === "tanentm") role = "tenantmember";
+  if (role === "security") role = "security";
   const dashboardByRole = {
     superadmin: "/superadmin/dashboard",
     propertymanager: "/property/dashboard",
     admin: "/admin/dashboard",
+    tenantowner: "/user/dashboard",
+    tenantmember: "/user/dashboard",
+    security: "/user/dashboard",
   };
 
-  // Safety fallback
   if (!dashboardByRole[role]) {
-    localStorage.clear();
     return children;
   }
 

@@ -42,6 +42,8 @@ import TermsAndConditions from "../pages/TermsAndConditions";
 import PrivacyPolicy from "../pages/PrivacyPolicy";
 import AdminTicket from "../pages/Admin/AdminTicket";
 import AboutUs from "../pages/About";
+
+import UserDashboard from "../pages/Users/dashboard/UserDashboard";
 // import AdminComplaints from "../pages/Admin/Complaints";
 
 export default function Router() {
@@ -75,6 +77,9 @@ export default function Router() {
                 "propertymanager",
                 "Super",
                 "Manager",
+                "tenantowner",
+                "tenantmember",
+                "security",
               ]}
             >
               <AppLayout />
@@ -146,12 +151,24 @@ export default function Router() {
           <Route path="/admin/tickets" element={<AdminTicket />} />
           <Route path="/admin/cards" element={<AdminCards />} />
         </Route>
+        {/* ================= COMMON USER DASHBOARD ================= */}
+        <Route
+          element={
+            <ProtectedRoute
+              allowedRoles={["tenantowner", "tenantmember", "security"]}
+            >
+              <AppLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/user/dashboard" element={<UserDashboard />} />
+        </Route>
 
         {/* Unauthorized */}
         <Route path="/unauthorized" element={<Unauthorized />} />
         <Route path="/terms" element={<TermsAndConditions />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
-         <Route path="/about" element={<AboutUs />} />
+        <Route path="/about" element={<AboutUs />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

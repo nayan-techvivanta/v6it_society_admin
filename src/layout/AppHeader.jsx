@@ -3,10 +3,26 @@ import { Link } from "react-router";
 import { useSidebar } from "../context/SidebarContext";
 import logo from "../assets/Images/Logo/logo.png";
 import UserDropdown from "../components/Header/UserDropdown";
+import { GiSiren } from "react-icons/gi";
+import { PiSirenLight } from "react-icons/pi";
+import { IoNotificationsCircleOutline } from "react-icons/io5";
+import { MdOutlineNotificationsActive } from "react-icons/md";
 
 const AppHeader = () => {
   const [isApplicationMenuOpen, setApplicationMenuOpen] = useState(false);
   const { isMobileOpen, toggleSidebar, toggleMobileSidebar } = useSidebar();
+  const storedRole = localStorage.getItem("role");
+  let userRole = storedRole?.toLowerCase().replace(/-/g, "");
+
+  if (userRole === "tanento") userRole = "tenantowner";
+  if (userRole === "tanentm") userRole = "tenantmember";
+
+  const isTenant = userRole === "tenantowner" || userRole === "tenantmember";
+
+  const isUserModuleRole =
+    userRole === "tenantowner" ||
+    userRole === "tenantmember" ||
+    userRole === "security";
 
   const handleToggle = () => {
     if (window.innerWidth >= 1024) {
@@ -154,6 +170,33 @@ const AppHeader = () => {
           <div className="flex items-center gap-2 2xsm:gap-3">
             {/* <NotificationDropdown /> */}
             {/* Notification Menu Area */}
+            {isUserModuleRole && (
+              <button className="relative flex items-center justify-center w-10 h-10 rounded-lg hover:bg-gray-100 transition">
+                <MdOutlineNotificationsActive size={25} />
+
+                {/* red dot */}
+                <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
+              </button>
+            )}
+
+            {isTenant && (
+              <button
+                className="group relative flex items-center gap-2 px-5 py-2.5
+               rounded-full bg-red-600 text-white font-semibold
+               shadow-md hover:shadow-lg hover:bg-red-700
+               transition-all duration-200 ease-in-out
+               active:scale-95"
+              >
+                {/* Icon */}
+                <PiSirenLight size={20} />
+
+                {/* Text */}
+                <span>Emergency</span>
+
+                {/* Subtle Ping */}
+                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-white rounded-full opacity-80 group-hover:animate-ping" />
+              </button>
+            )}
           </div>
           {/* User Area */}
           <UserDropdown />

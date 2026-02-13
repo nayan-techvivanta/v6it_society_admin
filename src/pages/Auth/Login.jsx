@@ -124,6 +124,9 @@ const Login = () => {
       let role = profile.role_type.toLowerCase();
       if (role === "super") role = "superadmin";
       if (role === "manager") role = "propertymanager";
+      if (role === "tanento") role = "tenantowner";
+      if (role === "tanentm") role = "tenantmember";
+      if (role === "security") role = "security";
 
       localStorage.setItem("token", accessToken);
       localStorage.setItem("role", role);
@@ -137,6 +140,9 @@ const Login = () => {
         superadmin: "/superadmin/dashboard",
         admin: "/admin/dashboard",
         propertymanager: "/property/dashboard",
+        tenantowner: "/user/dashboard",
+        tenantmember: "/user/dashboard",
+        security: "/user/dashboard",
       };
 
       // navigate(dashboardPathByRole[role] || "/", { replace: true });
@@ -197,7 +203,7 @@ const Login = () => {
                 >
                   <div className="text-primary font-semibold">{item}</div>
                 </div>
-              )
+              ),
             )}
           </motion.div>
         </div>

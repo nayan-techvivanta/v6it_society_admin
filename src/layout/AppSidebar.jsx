@@ -22,10 +22,26 @@ const AppSidebar = () => {
   const [openSubmenu, setOpenSubmenu] = useState(null);
   const [subMenuHeight, setSubMenuHeight] = useState({});
   const subMenuRefs = useRef({});
-  const userRole = localStorage.getItem("role");
+  // const userRole = localStorage.getItem("role");
 
-  if (!userRole) return null;
+  // if (!userRole) return null;
+  const storedRole = localStorage.getItem("role");
+  if (!storedRole) return null;
+  let userRole = storedRole.toLowerCase().replace("-", "");
+  if (userRole === "super") userRole = "superadmin";
+  if (userRole === "manager") userRole = "propertymanager";
+  if (userRole === "tanento") userRole = "tenantowner";
+  if (userRole === "tanentm") userRole = "tenantmember";
+  if (userRole === "security") userRole = "security";
 
+  // const basePath =
+  //   userRole === "superadmin"
+  //     ? "/superadmin"
+  //     : userRole === "propertymanager"
+  //       ? "/property"
+  //       : userRole === "admin"
+  //         ? "/admin"
+  //         : "";
   const basePath =
     userRole === "superadmin"
       ? "/superadmin"
@@ -33,12 +49,25 @@ const AppSidebar = () => {
         ? "/property"
         : userRole === "admin"
           ? "/admin"
-          : "";
+          : ["tenantowner", "tenantmember", "security"].includes(userRole)
+            ? "/user"
+            : "";
+  // const roleDisplayNames = useMemo(
+  //   () => ({
+  //     superadmin: "Super Admin",
+  //     propertymanager: "Property Manager",
+  //     admin: "Admin",
+  //   }),
+  //   [],
+  // );
   const roleDisplayNames = useMemo(
     () => ({
       superadmin: "Super Admin",
       propertymanager: "Property Manager",
       admin: "Admin",
+      tenantowner: "Tenant Owner",
+      tenantmember: "Tenant Member",
+      security: "Security",
     }),
     [],
   );
@@ -51,7 +80,14 @@ const AppSidebar = () => {
       icon: <RxDashboard size={20} />,
       name: "Dashboard",
       path: `${basePath}/dashboard`,
-      roles: ["superadmin", "admin", "propertymanager"],
+      roles: [
+        "superadmin",
+        "admin",
+        "propertymanager",
+        "tenantowner",
+        "tenantmember",
+        "security",
+      ],
     },
 
     {
