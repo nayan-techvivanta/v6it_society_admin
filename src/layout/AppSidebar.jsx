@@ -11,7 +11,7 @@ import { FaUserShield } from "react-icons/fa6";
 import { FiChevronDown } from "react-icons/fi";
 import { FaBuildingUser, FaHouse } from "react-icons/fa6";
 import { RxDashboard } from "react-icons/rx";
-
+import { SlUserFollow } from "react-icons/sl";
 import Logo from "../assets/Images/Logo/logo.png";
 import { useSidebar } from "../context/SidebarContext";
 
@@ -89,12 +89,18 @@ const AppSidebar = () => {
         "security",
       ],
     },
-
+    // ImUserPlus
     {
       icon: <PiBuildingApartment size={22} />,
       name: "Society",
       path: `${basePath}/society`,
       roles: ["superadmin", "propertymanager"],
+    },
+    {
+      icon: <SlUserFollow size={20} />,
+      name: "Add Visitor",
+      path: `${basePath}/visitor`,
+      roles: ["tenantowner", "tenantmember", "security"],
     },
     {
       icon: <BsBuildings size={20} />,

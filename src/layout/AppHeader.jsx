@@ -181,20 +181,20 @@ const AppHeader = () => {
 
             {isTenant && (
               <button
-                className="group relative flex items-center gap-2 px-5 py-2.5
+                className="group relative flex items-center gap-2 px-5 py-2
                rounded-full bg-red-600 text-white font-semibold
                shadow-md hover:shadow-lg hover:bg-red-700
                transition-all duration-200 ease-in-out
                active:scale-95"
               >
                 {/* Icon */}
-                <PiSirenLight size={20} />
+                <PiSirenLight size={25} />
 
                 {/* Text */}
-                <span>Emergency</span>
+                {/* <span>Emergency</span> */}
 
                 {/* Subtle Ping */}
-                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-white rounded-full opacity-80 group-hover:animate-ping" />
+                {/* <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-white rounded-full opacity-80 group-hover:animate-ping" /> */}
               </button>
             )}
           </div>

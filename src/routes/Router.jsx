@@ -44,6 +44,7 @@ import AdminTicket from "../pages/Admin/AdminTicket";
 import AboutUs from "../pages/About";
 
 import UserDashboard from "../pages/Users/dashboard/UserDashboard";
+import VisitorsList from "../pages/Users/visitors/VisitorsList";
 // import AdminComplaints from "../pages/Admin/Complaints";
 
 export default function Router() {
@@ -162,6 +163,7 @@ export default function Router() {
           }
         >
           <Route path="/user/dashboard" element={<UserDashboard />} />
+          <Route path="/user/visitor" element={<VisitorsList />} />
         </Route>
 
         {/* Unauthorized */}
