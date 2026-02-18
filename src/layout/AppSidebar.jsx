@@ -99,7 +99,8 @@ const AppSidebar = () => {
     {
       icon: <SlUserFollow size={20} />,
       name: "Add Visitor",
-      path: `${basePath}/visitor`,
+      // path: `${basePath}/visitor`,
+      path: userRole === "security" ? "/add-visitor" : `${basePath}/visitor`,
       roles: ["tenantowner", "tenantmember", "security"],
     },
     {

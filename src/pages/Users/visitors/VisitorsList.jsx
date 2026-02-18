@@ -65,12 +65,17 @@ import {
   QrCodeScanner,
   Check,
   Warning,
+  PersonAdd,
+  Security,
+  Groups,
+  LocationCity,
 } from "@mui/icons-material";
 import { Add } from "@mui/icons-material";
 
 import { supabase } from "../../../api/supabaseClient";
 import { format, formatDistanceToNow } from "date-fns";
-import AddVisitor from "./AddVisitor";
+import { useNavigate } from "react-router-dom";
+
 const normalizeRole = (rawRole = "") => {
   const r = rawRole.toLowerCase().replace("-", "");
   if (r === "tanento") return "tenant_o";
@@ -115,7 +120,7 @@ export default function VisitorsList() {
   const [expandedRows, setExpandedRows] = useState({});
   const [imagePreview, setImagePreview] = useState(null);
   const [actionLoading, setActionLoading] = useState({});
-  const [openAddVisitor, setOpenAddVisitor] = useState(false);
+  const navigate = useNavigate();
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: "",
@@ -174,8 +179,12 @@ export default function VisitorsList() {
       const normalizedRole = normalizeRole(rawRole);
       setRole(normalizedRole);
 
-      if (normalizedRole !== "tenant_o" && normalizedRole !== "tenant_m") {
-        setError("You are not authorized to view pre-visitors.");
+      if (
+        normalizedRole !== "tenant_o" &&
+        normalizedRole !== "tenant_m" &&
+        normalizedRole !== "security"
+      ) {
+        setError("You are not authorized to view this page.");
         return;
       }
 
@@ -252,7 +261,10 @@ export default function VisitorsList() {
 
       setUserDetails(userInfo);
 
-      await fetchPreVisitors(userInfo, normalizedRole);
+      // await fetchPreVisitors(userInfo, normalizedRole);
+      if (normalizedRole !== "security") {
+        await fetchPreVisitors(userInfo, normalizedRole);
+      }
     } catch (err) {
       console.error("Init error:", err);
       setError(err.message || "Failed to load visitors data");
@@ -295,7 +307,9 @@ export default function VisitorsList() {
       showSnackbar("Error fetching pre-visitors: " + err.message, "error");
     }
   };
-
+  const handleAddVisitor = () => {
+    navigate("/add-visitor");
+  };
   const filterVisitors = () => {
     let filtered = [...visitors];
 
@@ -587,8 +601,8 @@ export default function VisitorsList() {
     <Box
       sx={{
         p: { xs: 1, sm: 2, md: 3 },
-        backgroundColor: "#f5f5f5",
-        minHeight: "100vh",
+        // backgroundColor: "#f5f5f5",
+        minHeight: "80vh",
       }}
     >
       {/* Header Card */}
@@ -596,9 +610,9 @@ export default function VisitorsList() {
         <Paper
           elevation={0}
           sx={{
-            p: { xs: 2.5, md: 4 },
+            p: { xs: 3, md: 4 },
             mb: 3,
-            borderRadius: 3,
+            borderRadius: 4,
             background: "linear-gradient(135deg, #6F0B14 0%, #8B1E27 100%)",
             color: "white",
             position: "relative",
@@ -607,22 +621,31 @@ export default function VisitorsList() {
         >
           <Grid
             container
-            spacing={3}
+            spacing={4}
             alignItems="center"
             justifyContent="space-between"
           >
             {/* LEFT SECTION */}
             <Grid item xs={12} md={7}>
-              <Box display="flex" flexDirection="column" gap={2}>
-                <Typography
-                  variant="h4"
-                  fontWeight="bold"
-                  sx={{
-                    letterSpacing: 0.5,
-                  }}
-                >
-                  Pre-Visitors List
-                </Typography>
+              <Box display="flex" flexDirection="column" gap={2.5}>
+                {/* Heading With Icon */}
+                <Box display="flex" alignItems="center" gap={1.5}>
+                  {role === "security" ? (
+                    <Security sx={{ fontSize: 34 }} />
+                  ) : (
+                    <Groups sx={{ fontSize: 34 }} />
+                  )}
+
+                  <Typography
+                    variant="h4"
+                    fontWeight={700}
+                    sx={{ letterSpacing: 0.5 }}
+                  >
+                    {role === "security"
+                      ? "Visitor Entry Panel"
+                      : "Pre-Visitors List"}
+                  </Typography>
+                </Box>
 
                 {/* Chips Section */}
                 <Box
@@ -632,862 +655,910 @@ export default function VisitorsList() {
                     flexWrap: "wrap",
                   }}
                 >
+                  {/* Society Chip */}
                   <Chip
-                    icon={<Apartment />}
+                    icon={<LocationCity sx={{ color: "white !important" }} />}
                     label={userDetails?.societyName || "Society"}
-                    sx={chipStyle}
+                    sx={{
+                      ...chipStyle,
+                      fontWeight: 600,
+                      px: 1,
+                    }}
                   />
 
-                  <Chip
-                    icon={<MeetingRoom />}
-                    label={userDetails?.buildingName || "Building"}
-                    sx={chipStyle}
-                  />
-
-                  <Chip
-                    icon={<Home />}
-                    label={`Flat ${userDetails?.flatNumber || "-"}`}
-                    sx={chipStyle}
-                  />
+                  {/* Building + Flat Only for Tenant */}
+                  {role !== "security" && (
+                    <>
+                      <Chip
+                        icon={<MeetingRoom />}
+                        label={userDetails?.buildingName || "Building"}
+                        sx={chipStyle}
+                      />
+                      <Chip
+                        icon={<Home />}
+                        label={`Flat ${userDetails?.flatNumber || "-"}`}
+                        sx={chipStyle}
+                      />
+                    </>
+                  )}
                 </Box>
               </Box>
             </Grid>
 
-            {/* RIGHT SECTION (Search) */}
+            {/* RIGHT SECTION */}
             <Grid item xs={12} md={5}>
-              {/* <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: { xs: "flex-start", md: "flex-end" },
-                }}
-              >
-                <TextField
-                  fullWidth
-                  size="medium"
-                  placeholder="Search by name, phone, purpose..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Search sx={{ color: "white" }} />
-                      </InputAdornment>
-                    ),
-                    sx: {
-                      backgroundColor: "rgba(255,255,255,0.15)",
-                      backdropFilter: "blur(8px)",
-                      borderRadius: 3,
-                      color: "white",
-                      height: 48,
-                      "& input::placeholder": {
-                        color: "rgba(255,255,255,0.8)",
-                        opacity: 1,
-                      },
-                      "& .MuiOutlinedInput-notchedOutline": {
-                        borderColor: "rgba(255,255,255,0.3)",
-                      },
-                      "&:hover .MuiOutlinedInput-notchedOutline": {
-                        borderColor: "rgba(255,255,255,0.6)",
-                      },
-                      "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                        borderColor: "white",
-                      },
-                    },
-                  }}
-                />
-              </Box> */}
               <Box
                 sx={{
                   display: "flex",
                   gap: 2,
                   width: "100%",
-                  justifyContent: { xs: "flex-start", md: "flex-end" },
-                  flexWrap: "wrap",
+                  flexDirection: { xs: "column", sm: "row" },
+                  justifyContent: { md: "flex-end" },
+                  alignItems: { xs: "stretch", sm: "center" },
                 }}
               >
+                {/* Search Only for Tenant */}
+                {role !== "security" && (
+                  <TextField
+                    fullWidth
+                    size="medium"
+                    placeholder="Search by name, phone, purpose..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    sx={{
+                      flex: 1,
+                      minWidth: { sm: 220 },
+                    }}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Search sx={{ color: "white" }} />
+                        </InputAdornment>
+                      ),
+                      sx: {
+                        backgroundColor: "rgba(255,255,255,0.15)",
+                        backdropFilter: "blur(10px)",
+                        borderRadius: 3,
+                        color: "white",
+                        height: 48,
+                        "& input::placeholder": {
+                          color: "rgba(255,255,255,0.8)",
+                          opacity: 1,
+                        },
+                        "& .MuiOutlinedInput-notchedOutline": {
+                          borderColor: "rgba(255,255,255,0.3)",
+                        },
+                        "&:hover .MuiOutlinedInput-notchedOutline": {
+                          borderColor: "rgba(255,255,255,0.6)",
+                        },
+                        "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                          borderColor: "white",
+                        },
+                      },
+                    }}
+                  />
+                )}
+
+                {/* Add Visitor Button */}
                 <Button
                   variant="contained"
-                  startIcon={<Add />}
-                  onClick={() => setOpenAddVisitor(true)}
+                  startIcon={role === "security" ? <PersonAdd /> : <Add />}
+                  onClick={handleAddVisitor}
                   sx={{
                     height: 48,
                     borderRadius: 3,
-                    px: 3,
+                    px: 4,
                     fontWeight: 600,
+                    whiteSpace: "nowrap",
                     backgroundColor: "white",
                     color: "#6F0B14",
+                    boxShadow: "0 8px 20px rgba(0,0,0,0.2)",
                     "&:hover": {
                       backgroundColor: "#f3f3f3",
                     },
                   }}
                 >
-                  Add Visitor
+                  {role === "security" ? "Add New Visitor" : "Add Visitor"}
                 </Button>
-                <TextField
-                  fullWidth
-                  size="medium"
-                  placeholder="Search by name, phone, purpose..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  sx={{ maxWidth: 320 }}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Search sx={{ color: "white" }} />
-                      </InputAdornment>
-                    ),
-                    sx: {
-                      backgroundColor: "rgba(255,255,255,0.15)",
-                      backdropFilter: "blur(8px)",
-                      borderRadius: 3,
-                      color: "white",
-                      height: 48,
-                      "& input::placeholder": {
-                        color: "rgba(255,255,255,0.8)",
-                        opacity: 1,
-                      },
-                      "& .MuiOutlinedInput-notchedOutline": {
-                        borderColor: "rgba(255,255,255,0.3)",
-                      },
-                      "&:hover .MuiOutlinedInput-notchedOutline": {
-                        borderColor: "rgba(255,255,255,0.6)",
-                      },
-                      "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                        borderColor: "white",
-                      },
-                    },
-                  }}
-                />
               </Box>
             </Grid>
           </Grid>
         </Paper>
       </Fade>
 
-      {/* Filter Tabs */}
-      <Paper sx={{ p: 1, mb: 2, borderRadius: 2 }}>
-        <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", gap: 1 }}>
-          {["All", "Pending", "Approved", "Reschedule"].map((filter) => (
-            <Chip
-              key={filter}
-              label={`${filter} ${filter !== "All" ? `(${stats[filter.toLowerCase()]})` : ""}`}
-              onClick={() => setActiveFilter(filter)}
-              sx={{
-                backgroundColor:
-                  activeFilter === filter ? "#6F0B14" : "transparent",
-                color: activeFilter === filter ? "#FFFFFF" : "#6F0B14",
-                borderColor: "#6F0B14",
-                fontWeight: activeFilter === filter ? 600 : 400,
-                minWidth: 100,
-                "&:hover": {
-                  backgroundColor:
-                    activeFilter === filter
-                      ? "#6F0B14"
-                      : "rgba(111, 11, 20, 0.09)",
-                },
-              }}
-              variant={activeFilter === filter ? "filled" : "outlined"}
-            />
-          ))}
-        </Stack>
-      </Paper>
+      {role !== "security" && (
+        <>
+          {/* Filter Tabs */}
+          <Paper sx={{ p: 1, mb: 2, borderRadius: 2 }}>
+            <Stack
+              direction="row"
+              spacing={1}
+              sx={{ flexWrap: "wrap", gap: 1 }}
+            >
+              {["All", "Pending", "Approved", "Reschedule"].map((filter) => (
+                <Chip
+                  key={filter}
+                  label={`${filter} ${filter !== "All" ? `(${stats[filter.toLowerCase()]})` : ""}`}
+                  onClick={() => setActiveFilter(filter)}
+                  sx={{
+                    backgroundColor:
+                      activeFilter === filter ? "#6F0B14" : "transparent",
+                    color: activeFilter === filter ? "#FFFFFF" : "#6F0B14",
+                    borderColor: "#6F0B14",
+                    fontWeight: activeFilter === filter ? 600 : 400,
+                    minWidth: 100,
+                    "&:hover": {
+                      backgroundColor:
+                        activeFilter === filter
+                          ? "#6F0B14"
+                          : "rgba(111, 11, 20, 0.09)",
+                    },
+                  }}
+                  variant={activeFilter === filter ? "filled" : "outlined"}
+                />
+              ))}
+            </Stack>
+          </Paper>
 
-      {/* Visitors Table */}
-      <TableContainer
-        component={Paper}
-        elevation={3}
-        sx={{
-          borderRadius: 2,
-          overflow: "hidden",
-        }}
-      >
-        <Table size={isMobile ? "small" : "medium"}>
-          <TableHead>
-            <TableRow sx={{ backgroundColor: "#6F0B14" }}>
-              <TableCell padding="checkbox" sx={{ color: "white" }} />
-              <TableCell sx={{ color: "white", fontWeight: "bold" }}>
-                Visitor
-              </TableCell>
-              {!isMobile && (
-                <TableCell sx={{ color: "white", fontWeight: "bold" }}>
-                  Contact
-                </TableCell>
-              )}
-              <TableCell sx={{ color: "white", fontWeight: "bold" }}>
-                Visit Type
-              </TableCell>
-              <TableCell sx={{ color: "white", fontWeight: "bold" }}>
-                Location
-              </TableCell>
-              <TableCell sx={{ color: "white", fontWeight: "bold" }}>
-                Status
-              </TableCell>
-              <TableCell sx={{ color: "white", fontWeight: "bold" }}>
-                Requested
-              </TableCell>
-              <TableCell
-                align="center"
-                sx={{ color: "white", fontWeight: "bold" }}
-              >
-                Actions
-              </TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {filteredVisitors.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={8} align="center" sx={{ py: 8 }}>
-                  <Box sx={{ textAlign: "center" }}>
-                    <Person
-                      sx={{
-                        fontSize: 60,
-                        color: "#A29EB6",
-                        mb: 2,
-                      }}
-                    />
-                    <Typography
-                      variant="h6"
-                      color="text.secondary"
-                      gutterBottom
-                    >
-                      No pre-visitors found
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {search
-                        ? "Try adjusting your search criteria"
-                        : "All pre-scheduled visitors will appear here"}
-                    </Typography>
-                    {search && (
-                      <Button
-                        variant="outlined"
-                        onClick={() => setSearch("")}
-                        sx={{ mt: 2 }}
-                      >
-                        Clear Search
-                      </Button>
-                    )}
-                  </Box>
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredVisitors.map((visitor) => (
-                <React.Fragment key={visitor.id}>
-                  <TableRow
-                    hover
-                    sx={{
-                      "&:hover": {
-                        backgroundColor: "rgba(111, 11, 20, 0.09)",
-                      },
-                      transition: "background-color 0.3s",
-                    }}
+          {/* Visitors Table */}
+          <TableContainer
+            component={Paper}
+            elevation={3}
+            sx={{
+              borderRadius: 2,
+              overflow: "hidden",
+            }}
+          >
+            <Table size={isMobile ? "small" : "medium"}>
+              <TableHead>
+                <TableRow sx={{ backgroundColor: "#6F0B14" }}>
+                  <TableCell padding="checkbox" sx={{ color: "white" }} />
+                  <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                    ID
+                  </TableCell>
+                  <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                    Visitor
+                  </TableCell>
+                  {!isMobile && (
+                    <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                      Contact
+                    </TableCell>
+                  )}
+                  <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                    Visit Type
+                  </TableCell>
+                  <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                    Location
+                  </TableCell>
+                  <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                    Status
+                  </TableCell>
+                  <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                    Requested
+                  </TableCell>
+                  <TableCell
+                    align="center"
+                    sx={{ color: "white", fontWeight: "bold" }}
                   >
-                    <TableCell padding="checkbox">
-                      <IconButton
-                        size="small"
-                        onClick={() => toggleRowExpand(visitor.id)}
+                    Actions
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {filteredVisitors.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} align="center" sx={{ py: 8 }}>
+                      <Box sx={{ textAlign: "center" }}>
+                        <Person
+                          sx={{
+                            fontSize: 60,
+                            color: "#A29EB6",
+                            mb: 2,
+                          }}
+                        />
+                        <Typography
+                          variant="h6"
+                          color="text.secondary"
+                          gutterBottom
+                        >
+                          No pre-visitors found
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {search
+                            ? "Try adjusting your search criteria"
+                            : "All pre-scheduled visitors will appear here"}
+                        </Typography>
+                        {search && (
+                          <Button
+                            variant="outlined"
+                            onClick={() => setSearch("")}
+                            sx={{ mt: 2 }}
+                          >
+                            Clear Search
+                          </Button>
+                        )}
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredVisitors.map((visitor) => (
+                    <React.Fragment key={visitor.id}>
+                      <TableRow
+                        hover
                         sx={{
-                          transform: expandedRows[visitor.id]
-                            ? "rotate(90deg)"
-                            : "none",
-                          transition: "transform 0.3s",
-                          color: "#6F0B14",
+                          "&:hover": {
+                            backgroundColor: "rgba(111, 11, 20, 0.09)",
+                          },
+                          transition: "background-color 0.3s",
                         }}
                       >
-                        <KeyboardArrowRight />
-                      </IconButton>
-                    </TableCell>
-                    <TableCell>
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1.5 }}
-                      >
-                        <Badge
-                          overlap="circular"
-                          anchorOrigin={{
-                            vertical: "bottom",
-                            horizontal: "right",
-                          }}
-                          badgeContent={
-                            <Tooltip title={visitor.approved_status}>
-                              <Box
-                                sx={{
-                                  width: 10,
-                                  height: 10,
-                                  borderRadius: "50%",
-                                  bgcolor:
-                                    visitor.approved_status === "Approved"
-                                      ? "#008000"
-                                      : visitor.approved_status === "Pending"
-                                        ? "#DBA400"
-                                        : visitor.approved_status ===
-                                            "Reschedule"
-                                          ? "#E86100"
-                                          : "#B31B1B",
-                                  border: "2px solid white",
-                                }}
-                              />
-                            </Tooltip>
-                          }
-                        >
-                          <Avatar
-                            src={visitor.image_url}
-                            alt={visitor.visitor_name}
+                        <TableCell padding="checkbox">
+                          <IconButton
+                            size="small"
+                            onClick={() => toggleRowExpand(visitor.id)}
                             sx={{
-                              width: 40,
-                              height: 40,
-                              bgcolor: "rgba(111, 11, 20, 0.09)",
+                              transform: expandedRows[visitor.id]
+                                ? "rotate(90deg)"
+                                : "none",
+                              transition: "transform 0.3s",
                               color: "#6F0B14",
                             }}
                           >
-                            {visitor.visitor_name?.charAt(0).toUpperCase()}
-                          </Avatar>
-                        </Badge>
-                        <Box>
-                          <Typography variant="body1" fontWeight="600">
-                            {visitor.visitor_name}
-                          </Typography>
-                          {isMobile && (
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              {visitor.phone_number || "No phone"}
-                            </Typography>
-                          )}
-                        </Box>
-                      </Box>
-                    </TableCell>
-                    {!isMobile && (
-                      <TableCell>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 0.5,
-                          }}
-                        >
-                          <Phone fontSize="small" sx={{ color: "#6F0B14" }} />
-                          <Typography variant="body2">
-                            {visitor.phone_number || "N/A"}
-                          </Typography>
-                        </Box>
-                      </TableCell>
-                    )}
-                    <TableCell>
-                      {getVisitorTypeChip(visitor.visit_type)}
-                    </TableCell>
-                    <TableCell>
-                      <Box>
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 0.5,
-                          }}
-                        >
-                          <Apartment
-                            sx={{
-                              fontSize: 16,
-                              color: "#A29EB6",
-                            }}
-                          />
-                          {visitor.buildings?.name || "N/A"}
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 0.5,
-                          }}
-                        >
-                          <MeetingRoom
-                            sx={{
-                              fontSize: 16,
-                              color: "#A29EB6",
-                            }}
-                          />
-                          Flat {visitor.flat_number || "N/A"}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      {getStatusChip(visitor.approved_status)}
-                    </TableCell>
-                    <TableCell>
-                      <Tooltip
-                        title={format(new Date(visitor.created_at), "PPP p")}
-                      >
-                        <Box>
+                            <KeyboardArrowRight />
+                          </IconButton>
+                        </TableCell>
+                        <TableCell>
                           <Typography
                             variant="body2"
+                            fontWeight="600"
+                            sx={{ color: "#6F0B14" }}
+                          >
+                            #{visitor.id}
+                          </Typography>
+                        </TableCell>
+
+                        <TableCell>
+                          <Box
                             sx={{
                               display: "flex",
                               alignItems: "center",
-                              gap: 0.5,
+                              gap: 1.5,
                             }}
                           >
-                            <CalendarToday
-                              sx={{
-                                fontSize: 14,
-                                color: "#A29EB6",
+                            <Badge
+                              overlap="circular"
+                              anchorOrigin={{
+                                vertical: "bottom",
+                                horizontal: "right",
                               }}
-                            />
-                            {format(new Date(visitor.created_at), "dd MMM")}
-                          </Typography>
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 0.5,
-                            }}
-                          >
-                            <AccessTime sx={{ fontSize: 12 }} />
-                            {getTimeAgo(visitor.created_at)}
-                          </Typography>
-                        </Box>
-                      </Tooltip>
-                    </TableCell>
-                    <TableCell align="center">
-                      <Stack
-                        direction="row"
-                        spacing={0.5}
-                        justifyContent="center"
-                      >
-                        {visitor.approved_status === "Pending" && (
-                          <>
-                            <Tooltip title="Approve">
-                              <IconButton
-                                size="small"
-                                onClick={() => handleApprove(visitor)}
-                                disabled={actionLoading[visitor.id]}
-                                sx={{
-                                  backgroundColor: "#00800020",
-                                  color: "#008000",
-                                  "&:hover": {
-                                    backgroundColor: "#008000",
-                                    color: "white",
-                                  },
-                                }}
-                              >
-                                {actionLoading[visitor.id] === "approve" ? (
-                                  <CircularProgress size={20} />
-                                ) : (
-                                  <CheckCircle fontSize="small" />
-                                )}
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Reject">
-                              <IconButton
-                                size="small"
-                                onClick={() => handleReject(visitor)}
-                                disabled={actionLoading[visitor.id]}
-                                sx={{
-                                  backgroundColor: "#B31B1B20",
-                                  color: "#B31B1B",
-                                  "&:hover": {
-                                    backgroundColor: "#B31B1B",
-                                    color: "white",
-                                  },
-                                }}
-                              >
-                                {actionLoading[visitor.id] === "reject" ? (
-                                  <CircularProgress size={20} />
-                                ) : (
-                                  <Cancel fontSize="small" />
-                                )}
-                              </IconButton>
-                            </Tooltip>
-                          </>
-                        )}
-                        {visitor.approved_status === "Approved" && (
-                          <Tooltip title="Check In">
-                            <IconButton
-                              size="small"
-                              onClick={() => handleCheckIn(visitor)}
-                              disabled={actionLoading[visitor.id]}
-                              sx={{
-                                backgroundColor: "#6F0B1420",
-                                color: "#6F0B14",
-                                "&:hover": {
-                                  backgroundColor: "#6F0B14",
-                                  color: "white",
-                                },
-                              }}
-                            >
-                              {actionLoading[visitor.id] === "checkin" ? (
-                                <CircularProgress size={20} />
-                              ) : (
-                                <ExitToApp fontSize="small" />
-                              )}
-                            </IconButton>
-                          </Tooltip>
-                        )}
-                        {visitor.approved_status === "Reschedule" && (
-                          <Tooltip title="View Reschedule">
-                            <IconButton
-                              size="small"
-                              onClick={() => handleReschedule(visitor)}
-                              sx={{
-                                backgroundColor: "#E8610020",
-                                color: "#E86100",
-                                "&:hover": {
-                                  backgroundColor: "#E86100",
-                                  color: "white",
-                                },
-                              }}
-                            >
-                              <Schedule fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        )}
-                      </Stack>
-                    </TableCell>
-                  </TableRow>
-
-                  {/* Expanded Details Row */}
-                  <TableRow>
-                    <TableCell
-                      style={{ paddingBottom: 0, paddingTop: 0 }}
-                      colSpan={8}
-                    >
-                      <Collapse
-                        in={expandedRows[visitor.id]}
-                        timeout="auto"
-                        unmountOnExit
-                      >
-                        <Box
-                          sx={{
-                            p: 3,
-                            backgroundColor: "rgba(111, 11, 20, 0.02)",
-                          }}
-                        >
-                          <Typography
-                            variant="h6"
-                            gutterBottom
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 1,
-                              color: "#6F0B14",
-                            }}
-                          >
-                            <Info />
-                            Additional Details
-                          </Typography>
-                          <Divider sx={{ mb: 2, borderColor: "#6F0B1420" }} />
-
-                          <Grid container spacing={3}>
-                            {/* Purpose */}
-                            {visitor.purpose && (
-                              <Grid item xs={12} sm={6} md={4}>
-                                <Paper
-                                  variant="outlined"
-                                  sx={{ p: 2, borderColor: "#6F0B1420" }}
-                                >
-                                  <Typography
-                                    variant="caption"
-                                    color="text.secondary"
+                              badgeContent={
+                                <Tooltip title={visitor.approved_status}>
+                                  <Box
                                     sx={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 0.5,
-                                      mb: 1,
-                                    }}
-                                  >
-                                    <Description
-                                      sx={{ fontSize: 16, color: "#6F0B14" }}
-                                    />
-                                    Purpose
-                                  </Typography>
-                                  <Typography variant="body2" fontWeight="500">
-                                    {visitor.purpose}
-                                  </Typography>
-                                </Paper>
-                              </Grid>
-                            )}
-                            {/* Rescheduled At - Only show for Reschedule status */}
-                            {visitor.approved_status === "Reschedule" &&
-                              visitor.rescheduled_at && (
-                                <Grid item xs12 sm6 md4>
-                                  <Paper
-                                    variant="outlined"
-                                    sx={{ p: 2, borderColor: "#6F0B1420" }}
-                                  >
-                                    <Typography
-                                      variant="caption"
-                                      color="text.secondary"
-                                      sx={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: 0.5,
-                                        mb: 1,
-                                      }}
-                                    >
-                                      <Schedule
-                                        sx={{ fontSize: 16, color: "#6F0B14" }}
-                                      />
-                                      Rescheduled At
-                                    </Typography>
-                                    <Typography
-                                      variant="body2"
-                                      fontWeight={500}
-                                    >
-                                      {format(
-                                        new Date(visitor.rescheduled_at),
-                                        "dd MMM, HH:mm",
-                                      )}
-                                    </Typography>
-                                    <Typography
-                                      variant="caption"
-                                      color="text.secondary"
-                                      sx={{ mt: 0.5 }}
-                                    >
-                                      {getTimeAgo(visitor.rescheduled_at)}
-                                    </Typography>
-                                  </Paper>
-                                </Grid>
-                              )}
-
-                            {/* Vehicle Number */}
-                            {visitor.vehicle_number && (
-                              <Grid item xs={12} sm={6} md={4}>
-                                <Paper
-                                  variant="outlined"
-                                  sx={{ p: 2, borderColor: "#6F0B1420" }}
-                                >
-                                  <Typography
-                                    variant="caption"
-                                    color="text.secondary"
-                                    sx={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 0.5,
-                                      mb: 1,
-                                    }}
-                                  >
-                                    <DirectionsCar
-                                      sx={{ fontSize: 16, color: "#6F0B14" }}
-                                    />
-                                    Vehicle Number
-                                  </Typography>
-                                  <Typography variant="body2" fontWeight="500">
-                                    {visitor.vehicle_number}
-                                  </Typography>
-                                </Paper>
-                              </Grid>
-                            )}
-
-                            {/* Card ID */}
-                            {visitor.card_id && (
-                              <Grid item xs={12} sm={6} md={4}>
-                                <Paper
-                                  variant="outlined"
-                                  sx={{ p: 2, borderColor: "#6F0B1420" }}
-                                >
-                                  <Typography
-                                    variant="caption"
-                                    color="text.secondary"
-                                    sx={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 0.5,
-                                      mb: 1,
-                                    }}
-                                  >
-                                    <CreditCard
-                                      sx={{ fontSize: 16, color: "#6F0B14" }}
-                                    />
-                                    Card ID
-                                  </Typography>
-                                  <Typography variant="body2" fontWeight="500">
-                                    {visitor.card_id}
-                                  </Typography>
-                                </Paper>
-                              </Grid>
-                            )}
-
-                            {/* OTP */}
-                            {visitor.visitor_otp && (
-                              <Grid item xs={12} sm={6} md={4}>
-                                <Paper
-                                  variant="outlined"
-                                  sx={{ p: 2, borderColor: "#6F0B1420" }}
-                                >
-                                  <Typography
-                                    variant="caption"
-                                    color="text.secondary"
-                                    sx={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 0.5,
-                                      mb: 1,
-                                    }}
-                                  >
-                                    <Fingerprint
-                                      sx={{ fontSize: 16, color: "#6F0B14" }}
-                                    />
-                                    OTP
-                                  </Typography>
-                                  <Typography variant="body2" fontWeight="500">
-                                    {visitor.visitor_otp}
-                                  </Typography>
-                                </Paper>
-                              </Grid>
-                            )}
-
-                            {/* Card Status */}
-                            {visitor.card_status && (
-                              <Grid item xs={12} sm={6} md={4}>
-                                <Paper
-                                  variant="outlined"
-                                  sx={{ p: 2, borderColor: "#6F0B1420" }}
-                                >
-                                  <Typography
-                                    variant="caption"
-                                    color="text.secondary"
-                                    sx={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 0.5,
-                                      mb: 1,
-                                    }}
-                                  >
-                                    <QrCodeScanner
-                                      sx={{ fontSize: 16, color: "#6F0B14" }}
-                                    />
-                                    Card Status
-                                  </Typography>
-                                  <Chip
-                                    size="small"
-                                    label={visitor.card_status}
-                                    sx={{
-                                      backgroundColor:
-                                        visitor.card_status === "Active"
-                                          ? "#00800020"
-                                          : "#A29EB6",
-                                      color:
-                                        visitor.card_status === "Active"
+                                      width: 10,
+                                      height: 10,
+                                      borderRadius: "50%",
+                                      bgcolor:
+                                        visitor.approved_status === "Approved"
                                           ? "#008000"
-                                          : "#FFFFFF",
-                                      fontWeight: 500,
+                                          : visitor.approved_status ===
+                                              "Pending"
+                                            ? "#DBA400"
+                                            : visitor.approved_status ===
+                                                "Reschedule"
+                                              ? "#E86100"
+                                              : "#B31B1B",
+                                      border: "2px solid white",
                                     }}
                                   />
-                                </Paper>
-                              </Grid>
-                            )}
-
-                            {/* Scan Status */}
-                            {visitor.is_card_scan && (
-                              <Grid item xs={12} sm={6} md={4}>
-                                <Paper
-                                  variant="outlined"
-                                  sx={{ p: 2, borderColor: "#6F0B1420" }}
+                                </Tooltip>
+                              }
+                            >
+                              <Avatar
+                                src={visitor.image_url}
+                                alt={visitor.visitor_name}
+                                sx={{
+                                  width: 40,
+                                  height: 40,
+                                  bgcolor: "rgba(111, 11, 20, 0.09)",
+                                  color: "#6F0B14",
+                                }}
+                              >
+                                {visitor.visitor_name?.charAt(0).toUpperCase()}
+                              </Avatar>
+                            </Badge>
+                            <Box>
+                              <Typography variant="body1" fontWeight="600">
+                                {visitor.visitor_name}
+                              </Typography>
+                              {isMobile && (
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
                                 >
-                                  <Typography
-                                    variant="caption"
-                                    color="text.secondary"
-                                    sx={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 0.5,
-                                      mb: 1,
-                                    }}
-                                  >
-                                    <QrCodeScanner
-                                      sx={{ fontSize: 16, color: "#6F0B14" }}
-                                    />
-                                    Scan Status
-                                  </Typography>
-                                  <Chip
-                                    size="small"
-                                    label={visitor.is_card_scan}
-                                    sx={{
-                                      backgroundColor:
-                                        visitor.is_card_scan === "Scanned"
-                                          ? "#00800020"
-                                          : "#DBA40020",
-                                      color:
-                                        visitor.is_card_scan === "Scanned"
-                                          ? "#008000"
-                                          : "#DBA400",
-                                      fontWeight: 500,
-                                    }}
-                                    icon={
-                                      visitor.is_card_scan === "Scanned" ? (
-                                        <Check />
-                                      ) : (
-                                        <Warning />
-                                      )
-                                    }
-                                  />
-                                </Paper>
-                              </Grid>
+                                  {visitor.phone_number || "No phone"}
+                                </Typography>
+                              )}
+                            </Box>
+                          </Box>
+                        </TableCell>
+                        {!isMobile && (
+                          <TableCell>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 0.5,
+                              }}
+                            >
+                              <Phone
+                                fontSize="small"
+                                sx={{ color: "#6F0B14" }}
+                              />
+                              <Typography variant="body2">
+                                {visitor.phone_number || "N/A"}
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                        )}
+                        <TableCell>
+                          {getVisitorTypeChip(visitor.visit_type)}
+                        </TableCell>
+                        <TableCell>
+                          <Box>
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 0.5,
+                              }}
+                            >
+                              <Apartment
+                                sx={{
+                                  fontSize: 16,
+                                  color: "#A29EB6",
+                                }}
+                              />
+                              {visitor.buildings?.name || "N/A"}
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 0.5,
+                              }}
+                            >
+                              <MeetingRoom
+                                sx={{
+                                  fontSize: 16,
+                                  color: "#A29EB6",
+                                }}
+                              />
+                              Flat {visitor.flat_number || "N/A"}
+                            </Typography>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          {getStatusChip(visitor.approved_status)}
+                        </TableCell>
+                        <TableCell>
+                          <Tooltip
+                            title={format(
+                              new Date(visitor.created_at),
+                              "PPP p",
                             )}
-
-                            {/* Rejection Reason */}
-                            {visitor.rejected_reschedule_reason && (
-                              <Grid item xs={12}>
-                                <Paper
-                                  variant="outlined"
+                          >
+                            <Box>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 0.5,
+                                }}
+                              >
+                                <CalendarToday
                                   sx={{
-                                    p: 2,
-                                    backgroundColor: "#B31B1B10",
-                                    borderColor: "#B31B1B",
+                                    fontSize: 14,
+                                    color: "#A29EB6",
+                                  }}
+                                />
+                                {format(new Date(visitor.created_at), "dd MMM")}
+                              </Typography>
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 0.5,
+                                }}
+                              >
+                                <AccessTime sx={{ fontSize: 12 }} />
+                                {getTimeAgo(visitor.created_at)}
+                              </Typography>
+                            </Box>
+                          </Tooltip>
+                        </TableCell>
+                        <TableCell align="center">
+                          <Stack
+                            direction="row"
+                            spacing={0.5}
+                            justifyContent="center"
+                          >
+                            {visitor.approved_status === "Pending" && (
+                              <>
+                                <Tooltip title="Approve">
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleApprove(visitor)}
+                                    disabled={actionLoading[visitor.id]}
+                                    sx={{
+                                      backgroundColor: "#00800020",
+                                      color: "#008000",
+                                      "&:hover": {
+                                        backgroundColor: "#008000",
+                                        color: "white",
+                                      },
+                                    }}
+                                  >
+                                    {actionLoading[visitor.id] === "approve" ? (
+                                      <CircularProgress size={20} />
+                                    ) : (
+                                      <CheckCircle fontSize="small" />
+                                    )}
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Reject">
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleReject(visitor)}
+                                    disabled={actionLoading[visitor.id]}
+                                    sx={{
+                                      backgroundColor: "#B31B1B20",
+                                      color: "#B31B1B",
+                                      "&:hover": {
+                                        backgroundColor: "#B31B1B",
+                                        color: "white",
+                                      },
+                                    }}
+                                  >
+                                    {actionLoading[visitor.id] === "reject" ? (
+                                      <CircularProgress size={20} />
+                                    ) : (
+                                      <Cancel fontSize="small" />
+                                    )}
+                                  </IconButton>
+                                </Tooltip>
+                              </>
+                            )}
+                            {visitor.approved_status === "Approved" && (
+                              <Tooltip title="Check In">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleCheckIn(visitor)}
+                                  disabled={actionLoading[visitor.id]}
+                                  sx={{
+                                    backgroundColor: "#6F0B1420",
+                                    color: "#6F0B14",
+                                    "&:hover": {
+                                      backgroundColor: "#6F0B14",
+                                      color: "white",
+                                    },
                                   }}
                                 >
-                                  <Typography
-                                    variant="caption"
-                                    sx={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 0.5,
-                                      mb: 1,
-                                      color: "#B31B1B",
-                                    }}
-                                  >
-                                    <Cancel sx={{ fontSize: 16 }} />
-                                    Rejection Reason
-                                  </Typography>
-                                  <Typography
-                                    variant="body2"
-                                    fontWeight="500"
-                                    sx={{ color: "#B31B1B" }}
-                                  >
-                                    {visitor.rejected_reschedule_reason}
-                                  </Typography>
-                                </Paper>
-                              </Grid>
+                                  {actionLoading[visitor.id] === "checkin" ? (
+                                    <CircularProgress size={20} />
+                                  ) : (
+                                    <ExitToApp fontSize="small" />
+                                  )}
+                                </IconButton>
+                              </Tooltip>
                             )}
+                            {visitor.approved_status === "Reschedule" && (
+                              <Tooltip title="View Reschedule">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleReschedule(visitor)}
+                                  sx={{
+                                    backgroundColor: "#E8610020",
+                                    color: "#E86100",
+                                    "&:hover": {
+                                      backgroundColor: "#E86100",
+                                      color: "white",
+                                    },
+                                  }}
+                                >
+                                  <Schedule fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            )}
+                          </Stack>
+                        </TableCell>
+                      </TableRow>
 
-                            {/* ID Proof Image */}
-                            {visitor.id_proof_image && (
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                startIcon={<Visibility />}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  window.open(visitor.id_proof_image, "_blank");
+                      {/* Expanded Details Row */}
+                      <TableRow>
+                        <TableCell
+                          style={{ paddingBottom: 0, paddingTop: 0 }}
+                          colSpan={8}
+                        >
+                          <Collapse
+                            in={expandedRows[visitor.id]}
+                            timeout="auto"
+                            unmountOnExit
+                          >
+                            <Box
+                              sx={{
+                                p: 3,
+                                backgroundColor: "rgba(111, 11, 20, 0.02)",
+                              }}
+                            >
+                              <Typography
+                                variant="h6"
+                                gutterBottom
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 1,
+                                  color: "#6F0B14",
                                 }}
                               >
-                                View ID Proof
-                              </Button>
-                            )}
-                          </Grid>
-                        </Box>
-                      </Collapse>
-                    </TableCell>
-                  </TableRow>
-                </React.Fragment>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
+                                <Info />
+                                Additional Details
+                              </Typography>
+                              <Divider
+                                sx={{ mb: 2, borderColor: "#6F0B1420" }}
+                              />
 
+                              <Grid container spacing={3}>
+                                {/* Purpose */}
+                                {visitor.purpose && (
+                                  <Grid item xs={12} sm={6} md={4}>
+                                    <Paper
+                                      variant="outlined"
+                                      sx={{ p: 2, borderColor: "#6F0B1420" }}
+                                    >
+                                      <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                        sx={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: 0.5,
+                                          mb: 1,
+                                        }}
+                                      >
+                                        <Description
+                                          sx={{
+                                            fontSize: 16,
+                                            color: "#6F0B14",
+                                          }}
+                                        />
+                                        Purpose
+                                      </Typography>
+                                      <Typography
+                                        variant="body2"
+                                        fontWeight="500"
+                                      >
+                                        {visitor.purpose}
+                                      </Typography>
+                                    </Paper>
+                                  </Grid>
+                                )}
+                                {/* Rescheduled At - Only show for Reschedule status */}
+                                {visitor.approved_status === "Reschedule" &&
+                                  visitor.rescheduled_at && (
+                                    <Grid item xs12 sm6 md4>
+                                      <Paper
+                                        variant="outlined"
+                                        sx={{ p: 2, borderColor: "#6F0B1420" }}
+                                      >
+                                        <Typography
+                                          variant="caption"
+                                          color="text.secondary"
+                                          sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 0.5,
+                                            mb: 1,
+                                          }}
+                                        >
+                                          <Schedule
+                                            sx={{
+                                              fontSize: 16,
+                                              color: "#6F0B14",
+                                            }}
+                                          />
+                                          Rescheduled At
+                                        </Typography>
+                                        <Typography
+                                          variant="body2"
+                                          fontWeight={500}
+                                        >
+                                          {format(
+                                            new Date(visitor.rescheduled_at),
+                                            "dd MMM, HH:mm",
+                                          )}
+                                        </Typography>
+                                        <Typography
+                                          variant="caption"
+                                          color="text.secondary"
+                                          sx={{ mt: 0.5 }}
+                                        >
+                                          {getTimeAgo(visitor.rescheduled_at)}
+                                        </Typography>
+                                      </Paper>
+                                    </Grid>
+                                  )}
+
+                                {/* Vehicle Number */}
+                                {visitor.vehicle_number && (
+                                  <Grid item xs={12} sm={6} md={4}>
+                                    <Paper
+                                      variant="outlined"
+                                      sx={{ p: 2, borderColor: "#6F0B1420" }}
+                                    >
+                                      <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                        sx={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: 0.5,
+                                          mb: 1,
+                                        }}
+                                      >
+                                        <DirectionsCar
+                                          sx={{
+                                            fontSize: 16,
+                                            color: "#6F0B14",
+                                          }}
+                                        />
+                                        Vehicle Number
+                                      </Typography>
+                                      <Typography
+                                        variant="body2"
+                                        fontWeight="500"
+                                      >
+                                        {visitor.vehicle_number}
+                                      </Typography>
+                                    </Paper>
+                                  </Grid>
+                                )}
+
+                                {/* Card ID */}
+                                {visitor.card_id && (
+                                  <Grid item xs={12} sm={6} md={4}>
+                                    <Paper
+                                      variant="outlined"
+                                      sx={{ p: 2, borderColor: "#6F0B1420" }}
+                                    >
+                                      <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                        sx={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: 0.5,
+                                          mb: 1,
+                                        }}
+                                      >
+                                        <CreditCard
+                                          sx={{
+                                            fontSize: 16,
+                                            color: "#6F0B14",
+                                          }}
+                                        />
+                                        Card ID
+                                      </Typography>
+                                      <Typography
+                                        variant="body2"
+                                        fontWeight="500"
+                                      >
+                                        {visitor.card_id}
+                                      </Typography>
+                                    </Paper>
+                                  </Grid>
+                                )}
+
+                                {/* OTP */}
+                                {visitor.visitor_otp && (
+                                  <Grid item xs={12} sm={6} md={4}>
+                                    <Paper
+                                      variant="outlined"
+                                      sx={{ p: 2, borderColor: "#6F0B1420" }}
+                                    >
+                                      <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                        sx={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: 0.5,
+                                          mb: 1,
+                                        }}
+                                      >
+                                        <Fingerprint
+                                          sx={{
+                                            fontSize: 16,
+                                            color: "#6F0B14",
+                                          }}
+                                        />
+                                        OTP
+                                      </Typography>
+                                      <Typography
+                                        variant="body2"
+                                        fontWeight="500"
+                                      >
+                                        {visitor.visitor_otp}
+                                      </Typography>
+                                    </Paper>
+                                  </Grid>
+                                )}
+
+                                {/* Card Status */}
+                                {visitor.card_status && (
+                                  <Grid item xs={12} sm={6} md={4}>
+                                    <Paper
+                                      variant="outlined"
+                                      sx={{ p: 2, borderColor: "#6F0B1420" }}
+                                    >
+                                      <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                        sx={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: 0.5,
+                                          mb: 1,
+                                        }}
+                                      >
+                                        <QrCodeScanner
+                                          sx={{
+                                            fontSize: 16,
+                                            color: "#6F0B14",
+                                          }}
+                                        />
+                                        Card Status
+                                      </Typography>
+                                      <Chip
+                                        size="small"
+                                        label={visitor.card_status}
+                                        sx={{
+                                          backgroundColor:
+                                            visitor.card_status === "Active"
+                                              ? "#00800020"
+                                              : "#A29EB6",
+                                          color:
+                                            visitor.card_status === "Active"
+                                              ? "#008000"
+                                              : "#FFFFFF",
+                                          fontWeight: 500,
+                                        }}
+                                      />
+                                    </Paper>
+                                  </Grid>
+                                )}
+
+                                {/* Scan Status */}
+                                {visitor.is_card_scan && (
+                                  <Grid item xs={12} sm={6} md={4}>
+                                    <Paper
+                                      variant="outlined"
+                                      sx={{ p: 2, borderColor: "#6F0B1420" }}
+                                    >
+                                      <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                        sx={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: 0.5,
+                                          mb: 1,
+                                        }}
+                                      >
+                                        <QrCodeScanner
+                                          sx={{
+                                            fontSize: 16,
+                                            color: "#6F0B14",
+                                          }}
+                                        />
+                                        Scan Status
+                                      </Typography>
+                                      <Chip
+                                        size="small"
+                                        label={visitor.is_card_scan}
+                                        sx={{
+                                          backgroundColor:
+                                            visitor.is_card_scan === "Scanned"
+                                              ? "#00800020"
+                                              : "#DBA40020",
+                                          color:
+                                            visitor.is_card_scan === "Scanned"
+                                              ? "#008000"
+                                              : "#DBA400",
+                                          fontWeight: 500,
+                                        }}
+                                        icon={
+                                          visitor.is_card_scan === "Scanned" ? (
+                                            <Check />
+                                          ) : (
+                                            <Warning />
+                                          )
+                                        }
+                                      />
+                                    </Paper>
+                                  </Grid>
+                                )}
+
+                                {/* Rejection Reason */}
+                                {visitor.rejected_reschedule_reason && (
+                                  <Grid item xs={12}>
+                                    <Paper
+                                      variant="outlined"
+                                      sx={{
+                                        p: 2,
+                                        backgroundColor: "#B31B1B10",
+                                        borderColor: "#B31B1B",
+                                      }}
+                                    >
+                                      <Typography
+                                        variant="caption"
+                                        sx={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: 0.5,
+                                          mb: 1,
+                                          color: "#B31B1B",
+                                        }}
+                                      >
+                                        <Cancel sx={{ fontSize: 16 }} />
+                                        Rejection Reason
+                                      </Typography>
+                                      <Typography
+                                        variant="body2"
+                                        fontWeight="500"
+                                        sx={{ color: "#B31B1B" }}
+                                      >
+                                        {visitor.rejected_reschedule_reason}
+                                      </Typography>
+                                    </Paper>
+                                  </Grid>
+                                )}
+
+                                {/* ID Proof Image */}
+                                {visitor.id_proof_image && (
+                                  <Button
+                                    size="small"
+                                    variant="outlined"
+                                    startIcon={<Visibility />}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      window.open(
+                                        visitor.id_proof_image,
+                                        "_blank",
+                                      );
+                                    }}
+                                  >
+                                    View ID Proof
+                                  </Button>
+                                )}
+                              </Grid>
+                            </Box>
+                          </Collapse>
+                        </TableCell>
+                      </TableRow>
+                    </React.Fragment>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </>
+      )}
       {/* Image Preview Dialog */}
       <Dialog
         open={!!imagePreview}
@@ -1740,10 +1811,6 @@ export default function VisitorsList() {
           {snackbar.message}
         </Alert>
       </Snackbar>
-      <AddVisitor
-        open={openAddVisitor}
-        onClose={() => setOpenAddVisitor(false)}
-      />
     </Box>
   );
 }

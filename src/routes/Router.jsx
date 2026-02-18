@@ -45,6 +45,7 @@ import AboutUs from "../pages/About";
 
 import UserDashboard from "../pages/Users/dashboard/UserDashboard";
 import VisitorsList from "../pages/Users/visitors/VisitorsList";
+import AddVisitorPage from "../pages/Users/visitors/AddVisitorPage";
 // import AdminComplaints from "../pages/Admin/Complaints";
 
 export default function Router() {
@@ -164,6 +165,7 @@ export default function Router() {
         >
           <Route path="/user/dashboard" element={<UserDashboard />} />
           <Route path="/user/visitor" element={<VisitorsList />} />
+          <Route path="add-visitor" element={<AddVisitorPage />} />
         </Route>
 
         {/* Unauthorized */}

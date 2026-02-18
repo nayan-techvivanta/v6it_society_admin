@@ -65,6 +65,7 @@ import {
   LastPage,
   NavigateBefore,
   NavigateNext,
+  Visibility,
 } from "@mui/icons-material";
 import { supabase } from "../../../api/supabaseClient";
 import { format, formatDistanceToNow } from "date-fns";
@@ -117,7 +118,11 @@ export default function UserDashboard() {
   const [activeFilter, setActiveFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [expandedRows, setExpandedRows] = useState({});
-  const [imagePreview, setImagePreview] = useState(null);
+  const [imagePreview, setImagePreview] = useState({
+    url: null,
+    type: null,
+  });
+
   const [actionLoading, setActionLoading] = useState({});
   const [rescheduleDialog, setRescheduleDialog] = useState({
     open: false,
@@ -137,6 +142,8 @@ export default function UserDashboard() {
     visitor: null,
     reason: "",
   });
+  const [availableCards, setAvailableCards] = useState([]);
+  const [cardsLoading, setCardsLoading] = useState(false);
   const [assignCardDialog, setAssignCardDialog] = useState({
     open: false,
     visitor: null,
@@ -158,12 +165,10 @@ export default function UserDashboard() {
   }, [visitors, activeFilter, search]);
 
   useEffect(() => {
-    // Reset to first page when filters change
     setPage(0);
   }, [activeFilter, search]);
 
   useEffect(() => {
-    // Update paginated data when filtered visitors or pagination changes
     const start = page * rowsPerPage;
     const end = start + rowsPerPage;
     setPaginatedVisitors(filteredVisitors.slice(start, end));
@@ -190,7 +195,24 @@ export default function UserDashboard() {
       rescheduled,
     });
   }, [visitors]);
+  const fetchAvailableCards = async () => {
+    setCardsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("cards")
+        .select("*")
+        .eq("society_id", userDetails.societyId)
+        .eq("card_status", "active")
+        .eq("is_assigned", false);
 
+      if (error) throw error;
+      setAvailableCards(data || []);
+    } catch (err) {
+      showSnackbar("Error fetching cards: " + err.message, "error");
+    } finally {
+      setCardsLoading(false);
+    }
+  };
   const init = async () => {
     try {
       setLoading(true);
@@ -645,8 +667,8 @@ export default function UserDashboard() {
     <Box
       sx={{
         p: { xs: 1, sm: 2, md: 3 },
-        backgroundColor: "#f5f5f5",
-        minHeight: "100vh",
+        // backgroundColor: "#f5f5f5",
+        minHeight: "80vh",
       }}
     >
       {/* Header Card */}
@@ -845,6 +867,10 @@ export default function UserDashboard() {
               <TableRow sx={{ backgroundColor: "#6F0B14" }}>
                 <TableCell padding="checkbox" sx={{ color: "white" }} />
                 <TableCell sx={{ color: "white", fontWeight: "bold" }}>
+                  ID
+                </TableCell>
+
+                <TableCell sx={{ color: "white", fontWeight: "bold" }}>
                   Visitor
                 </TableCell>
                 {!isMobile && (
@@ -950,6 +976,16 @@ export default function UserDashboard() {
                         </IconButton>
                       </TableCell>
                       <TableCell>
+                        <Typography
+                          variant="body2"
+                          fontWeight="600"
+                          sx={{ color: "#6F0B14" }}
+                        >
+                          #{visitor.id}
+                        </Typography>
+                      </TableCell>
+
+                      <TableCell>
                         <Box
                           sx={{
                             display: "flex",
@@ -998,7 +1034,10 @@ export default function UserDashboard() {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   if (visitor.image_url) {
-                                    setImagePreview(visitor.image_url);
+                                    setImagePreview({
+                                      url: visitor.image_url,
+                                      type: "visitor",
+                                    });
                                   }
                                 }}
                                 sx={{
@@ -1016,7 +1055,7 @@ export default function UserDashboard() {
                               >
                                 {visitor.visitor_name
                                   ?.charAt(0)
-                                  .toUpperCase() || <Person />}
+                                  ?.toUpperCase() || <Person />}
                               </Avatar>
                             </Tooltip>
                           </Badge>
@@ -1244,13 +1283,14 @@ export default function UserDashboard() {
                                     size="small"
                                     onClick={(e) => {
                                       e.stopPropagation();
+                                      fetchAvailableCards();
                                       setAssignCardDialog({
                                         open: true,
                                         visitor,
                                         cardNumber: "",
                                       });
                                     }}
-                                    disabled={visitor.card_number}
+                                    disabled={!!visitor.card_number}
                                     sx={{
                                       backgroundColor: visitor.card_number
                                         ? "#A29EB620"
@@ -1545,19 +1585,21 @@ export default function UserDashboard() {
                               )}
 
                               {/* ID Proof Image */}
-                              {visitor.image_url && (
-                                <Grid item xs={12}>
-                                  <Button
-                                    variant="outlined"
-                                    startIcon={<ZoomIn />}
-                                    onClick={() =>
-                                      setImagePreview(visitor.image_url)
-                                    }
-                                    sx={{ mt: 1 }}
-                                  >
-                                    View ID Proof
-                                  </Button>
-                                </Grid>
+                              {visitor.id_proof_image && (
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  startIcon={<Visibility />}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setImagePreview({
+                                      url: visitor.id_proof_image,
+                                      type: "id",
+                                    });
+                                  }}
+                                >
+                                  View ID Proof
+                                </Button>
                               )}
                             </Grid>
 
@@ -1656,13 +1698,14 @@ export default function UserDashboard() {
                                       startIcon={<CreditCard />}
                                       onClick={(e) => {
                                         e.stopPropagation();
+                                        fetchAvailableCards();
                                         setAssignCardDialog({
                                           open: true,
                                           visitor,
                                           cardNumber: "",
                                         });
                                       }}
-                                      disabled={visitor.card_number}
+                                      disabled={!!visitor.card_number}
                                     >
                                       Assign Card
                                     </Button>
@@ -1736,8 +1779,13 @@ export default function UserDashboard() {
 
       {/* Image Preview Dialog */}
       <Dialog
-        open={!!imagePreview}
-        onClose={() => setImagePreview(null)}
+        open={!!imagePreview.url}
+        onClose={() =>
+          setImagePreview({
+            url: null,
+            type: null,
+          })
+        }
         maxWidth="md"
         fullWidth
         TransitionComponent={Zoom}
@@ -1758,9 +1806,14 @@ export default function UserDashboard() {
             color: "white",
           }}
         >
-          <Typography variant="h6">Visitor Image</Typography>
+          <Typography variant="h6">
+            {imagePreview.type === "id"
+              ? "ID Proof Preview"
+              : "Visitor Image Preview"}
+          </Typography>
+
           <IconButton
-            onClick={() => setImagePreview(null)}
+            onClick={() => setImagePreview({ url: null, type: null })}
             sx={{ color: "white" }}
           >
             <Close />
@@ -1770,7 +1823,7 @@ export default function UserDashboard() {
         <DialogContent>
           <Box sx={{ display: "flex", justifyContent: "center" }}>
             <img
-              src={imagePreview}
+              src={imagePreview.url}
               alt="Visitor"
               style={{
                 maxWidth: "100%",
@@ -1919,36 +1972,52 @@ export default function UserDashboard() {
             <Typography variant="h6">Assign Card</Typography>
           </Box>
         </DialogTitle>
+
         <DialogContent sx={{ mt: 2 }}>
           <Typography variant="body2" gutterBottom>
             Visitor: <strong>{assignCardDialog.visitor?.visitor_name}</strong>
           </Typography>
-          <TextField
-            autoFocus
-            margin="dense"
-            label="Card Number"
-            fullWidth
-            value={assignCardDialog.cardNumber}
-            onChange={(e) =>
-              setAssignCardDialog((prev) => ({
-                ...prev,
-                cardNumber: e.target.value,
-              }))
-            }
-            placeholder="Enter card number"
-            sx={{
-              mt: 2,
-              "& .MuiOutlinedInput-root": {
-                "&:hover fieldset": {
-                  borderColor: "#6F0B14",
+
+          {cardsLoading ? (
+            <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
+              <CircularProgress sx={{ color: "#6F0B14" }} />
+            </Box>
+          ) : availableCards.length === 0 ? (
+            <Alert severity="warning" sx={{ mt: 2 }}>
+              No available cards found for this society.
+            </Alert>
+          ) : (
+            <TextField
+              select
+              fullWidth
+              margin="dense"
+              value={assignCardDialog.cardNumber}
+              onChange={(e) =>
+                setAssignCardDialog((prev) => ({
+                  ...prev,
+                  cardNumber: e.target.value,
+                }))
+              }
+              SelectProps={{ native: true }}
+              sx={{
+                mt: 2,
+                "& .MuiOutlinedInput-root": {
+                  "&:hover fieldset": { borderColor: "#6F0B14" },
+                  "&.Mui-focused fieldset": { borderColor: "#6F0B14" },
                 },
-                "&.Mui-focused fieldset": {
-                  borderColor: "#6F0B14",
-                },
-              },
-            }}
-          />
+                "& .MuiInputLabel-root.Mui-focused": { color: "#6F0B14" },
+              }}
+            >
+              <option value="">-- Select a Card --</option>
+              {availableCards.map((card) => (
+                <option key={card.id} value={card.card_serial_number}>
+                  {card.card_serial_number}
+                </option>
+              ))}
+            </TextField>
+          )}
         </DialogContent>
+
         <DialogActions sx={{ p: 2 }}>
           <Button
             onClick={() =>
@@ -1959,6 +2028,7 @@ export default function UserDashboard() {
               })
             }
             variant="outlined"
+            sx={{ borderColor: "#6F0B14", color: "#6F0B14" }}
           >
             Cancel
           </Button>
@@ -1969,7 +2039,7 @@ export default function UserDashboard() {
                 cardNumber: assignCardDialog.cardNumber,
               })
             }
-            disabled={!assignCardDialog.cardNumber}
+            disabled={!assignCardDialog.cardNumber || cardsLoading}
             sx={{
               backgroundColor: "#6F0B14",
               "&:hover": { backgroundColor: "#8B0F1A" },
@@ -1978,7 +2048,11 @@ export default function UserDashboard() {
               },
             }}
           >
-            Assign
+            {actionLoading[`${assignCardDialog.visitor?.id}-assignCard`] ? (
+              <CircularProgress size={20} color="inherit" />
+            ) : (
+              "Assign"
+            )}
           </Button>
         </DialogActions>
       </Dialog>
