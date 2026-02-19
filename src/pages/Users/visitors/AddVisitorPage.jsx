@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import ReactDOM from "react-dom/client";
 import {
   Container,
   Paper,
@@ -57,7 +58,9 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../../../api/supabaseClient";
 import { getFaceEmbedding } from "../../../Hooks/faceRecognition";
 import { uploadImage } from "../../../api/uploadImage";
-
+import { useSendVisitorPass } from "../../../Hooks/useSendVisitorPass";
+import html2canvas from "html2canvas";
+import VisitorPass from "./VisitorPass";
 const PageContainer = styled(Box)(({ theme }) => ({
   minHeight: "80vh",
   [theme.breakpoints.down("sm")]: {
@@ -186,7 +189,9 @@ const StyledTextField = styled(TextField)({
   },
 });
 
-const UploadArea = styled(Paper)(({ theme, error }) => ({
+const UploadArea = styled(Paper, {
+  shouldForwardProp: (prop) => prop !== "error",
+})(({ theme, error }) => ({
   border: `2px dashed ${error ? "#dc3545" : "#6F0B14"}`,
   borderRadius: "16px",
   padding: theme.spacing(3),
@@ -217,7 +222,41 @@ const PreviewCard = styled(Paper)(({ theme }) => ({
   gap: theme.spacing(2),
   position: "relative",
 }));
+const captureVisitorPassImage = async (visitorPassData) => {
+  const html2canvas = (await import("html2canvas")).default;
 
+  const container = document.createElement("div");
+  container.style.cssText =
+    "position:fixed;top:-9999px;left:-9999px;z-index:-1;";
+  document.body.appendChild(container);
+
+  const root = ReactDOM.createRoot(container);
+  await new Promise((resolve) => {
+    root.render(<VisitorPass visitor={visitorPassData} />);
+    setTimeout(resolve, 300);
+  });
+
+  const canvas = await html2canvas(container.firstChild, {
+    useCORS: true,
+    scale: 2,
+    backgroundColor: "#ffffff",
+  });
+
+  root.unmount();
+  document.body.removeChild(container);
+
+  const blob = await new Promise((resolve) =>
+    canvas.toBlob(resolve, "image/png"),
+  );
+  const file = new File(
+    [blob],
+    `visitor_pass_${visitorPassData.visitorName?.replace(/\s+/g, "_") || "pass"}.png`,
+    { type: "image/png" },
+  );
+
+  const uploadResult = await uploadImage(file);
+  return uploadResult.url;
+};
 function TabPanel(props) {
   const { children, value, index, ...other } = props;
   return (
@@ -283,15 +322,14 @@ export default function AddVisitorPage() {
     societyName: "",
     buildingName: "",
   });
+  const { sendPass } = useSendVisitorPass();
 
-  // Fetch flats for security user based on their society
   useEffect(() => {
     const fetchFlatsForSecurity = async () => {
       if (!isSecurity || !societyId) return;
 
       setLoadingFlats(true);
       try {
-        // First get all buildings in the society
         const { data: buildings, error: buildingsError } = await supabase
           .from("buildings")
           .select("id, name")
@@ -341,7 +379,6 @@ export default function AddVisitorPage() {
     fetchFlatsForSecurity();
   }, [isSecurity, societyId]);
 
-  // Fetch tenant location for tenants
   useEffect(() => {
     const fetchTenantLocation = async () => {
       try {
@@ -399,8 +436,7 @@ export default function AddVisitorPage() {
     }
   }, [isSecurity]);
 
-  const generateVisitorOtp = () =>
-    Math.floor(1000 + Math.random() * 9000).toString();
+  const generateVisitorOtp = () => Math.floor(1000 + Math.random() * 9000);
   const visitPurposes = [
     {
       value: "Guests",
@@ -543,81 +579,173 @@ export default function AddVisitorPage() {
       }));
       return;
     }
+
     if (!file.type.startsWith("image/")) {
       setErrors((prev) => ({ ...prev, photo: "Please upload an image file" }));
       return;
     }
 
-    // Show preview immediately
     setFormData((prev) => ({ ...prev, visitorPhoto: file }));
     setErrors((prev) => ({ ...prev, photo: null }));
+
     const reader = new FileReader();
     reader.onloadend = () => setPhotoPreview(reader.result);
     reader.readAsDataURL(file);
 
-    // Run face recognition for both security and tenant
     setFaceLoading(true);
     setFaceMatchResult(null);
     setFaceEmbedding(null);
 
     try {
-      const embedding = await getFaceEmbedding(file);
+      // ── Call edge function directly ──────────────────
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-      if (!embedding) {
+      const fd = new FormData();
+      fd.append("file", file);
+
+      const { data: rawData, error: fnError } = await supabase.functions.invoke(
+        "face_recognition",
+        {
+          body: fd,
+          headers: { Authorization: `Bearer ${session?.access_token}` },
+        },
+      );
+
+      if (fnError) {
         setErrors((prev) => ({
           ...prev,
-          photo: "Could not detect a face. Please upload a clear photo.",
+          photo: "Face recognition failed. Please try again.",
         }));
-        setFaceLoading(false);
         return;
       }
 
-      setFaceEmbedding(embedding);
+      console.log("Face recognition raw response:", rawData);
+      console.log("Type of rawData:", typeof rawData);
+      console.log("rawData keys:", rawData ? Object.keys(rawData) : "null");
 
-      // Check if visitor already exists using the embedding
-      if (isSecurity) {
-        const session = await supabase.auth.getSession();
-        const token = session.data.session?.access_token;
+      // ── Normalize response — handle all wrapping cases ──
+      let response = rawData;
 
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/visitor_logs`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              society_id: Number(societyId),
-              face_embedding: JSON.stringify(embedding),
-            }),
-          },
-        );
-
-        const result = await response.json();
-
-        if (result.success && result.total_entries > 0) {
-          const lastVisit = result.visitors[0];
-          setFaceMatchResult({ found: true, visitor: lastVisit });
-
-          setFormData((prev) => ({
-            ...prev,
-            fullName: lastVisit.visitor_name || prev.fullName,
-            phoneNumber: lastVisit.phone_number || prev.phoneNumber,
-            visitPurpose: lastVisit.purpose || prev.visitPurpose,
-            vehicleNumber: lastVisit.vehicle_number || prev.vehicleNumber,
-          }));
-        } else {
-          setFaceMatchResult({ found: false });
+      // If it's a string, parse it
+      if (typeof response === "string") {
+        try {
+          response = JSON.parse(response);
+        } catch (e) {
+          response = rawData;
         }
       }
+
+      // If wrapped inside .data
+      if (
+        response &&
+        !response.visitor &&
+        !response.face_data &&
+        response.data
+      ) {
+        response = response.data;
+      }
+
+      console.log("Normalized response:", response);
+      console.log("response.visitor:", response?.visitor);
+
+      // ── Parse embedding helper ───────────────────────
+      const parseEmbedding = (raw) => {
+        if (!raw) return null;
+        if (typeof raw === "string") {
+          try {
+            return JSON.parse(raw);
+          } catch {
+            return null;
+          }
+        }
+        return Array.isArray(raw) ? raw : null;
+      };
+
+      // ── Purpose reverse map ──────────────────────────
+      const purposeReverseMap = {
+        "Guests/VisitorsMaintenance & Repairs": "Guests",
+        Guests: "Guests",
+        Residents: "Residents",
+        "Residents/Tenants": "Residents",
+        Delivery: "Deliveries",
+        Deliveries: "Deliveries",
+        "Deliveries/Couriers": "Deliveries",
+        Maintenance: "Maintenance",
+        "Maintenance & Repairs": "Maintenance",
+        ServiceProviders: "ServiceProviders",
+        "Service Providers": "ServiceProviders",
+        Emergency: "Emergency",
+        "Emergency Services": "Emergency",
+        Other: "Other",
+      };
+
+      // ── Check visitor in response OR nested ──────────
+      const visitor = response?.visitor ?? response?.data?.visitor ?? null;
+      const faceData = response?.face_data ?? response?.data?.face_data ?? null;
+      const hasError = response?.error ?? response?.data?.error ?? null;
+
+      // ── Visitor found in DB ──────────────────────────
+      if (visitor) {
+        const embedding = parseEmbedding(visitor.face_embedding);
+
+        setFaceEmbedding(embedding);
+        setFaceMatchResult({ found: true, visitor });
+
+        setFormData((prev) => ({
+          ...prev,
+          fullName: visitor.visitor_name || prev.fullName,
+          phoneNumber: visitor.phone_number || prev.phoneNumber,
+          visitPurpose: purposeReverseMap[visitor.purpose] || prev.visitPurpose,
+          vehicleNumber: visitor.vehicle_number || prev.vehicleNumber,
+        }));
+
+        return;
+      }
+
+      // ── New visitor — face not in DB ─────────────────
+      if (faceData) {
+        const embedding = parseEmbedding(faceData.embedding);
+
+        if (!embedding) {
+          setErrors((prev) => ({
+            ...prev,
+            photo: "No face detected. Please upload a clear photo.",
+          }));
+          return;
+        }
+
+        setFaceEmbedding(embedding);
+        setFaceMatchResult({ found: false });
+        return;
+      }
+
+      // ── No face detected ─────────────────────────────
+      if (hasError === "No face detacted") {
+        setErrors((prev) => ({
+          ...prev,
+          photo: "No face detected. Please upload a clear photo.",
+        }));
+        return;
+      }
+
+      // ── Unexpected response ──────────────────────────
+      console.error("Unexpected response:", response);
+      setErrors((prev) => ({
+        ...prev,
+        photo: "Face recognition failed. Please try again.",
+      }));
     } catch (err) {
-      console.error("Face recognition error:", err.message);
+      console.error("Face recognition error:", err);
+      setErrors((prev) => ({
+        ...prev,
+        photo: "Something went wrong during face recognition.",
+      }));
     } finally {
       setFaceLoading(false);
     }
   };
-
   const handleIdProofUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -672,6 +800,42 @@ export default function AddVisitorPage() {
     fieldsToValidate.forEach((field) => validateField(field));
     return fieldsToValidate.every((field) => !errors[field]);
   };
+  const handleSendVisitorPass = async ({
+    insertedVisitor,
+    otp,
+    societyName,
+    buildingName,
+    flatNumber,
+  }) => {
+    try {
+      const visitorPassData = {
+        visitorId: insertedVisitor.id,
+        societyName,
+        buildingName,
+        flatNumber,
+        tenantName: localStorage.getItem("userName") || "Resident",
+        visitorName: insertedVisitor.visitor_name,
+        visitorPhone: insertedVisitor.phone_number,
+        purpose: insertedVisitor.purpose,
+        otp,
+      };
+
+      const passImageUrl = await captureVisitorPassImage(visitorPassData);
+
+      const whatsappTarget = formData.whatsappNumber || formData.phoneNumber;
+
+      await sendPass({
+        visitor_id: insertedVisitor.id,
+        whatsapp: whatsappTarget,
+        file_url: passImageUrl,
+        file_name: `visitor_pass_${insertedVisitor.id}.png`,
+      });
+
+      console.log("✅ Visitor pass sent to WhatsApp:", whatsappTarget);
+    } catch (err) {
+      console.error("⚠️ Visitor pass send failed (non-critical):", err.message);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -694,7 +858,7 @@ export default function AddVisitorPage() {
     setErrors({});
 
     try {
-      // Additional validation from the new functionality
+      // ── Validation ──────────────────────────────
       if (!formData.fullName || !formData.phoneNumber) {
         throw new Error("Please fill required fields");
       }
@@ -705,10 +869,7 @@ export default function AddVisitorPage() {
 
       const flatInfo = isTenant
         ? tenantLocation
-        : {
-            flatId: formData.flatId,
-            societyId: societyId,
-          };
+        : { flatId: formData.flatId, societyId };
 
       if (!flatInfo.flatId) {
         throw new Error("Flat information missing");
@@ -718,24 +879,19 @@ export default function AddVisitorPage() {
         throw new Error("Please select visit date & time");
       }
 
+      // ── Upload visitor photo ─────────────────────
       let imageUrl = null;
+      try {
+        const uploadResult = await uploadImage(formData.visitorPhoto);
+        imageUrl = uploadResult.url;
+      } catch (uploadError) {
+        throw new Error(`Image upload failed: ${uploadError.message}`);
+      }
+
+      if (!imageUrl) throw new Error("Visitor image upload failed");
+
+      // ── Upload ID proof (security only) ──────────
       let idProofUrl = null;
-
-      // Upload visitor photo
-      if (formData.visitorPhoto) {
-        try {
-          const uploadResult = await uploadImage(formData.visitorPhoto);
-          imageUrl = uploadResult.url;
-        } catch (uploadError) {
-          throw new Error(`Image upload failed: ${uploadError.message}`);
-        }
-      }
-
-      if (!imageUrl) {
-        throw new Error("Visitor image upload failed");
-      }
-
-      // Upload ID proof image if exists (for security)
       if (isSecurity && formData.idProofImage) {
         try {
           const uploadResult = await uploadImage(formData.idProofImage);
@@ -745,32 +901,47 @@ export default function AddVisitorPage() {
         }
       }
 
-      // Generate OTP for visitor
-      const generateVisitorOtp = () =>
-        Math.floor(1000 + Math.random() * 9000).toString();
-      const otp = generateVisitorOtp();
+      // ── Generate OTP (number to match bigint column) ─
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
+      // ── Build common values ──────────────────────
       const societyIdValue = isTenant
         ? tenantLocation?.societyId
         : localStorage.getItem("societyId");
-
       const buildingIdValue = isTenant ? tenantLocation?.buildingId : null;
-
       const flatIdValue = isTenant
         ? tenantLocation?.flatId
         : formData.flatId || null;
-
       const flatNumberValue = isTenant
         ? tenantLocation?.flatNumber
         : formData.flatNumber || null;
-
-      const visitType = isTenant ? "PreVisitor" : "Normal";
-
+      const visitType = isTenant ? "previsitor" : "normal";
       const inTime = isTenant
         ? formData.visitDateTime.toISOString()
         : new Date().toISOString();
 
-      // Base visitor data with OTP
+      // ── visitor_type mapping (matches DB constraint) ─
+      const visitorTypeMap = {
+        Guests: "Guest",
+        Residents: "Other",
+        Deliveries: "Delivery",
+        Maintenance: "Maintenance",
+        ServiceProviders: "Maintenance",
+        Emergency: "Other",
+        Other: "Other",
+      };
+
+      let finalEmbedding = null;
+
+      if (faceMatchResult?.found && faceMatchResult?.visitor?.face_embedding) {
+        finalEmbedding =
+          typeof faceMatchResult.visitor.face_embedding === "string"
+            ? faceMatchResult.visitor.face_embedding
+            : JSON.stringify(faceMatchResult.visitor.face_embedding);
+      } else if (faceEmbedding) {
+        finalEmbedding = JSON.stringify(faceEmbedding);
+      }
+      // ── Build visitor payload ────────────────────
       const visitorData = {
         society_id: Number(societyIdValue),
         building_id: buildingIdValue ? Number(buildingIdValue) : null,
@@ -779,20 +950,15 @@ export default function AddVisitorPage() {
         visitor_name: formData.fullName,
         phone_number: formData.phoneNumber,
         purpose: formData.visitPurpose,
-        visitor_type: formData.visitPurpose,
+        visitor_type: visitorTypeMap[formData.visitPurpose] ?? "Other",
         visit_type: visitType,
         image_url: imageUrl,
         approved_status: "Pending",
         in_time: inTime,
         visitor_otp: otp,
-        face_embedding: faceEmbedding ? JSON.stringify(faceEmbedding) : null,
+        face_embedding: finalEmbedding,
       };
 
-      if (isTenant) {
-        visitorData.approved_by = Number(userId);
-      }
-
-      // Add security-specific fields
       if (isSecurity) {
         visitorData.verified_by_guard = Number(userId);
         visitorData.id_proof_image = idProofUrl;
@@ -803,6 +969,7 @@ export default function AddVisitorPage() {
 
       console.log("Submitting visitor data:", visitorData);
 
+      // ── Insert visitor ───────────────────────────
       const { error, data } = await supabase
         .from("visitors")
         .insert([visitorData])
@@ -810,61 +977,84 @@ export default function AddVisitorPage() {
 
       if (error) throw error;
 
-      // If Tenant → Generate Visitor Pass Image and Send WhatsApp
       if (isTenant && data && data[0]) {
         try {
-          // Generate Visitor Pass Image
-          const element = formRef.current;
-          if (element) {
-            // You'll need to install html2canvas: npm install html2canvas
-            const html2canvas = (await import("html2canvas")).default;
-            const canvas = await html2canvas(element);
-            const image = canvas.toDataURL("image/png");
+          const insertedVisitor = data[0];
 
-            // Upload the screenshot
-            const blob = await (await fetch(image)).blob();
-            const file = new File(
-              [blob],
-              `visitor_${formData.fullName.replace(/\s+/g, "_")}.jpg`,
-              { type: "image/png" },
-            );
-            const screenshotResult = await uploadImage(file);
-            const screenshotUrl = screenshotResult.url;
+          // ── Build VisitorPass data ───────────────────────
+          const visitorPassData = {
+            visitorId: insertedVisitor.id,
+            societyName: locationInfo.societyName,
+            buildingName: locationInfo.buildingName,
+            flatNumber: tenantLocation.flatNumber,
+            tenantName: localStorage.getItem("userName") || "Resident",
+            visitorName: insertedVisitor.visitor_name,
+            visitorPhone: insertedVisitor.phone_number,
+            purpose: insertedVisitor.purpose,
+            otp: otp,
+          };
 
-            // Send WhatsApp if number exists
-            const whatsappNumber =
-              formData.whatsappNumber || formData.phoneNumber;
-            if (whatsappNumber) {
-              // Implement your WhatsApp sending logic here
-              console.log(
-                "Send WhatsApp to:",
-                whatsappNumber,
-                "with image:",
-                screenshotUrl,
-              );
+          // ── Render VisitorPass off-screen ────────────────
+          const container = document.createElement("div");
+          container.style.cssText =
+            "position:fixed;top:-9999px;left:-9999px;z-index:-1;";
+          document.body.appendChild(container);
 
-              // Example WhatsApp integration (you can customize this)
-              try {
-                // You can call your WhatsApp API here
-                // await sendWhatsAppMessage(whatsappNumber, screenshotUrl, visitorData);
-                console.log("WhatsApp sent successfully");
-              } catch (whatsappError) {
-                console.error("WhatsApp send failed:", whatsappError);
-                // Don't throw error, visitor is already created
-              }
-            }
-          }
+          const passRoot = ReactDOM.createRoot(container);
+          await new Promise((resolve) => {
+            passRoot.render(<VisitorPass visitor={visitorPassData} />);
+            setTimeout(resolve, 500);
+          });
+
+          // ── Capture with html2canvas ─────────────────────
+          const passCanvas = await html2canvas(container.firstChild, {
+            useCORS: true,
+            scale: 2,
+            backgroundColor: "#ffffff",
+          });
+
+          // ── Cleanup DOM ──────────────────────────────────
+          passRoot.unmount();
+          document.body.removeChild(container);
+
+          // ── Convert to File and upload ───────────────────
+          const passBlob = await new Promise((resolve) =>
+            passCanvas.toBlob(resolve, "image/png"),
+          );
+          const passFile = new File(
+            [passBlob],
+            `visitor_pass_${insertedVisitor.id}.png`,
+            { type: "image/png" },
+          );
+          const passUpload = await uploadImage(passFile);
+          const passImageUrl = passUpload?.url;
+
+          if (!passImageUrl) throw new Error("Pass image upload failed");
+
+          // ── Send via WhatsApp ────────────────────────────
+          const whatsappTarget =
+            formData.whatsappNumber || formData.phoneNumber;
+
+          await sendPass({
+            visitor_id: insertedVisitor.id,
+            whatsapp: whatsappTarget,
+            file_url: passImageUrl,
+            file_name: `visitor_pass_${insertedVisitor.id}.png`,
+          });
+
+          console.log("✅ Visitor pass sent to WhatsApp:", whatsappTarget);
         } catch (passError) {
-          console.error("Error generating visitor pass:", passError);
-          // Don't throw error here, visitor is already created
+          console.error(
+            "⚠️ Pass send failed (non-critical):",
+            passError.message,
+          );
         }
       }
 
+      // ── Success ──────────────────────────────────
       setSuccess(true);
 
-      // Clear form and redirect
       setTimeout(() => {
-        // Clear form
         setFormData({
           fullName: "",
           phoneNumber: "",
@@ -880,11 +1070,7 @@ export default function AddVisitorPage() {
         setPhotoPreview(null);
         setIdProofPreview(null);
 
-        if (isSecurity) {
-          navigate("/dashboard");
-        } else {
-          navigate("/user/visitor");
-        }
+        navigate(isSecurity ? "/dashboard" : "/user/visitor");
       }, 2000);
     } catch (err) {
       console.error("Error:", err.message);
@@ -982,7 +1168,10 @@ export default function AddVisitorPage() {
                         severity="success"
                         sx={{ mb: 3, borderRadius: "12px" }}
                       >
-                        Visitor added successfully! Redirecting...
+                        {/* Visitor added successfully! Redirecting... */}
+                        {isTenant
+                          ? "Visitor scheduled! Pass sent to WhatsApp. Redirecting…"
+                          : "Visitor registered successfully! Redirecting…"}
                       </Alert>
                     </Zoom>
                   )}
@@ -990,652 +1179,6 @@ export default function AddVisitorPage() {
                   {/* Main 2-Column Layout */}
                   <Grid container spacing={3}>
                     {/* LEFT COLUMN - Visitor Details */}
-                    <Grid item xs={12} md={6}>
-                      <DetailsPanel>
-                        <SectionTitle>
-                          <PersonIcon />
-                          <Typography>Visitor Details</Typography>
-                        </SectionTitle>
-
-                        <Stack spacing={3}>
-                          {/* Full Name */}
-                          <StyledTextField
-                            fullWidth
-                            label="Full Name *"
-                            name="fullName"
-                            value={formData.fullName}
-                            onChange={handleInputChange}
-                            onBlur={() => handleBlur("fullName")}
-                            error={touched.fullName && !!errors.fullName}
-                            helperText={touched.fullName && errors.fullName}
-                            disabled={loading}
-                            InputProps={{
-                              startAdornment: (
-                                <InputAdornment position="start">
-                                  <PersonIcon
-                                    sx={{ color: "#6F0B14", fontSize: 20 }}
-                                  />
-                                </InputAdornment>
-                              ),
-                            }}
-                            placeholder="Enter visitor's full name"
-                          />
-
-                          {/* Phone & WhatsApp */}
-                          <Grid container spacing={2}>
-                            <Grid item xs={12} sm={6}>
-                              <StyledTextField
-                                fullWidth
-                                label="Phone Number *"
-                                name="phoneNumber"
-                                value={formData.phoneNumber}
-                                onChange={handleInputChange}
-                                onBlur={() => handleBlur("phoneNumber")}
-                                error={
-                                  touched.phoneNumber && !!errors.phoneNumber
-                                }
-                                helperText={
-                                  touched.phoneNumber && errors.phoneNumber
-                                }
-                                disabled={loading}
-                                inputProps={{ maxLength: 10 }}
-                                InputProps={{
-                                  startAdornment: (
-                                    <InputAdornment position="start">
-                                      <PhoneIcon
-                                        sx={{ color: "#6F0B14", fontSize: 20 }}
-                                      />
-                                    </InputAdornment>
-                                  ),
-                                }}
-                                placeholder="10-digit mobile"
-                              />
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                              <StyledTextField
-                                fullWidth
-                                label="WhatsApp Number"
-                                name="whatsappNumber"
-                                value={formData.whatsappNumber}
-                                onChange={handleInputChange}
-                                disabled={loading}
-                                inputProps={{ maxLength: 10 }}
-                                InputProps={{
-                                  startAdornment: (
-                                    <InputAdornment position="start">
-                                      <WhatsAppIcon
-                                        sx={{ color: "#25D366", fontSize: 20 }}
-                                      />
-                                    </InputAdornment>
-                                  ),
-                                }}
-                                placeholder="Optional"
-                              />
-                            </Grid>
-                          </Grid>
-
-                          {/* Flat Selection - Different for Tenant vs Security */}
-                          {isTenant ? (
-                            <StyledTextField
-                              fullWidth
-                              label="Flat Number"
-                              name="flatNumber"
-                              value={formData.flatNumber}
-                              disabled
-                              InputProps={{
-                                startAdornment: (
-                                  <InputAdornment position="start">
-                                    <HomeIcon
-                                      sx={{ color: "#6F0B14", fontSize: 20 }}
-                                    />
-                                  </InputAdornment>
-                                ),
-                              }}
-                              sx={{
-                                "& .MuiOutlinedInput-root": {
-                                  bgcolor: "#f5f5f5",
-                                },
-                              }}
-                            />
-                          ) : (
-                            <FormControl
-                              fullWidth
-                              error={touched.flatId && !!errors.flatId}
-                            >
-                              <InputLabel>Select Flat *</InputLabel>
-                              <StyledSelect
-                                name="flatId"
-                                value={formData.flatId || ""}
-                                onChange={handleFlatChange}
-                                onBlur={() => handleBlur("flatId")}
-                                label="Select Flat *"
-                                disabled={loading || loadingFlats}
-                                startAdornment={
-                                  <InputAdornment position="start">
-                                    <HomeIcon
-                                      sx={{
-                                        color: "#6F0B14",
-                                        fontSize: 20,
-                                        ml: 1,
-                                      }}
-                                    />
-                                  </InputAdornment>
-                                }
-                              >
-                                {loadingFlats ? (
-                                  <MenuItem disabled>
-                                    <CircularProgress
-                                      size={20}
-                                      sx={{ mr: 1 }}
-                                    />
-                                    Loading flats...
-                                  </MenuItem>
-                                ) : flatsList.length > 0 ? (
-                                  flatsList.map((flat) => (
-                                    <MenuItem key={flat.id} value={flat.id}>
-                                      <Box
-                                        sx={{
-                                          display: "flex",
-                                          alignItems: "center",
-                                          gap: 1,
-                                        }}
-                                      >
-                                        <HomeIcon
-                                          sx={{
-                                            color: "#6F0B14",
-                                            fontSize: 18,
-                                          }}
-                                        />
-                                        <Box>
-                                          <Typography variant="body2">
-                                            Flat {flat.flat_number}
-                                          </Typography>
-                                          <Typography
-                                            variant="caption"
-                                            color="text.secondary"
-                                          >
-                                            {flat.building_name}
-                                          </Typography>
-                                        </Box>
-                                      </Box>
-                                    </MenuItem>
-                                  ))
-                                ) : (
-                                  <MenuItem disabled>
-                                    <Typography color="text.secondary">
-                                      No flats available
-                                    </Typography>
-                                  </MenuItem>
-                                )}
-                              </StyledSelect>
-                              {touched.flatId && errors.flatId && (
-                                <FormHelperText error>
-                                  {errors.flatId}
-                                </FormHelperText>
-                              )}
-                            </FormControl>
-                          )}
-
-                          {/* Visit Purpose */}
-                          <FormControl
-                            fullWidth
-                            error={
-                              touched.visitPurpose && !!errors.visitPurpose
-                            }
-                          >
-                            <InputLabel>Visit Purpose *</InputLabel>
-                            <StyledSelect
-                              name="visitPurpose"
-                              value={formData.visitPurpose || ""}
-                              onChange={handleInputChange}
-                              onBlur={() => handleBlur("visitPurpose")}
-                              label="Visit Purpose *"
-                              disabled={loading}
-                              renderValue={(selected) => {
-                                const purpose = visitPurposes.find(
-                                  (p) => p.value === selected,
-                                );
-                                return (
-                                  <Box
-                                    sx={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 1,
-                                    }}
-                                  >
-                                    <span>{purpose?.icon}</span>
-                                    <Typography>{purpose?.label}</Typography>
-                                  </Box>
-                                );
-                              }}
-                            >
-                              {visitPurposes.map((purpose) => (
-                                <MenuItem
-                                  key={purpose.value}
-                                  value={purpose.value}
-                                >
-                                  <Box
-                                    sx={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 1.5,
-                                    }}
-                                  >
-                                    <span style={{ fontSize: "1.2rem" }}>
-                                      {purpose.icon}
-                                    </span>
-                                    <Box>
-                                      <Typography variant="body2">
-                                        {purpose.label}
-                                      </Typography>
-                                      <Typography
-                                        variant="caption"
-                                        color="text.secondary"
-                                      >
-                                        {purpose.description}
-                                      </Typography>
-                                    </Box>
-                                  </Box>
-                                </MenuItem>
-                              ))}
-                            </StyledSelect>
-                            {touched.visitPurpose && errors.visitPurpose && (
-                              <FormHelperText error>
-                                {errors.visitPurpose}
-                              </FormHelperText>
-                            )}
-                          </FormControl>
-
-                          {/* Conditional Field: Date/Time for Tenant OR Vehicle Number for Security */}
-                          {isTenant ? (
-                            <DateTimePicker
-                              label="Visit Date & Time *"
-                              value={formData.visitDateTime}
-                              onChange={handleDateTimeChange}
-                              disabled={loading}
-                              minDateTime={new Date()}
-                              slotProps={{
-                                textField: {
-                                  fullWidth: true,
-                                  error:
-                                    touched.visitDateTime &&
-                                    !!errors.visitDateTime,
-                                  helperText:
-                                    touched.visitDateTime &&
-                                    errors.visitDateTime,
-                                  onBlur: () => handleBlur("visitDateTime"),
-                                  InputProps: {
-                                    startAdornment: (
-                                      <InputAdornment position="start">
-                                        <CalendarIcon
-                                          sx={{ color: "#6F0B14" }}
-                                        />
-                                      </InputAdornment>
-                                    ),
-                                  },
-                                  sx: {
-                                    "& .MuiOutlinedInput-root": {
-                                      borderRadius: "12px",
-                                      backgroundColor: "#fafafa",
-                                      transition: "all 0.2s ease",
-                                      "&:hover": {
-                                        backgroundColor: "#ffffff",
-                                        "& .MuiOutlinedInput-notchedOutline": {
-                                          borderColor: "#6F0B14",
-                                        },
-                                      },
-                                      "&.Mui-focused": {
-                                        backgroundColor: "#ffffff",
-                                        "& .MuiOutlinedInput-notchedOutline": {
-                                          borderColor: "#6F0B14",
-                                          borderWidth: "2px",
-                                        },
-                                      },
-                                    },
-                                  },
-                                },
-                              }}
-                            />
-                          ) : (
-                            <StyledTextField
-                              fullWidth
-                              label="Vehicle Number"
-                              name="vehicleNumber"
-                              value={formData.vehicleNumber}
-                              onChange={handleInputChange}
-                              onBlur={() => handleBlur("vehicleNumber")}
-                              error={
-                                touched.vehicleNumber && !!errors.vehicleNumber
-                              }
-                              helperText={
-                                touched.vehicleNumber && errors.vehicleNumber
-                              }
-                              disabled={loading}
-                              InputProps={{
-                                startAdornment: (
-                                  <InputAdornment position="start">
-                                    <DriveEtaIcon
-                                      sx={{ color: "#6F0B14", fontSize: 20 }}
-                                    />
-                                  </InputAdornment>
-                                ),
-                              }}
-                              placeholder="e.g., MH01AB1234"
-                            />
-                          )}
-                        </Stack>
-                      </DetailsPanel>
-                    </Grid>
-
-                    {/* RIGHT COLUMN - Upload Section */}
-                    {/* <Grid item xs={12} md={6}>
-                      <UploadPanel>
-                        <SectionTitle>
-                          <CloudUploadIcon />
-                          <Typography>Upload Files</Typography>
-                        </SectionTitle>
-
-                        
-                        {isSecurity ? (
-                          <>
-                            <Tabs
-                              value={uploadTab}
-                              onChange={(e, val) => setUploadTab(val)}
-                              sx={{
-                                borderBottom: 1,
-                                borderColor: "divider",
-                                "& .MuiTab-root.Mui-selected": {
-                                  color: "#6F0B14",
-                                },
-                                "& .MuiTabs-indicator": { bgcolor: "#6F0B14" },
-                              }}
-                            >
-                              <Tab
-                                icon={<CameraAltIcon />}
-                                label="Photo"
-                                iconPosition="start"
-                              />
-                              <Tab
-                                icon={<DescriptionIcon />}
-                                label="ID Proof"
-                                iconPosition="start"
-                              />
-                            </Tabs>
-
-                         
-                            <TabPanel value={uploadTab} index={0}>
-                              {photoPreview ? (
-                                <PreviewCard>
-                                  <Avatar
-                                    src={photoPreview}
-                                    variant="rounded"
-                                    sx={{
-                                      width: 80,
-                                      height: 80,
-                                      borderRadius: "10px",
-                                    }}
-                                  />
-                                  <Box sx={{ flex: 1 }}>
-                                    <Typography variant="subtitle2">
-                                      Visitor Photo
-                                    </Typography>
-                                    <Typography
-                                      variant="caption"
-                                      color="text.secondary"
-                                    >
-                                      Ready to upload
-                                    </Typography>
-                                  </Box>
-                                  <IconButton
-                                    onClick={removePhoto}
-                                    size="small"
-                                    sx={{ color: "#dc3545" }}
-                                  >
-                                    <DeleteIcon />
-                                  </IconButton>
-                                </PreviewCard>
-                              ) : (
-                                <UploadArea error={!!errors.photo}>
-                                  <input
-                                    accept="image/*"
-                                    id="photo-upload"
-                                    type="file"
-                                    onChange={handlePhotoUpload}
-                                    style={{ display: "none" }}
-                                    autoFocus={isSecurity}
-                                  />
-                                  <label
-                                    htmlFor="photo-upload"
-                                    style={{ cursor: "pointer", width: "100%" }}
-                                  >
-                                    <Box sx={{ textAlign: "center" }}>
-                                      <CameraAltIcon
-                                        sx={{
-                                          fontSize: 48,
-                                          color: "#6F0B14",
-                                          mb: 1,
-                                        }}
-                                      />
-                                      <Typography
-                                        variant="subtitle1"
-                                        sx={{
-                                          color: "#6F0B14",
-                                          fontWeight: 600,
-                                        }}
-                                      >
-                                        Click to upload photo
-                                      </Typography>
-                                      <Typography
-                                        variant="caption"
-                                        color="text.secondary"
-                                      >
-                                        JPG, PNG • Max 5MB
-                                      </Typography>
-                                      {isSecurity && (
-                                        <Typography
-                                          variant="caption"
-                                          display="block"
-                                          sx={{
-                                            mt: 1,
-                                            color: "#6F0B14",
-                                            fontStyle: "italic",
-                                          }}
-                                        >
-                                          Photo upload will auto-fill visitor
-                                          details
-                                        </Typography>
-                                      )}
-                                    </Box>
-                                  </label>
-                                </UploadArea>
-                              )}
-                            </TabPanel>
-
-                            
-                            <TabPanel value={uploadTab} index={1}>
-                              {idProofPreview ? (
-                                <PreviewCard>
-                                  {idProofPreview === "pdf" ? (
-                                    <DescriptionIcon
-                                      sx={{
-                                        fontSize: 50,
-                                        color: "#6F0B14",
-                                      }}
-                                    />
-                                  ) : (
-                                    <Avatar
-                                      src={idProofPreview}
-                                      variant="rounded"
-                                      sx={{
-                                        width: 80,
-                                        height: 80,
-                                        borderRadius: "10px",
-                                      }}
-                                    />
-                                  )}
-                                  <Box sx={{ flex: 1 }}>
-                                    <Typography variant="subtitle2">
-                                      ID Proof
-                                    </Typography>
-                                    <Typography
-                                      variant="caption"
-                                      color="text.secondary"
-                                    >
-                                      {formData.idProofImage?.name ||
-                                        "Ready to upload"}
-                                    </Typography>
-                                  </Box>
-                                  <IconButton
-                                    onClick={removeIdProof}
-                                    size="small"
-                                    sx={{ color: "#dc3545" }}
-                                  >
-                                    <DeleteIcon />
-                                  </IconButton>
-                                </PreviewCard>
-                              ) : (
-                                <UploadArea error={!!errors.idProof}>
-                                  <input
-                                    accept="image/*,application/pdf"
-                                    id="idproof-upload"
-                                    type="file"
-                                    onChange={handleIdProofUpload}
-                                    style={{ display: "none" }}
-                                  />
-                                  <label
-                                    htmlFor="idproof-upload"
-                                    style={{ cursor: "pointer", width: "100%" }}
-                                  >
-                                    <Box sx={{ textAlign: "center" }}>
-                                      <DescriptionIcon
-                                        sx={{
-                                          fontSize: 48,
-                                          color: "#6F0B14",
-                                          mb: 1,
-                                        }}
-                                      />
-                                      <Typography
-                                        variant="subtitle1"
-                                        sx={{
-                                          color: "#6F0B14",
-                                          fontWeight: 600,
-                                        }}
-                                      >
-                                        Upload ID Proof
-                                      </Typography>
-                                      <Typography
-                                        variant="caption"
-                                        color="text.secondary"
-                                      >
-                                        JPG, PNG, PDF • Max 10MB
-                                      </Typography>
-                                      <Typography
-                                        variant="caption"
-                                        display="block"
-                                        color="text.secondary"
-                                        sx={{ mt: 1 }}
-                                      >
-                                        Aadhar Card, Driving License, etc.
-                                      </Typography>
-                                    </Box>
-                                  </label>
-                                </UploadArea>
-                              )}
-                            </TabPanel>
-                          </>
-                        ) : (
-                          <>
-                            {photoPreview ? (
-                              <PreviewCard>
-                                <Avatar
-                                  src={photoPreview}
-                                  variant="rounded"
-                                  sx={{
-                                    width: 80,
-                                    height: 80,
-                                    borderRadius: "10px",
-                                  }}
-                                />
-                                <Box sx={{ flex: 1 }}>
-                                  <Typography variant="subtitle2">
-                                    Visitor Photo
-                                  </Typography>
-                                  <Typography
-                                    variant="caption"
-                                    color="text.secondary"
-                                  >
-                                    Ready to upload
-                                  </Typography>
-                                </Box>
-                                <IconButton
-                                  onClick={removePhoto}
-                                  size="small"
-                                  sx={{ color: "#dc3545" }}
-                                >
-                                  <DeleteIcon />
-                                </IconButton>
-                              </PreviewCard>
-                            ) : (
-                              <UploadArea error={!!errors.photo}>
-                                <input
-                                  accept="image/*"
-                                  id="photo-upload"
-                                  type="file"
-                                  onChange={handlePhotoUpload}
-                                  style={{ display: "none" }}
-                                />
-                                <label
-                                  htmlFor="photo-upload"
-                                  style={{ cursor: "pointer", width: "100%" }}
-                                >
-                                  <Box sx={{ textAlign: "center" }}>
-                                    <CloudUploadIcon
-                                      sx={{
-                                        fontSize: 48,
-                                        color: "#6F0B14",
-                                        mb: 1,
-                                      }}
-                                    />
-                                    <Typography
-                                      variant="subtitle1"
-                                      sx={{ color: "#6F0B14", fontWeight: 600 }}
-                                    >
-                                      Upload Visitor Photo
-                                    </Typography>
-                                    <Typography
-                                      variant="caption"
-                                      color="text.secondary"
-                                    >
-                                      JPG, PNG • Max 5MB (Optional)
-                                    </Typography>
-                                  </Box>
-                                </label>
-                              </UploadArea>
-                            )}
-                          </>
-                        )}
-
-                       
-                        {errors.photo && uploadTab === 0 && (
-                          <Alert
-                            severity="error"
-                            sx={{ mt: 2, borderRadius: "8px" }}
-                          >
-                            {errors.photo}
-                          </Alert>
-                        )}
-
-                        
-                        {errors.idProof && uploadTab === 1 && (
-                          <Alert
-                            severity="error"
-                            sx={{ mt: 2, borderRadius: "8px" }}
-                          >
-                            {errors.idProof}
-                          </Alert>
-                        )}
-                      </UploadPanel>
-                    </Grid> */}
                     <Grid item xs={12} md={6}>
                       <UploadPanel>
                         <SectionTitle>
@@ -2131,6 +1674,345 @@ export default function AddVisitorPage() {
                         )}
                       </UploadPanel>
                     </Grid>
+
+                    {/* RIGHT COLUMN - Upload Section */}
+                    <Grid item xs={12} md={6}>
+                      <DetailsPanel>
+                        <SectionTitle>
+                          <PersonIcon />
+                          <Typography>Visitor Details</Typography>
+                        </SectionTitle>
+
+                        <Stack spacing={3}>
+                          {/* Full Name */}
+                          <StyledTextField
+                            fullWidth
+                            label="Full Name *"
+                            name="fullName"
+                            value={formData.fullName}
+                            onChange={handleInputChange}
+                            onBlur={() => handleBlur("fullName")}
+                            error={touched.fullName && !!errors.fullName}
+                            helperText={touched.fullName && errors.fullName}
+                            disabled={loading}
+                            InputProps={{
+                              startAdornment: (
+                                <InputAdornment position="start">
+                                  <PersonIcon
+                                    sx={{ color: "#6F0B14", fontSize: 20 }}
+                                  />
+                                </InputAdornment>
+                              ),
+                            }}
+                            placeholder="Enter visitor's full name"
+                          />
+
+                          {/* Phone & WhatsApp */}
+                          <Grid container spacing={2}>
+                            <Grid item xs={12} sm={6}>
+                              <StyledTextField
+                                fullWidth
+                                label="Phone Number *"
+                                name="phoneNumber"
+                                value={formData.phoneNumber}
+                                onChange={handleInputChange}
+                                onBlur={() => handleBlur("phoneNumber")}
+                                error={
+                                  touched.phoneNumber && !!errors.phoneNumber
+                                }
+                                helperText={
+                                  touched.phoneNumber && errors.phoneNumber
+                                }
+                                disabled={loading}
+                                inputProps={{ maxLength: 10 }}
+                                InputProps={{
+                                  startAdornment: (
+                                    <InputAdornment position="start">
+                                      <PhoneIcon
+                                        sx={{ color: "#6F0B14", fontSize: 20 }}
+                                      />
+                                    </InputAdornment>
+                                  ),
+                                }}
+                                placeholder="10-digit mobile"
+                              />
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                              <StyledTextField
+                                fullWidth
+                                label="WhatsApp Number"
+                                name="whatsappNumber"
+                                value={formData.whatsappNumber}
+                                onChange={handleInputChange}
+                                disabled={loading}
+                                inputProps={{ maxLength: 10 }}
+                                InputProps={{
+                                  startAdornment: (
+                                    <InputAdornment position="start">
+                                      <WhatsAppIcon
+                                        sx={{ color: "#25D366", fontSize: 20 }}
+                                      />
+                                    </InputAdornment>
+                                  ),
+                                }}
+                                placeholder="Optional"
+                              />
+                            </Grid>
+                          </Grid>
+
+                          {/* Flat Selection - Different for Tenant vs Security */}
+                          {isTenant ? (
+                            <StyledTextField
+                              fullWidth
+                              label="Flat Number"
+                              name="flatNumber"
+                              value={formData.flatNumber}
+                              disabled
+                              InputProps={{
+                                startAdornment: (
+                                  <InputAdornment position="start">
+                                    <HomeIcon
+                                      sx={{ color: "#6F0B14", fontSize: 20 }}
+                                    />
+                                  </InputAdornment>
+                                ),
+                              }}
+                              sx={{
+                                "& .MuiOutlinedInput-root": {
+                                  bgcolor: "#f5f5f5",
+                                },
+                              }}
+                            />
+                          ) : (
+                            <FormControl
+                              fullWidth
+                              error={touched.flatId && !!errors.flatId}
+                            >
+                              <InputLabel>Select Flat *</InputLabel>
+                              <StyledSelect
+                                name="flatId"
+                                value={formData.flatId || ""}
+                                onChange={handleFlatChange}
+                                onBlur={() => handleBlur("flatId")}
+                                label="Select Flat *"
+                                disabled={loading || loadingFlats}
+                                startAdornment={
+                                  <InputAdornment position="start">
+                                    <HomeIcon
+                                      sx={{
+                                        color: "#6F0B14",
+                                        fontSize: 20,
+                                        ml: 1,
+                                      }}
+                                    />
+                                  </InputAdornment>
+                                }
+                              >
+                                {loadingFlats ? (
+                                  <MenuItem disabled>
+                                    <CircularProgress
+                                      size={20}
+                                      sx={{ mr: 1 }}
+                                    />
+                                    Loading flats...
+                                  </MenuItem>
+                                ) : flatsList.length > 0 ? (
+                                  flatsList.map((flat) => (
+                                    <MenuItem key={flat.id} value={flat.id}>
+                                      <Box
+                                        sx={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: 1,
+                                        }}
+                                      >
+                                        <HomeIcon
+                                          sx={{
+                                            color: "#6F0B14",
+                                            fontSize: 18,
+                                          }}
+                                        />
+                                        <Box>
+                                          <Typography variant="body2">
+                                            Flat {flat.flat_number}
+                                          </Typography>
+                                          <Typography
+                                            variant="caption"
+                                            color="text.secondary"
+                                          >
+                                            {flat.building_name}
+                                          </Typography>
+                                        </Box>
+                                      </Box>
+                                    </MenuItem>
+                                  ))
+                                ) : (
+                                  <MenuItem disabled>
+                                    <Typography color="text.secondary">
+                                      No flats available
+                                    </Typography>
+                                  </MenuItem>
+                                )}
+                              </StyledSelect>
+                              {touched.flatId && errors.flatId && (
+                                <FormHelperText error>
+                                  {errors.flatId}
+                                </FormHelperText>
+                              )}
+                            </FormControl>
+                          )}
+
+                          {/* Visit Purpose */}
+                          <FormControl
+                            fullWidth
+                            error={
+                              touched.visitPurpose && !!errors.visitPurpose
+                            }
+                          >
+                            <InputLabel>Visit Purpose *</InputLabel>
+                            <StyledSelect
+                              name="visitPurpose"
+                              value={formData.visitPurpose || ""}
+                              onChange={handleInputChange}
+                              onBlur={() => handleBlur("visitPurpose")}
+                              label="Visit Purpose *"
+                              disabled={loading}
+                              renderValue={(selected) => {
+                                const purpose = visitPurposes.find(
+                                  (p) => p.value === selected,
+                                );
+                                return (
+                                  <Box
+                                    sx={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 1,
+                                    }}
+                                  >
+                                    <span>{purpose?.icon}</span>
+                                    <Typography>{purpose?.label}</Typography>
+                                  </Box>
+                                );
+                              }}
+                            >
+                              {visitPurposes.map((purpose) => (
+                                <MenuItem
+                                  key={purpose.value}
+                                  value={purpose.value}
+                                >
+                                  <Box
+                                    sx={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 1.5,
+                                    }}
+                                  >
+                                    <span style={{ fontSize: "1.2rem" }}>
+                                      {purpose.icon}
+                                    </span>
+                                    <Box>
+                                      <Typography variant="body2">
+                                        {purpose.label}
+                                      </Typography>
+                                      <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                      >
+                                        {purpose.description}
+                                      </Typography>
+                                    </Box>
+                                  </Box>
+                                </MenuItem>
+                              ))}
+                            </StyledSelect>
+                            {touched.visitPurpose && errors.visitPurpose && (
+                              <FormHelperText error>
+                                {errors.visitPurpose}
+                              </FormHelperText>
+                            )}
+                          </FormControl>
+
+                          {/* Conditional Field: Date/Time for Tenant OR Vehicle Number for Security */}
+                          {isTenant ? (
+                            <DateTimePicker
+                              label="Visit Date & Time *"
+                              value={formData.visitDateTime}
+                              onChange={handleDateTimeChange}
+                              disabled={loading}
+                              minDateTime={new Date()}
+                              slotProps={{
+                                textField: {
+                                  fullWidth: true,
+                                  error:
+                                    touched.visitDateTime &&
+                                    !!errors.visitDateTime,
+                                  helperText:
+                                    touched.visitDateTime &&
+                                    errors.visitDateTime,
+                                  onBlur: () => handleBlur("visitDateTime"),
+                                  InputProps: {
+                                    startAdornment: (
+                                      <InputAdornment position="start">
+                                        <CalendarIcon
+                                          sx={{ color: "#6F0B14" }}
+                                        />
+                                      </InputAdornment>
+                                    ),
+                                  },
+                                  sx: {
+                                    "& .MuiOutlinedInput-root": {
+                                      borderRadius: "12px",
+                                      backgroundColor: "#fafafa",
+                                      transition: "all 0.2s ease",
+                                      "&:hover": {
+                                        backgroundColor: "#ffffff",
+                                        "& .MuiOutlinedInput-notchedOutline": {
+                                          borderColor: "#6F0B14",
+                                        },
+                                      },
+                                      "&.Mui-focused": {
+                                        backgroundColor: "#ffffff",
+                                        "& .MuiOutlinedInput-notchedOutline": {
+                                          borderColor: "#6F0B14",
+                                          borderWidth: "2px",
+                                        },
+                                      },
+                                    },
+                                  },
+                                },
+                              }}
+                            />
+                          ) : (
+                            <StyledTextField
+                              fullWidth
+                              label="Vehicle Number"
+                              name="vehicleNumber"
+                              value={formData.vehicleNumber}
+                              onChange={handleInputChange}
+                              onBlur={() => handleBlur("vehicleNumber")}
+                              error={
+                                touched.vehicleNumber && !!errors.vehicleNumber
+                              }
+                              helperText={
+                                touched.vehicleNumber && errors.vehicleNumber
+                              }
+                              disabled={loading}
+                              InputProps={{
+                                startAdornment: (
+                                  <InputAdornment position="start">
+                                    <DriveEtaIcon
+                                      sx={{ color: "#6F0B14", fontSize: 20 }}
+                                    />
+                                  </InputAdornment>
+                                ),
+                              }}
+                              placeholder="e.g., MH01AB1234"
+                            />
+                          )}
+                        </Stack>
+                      </DetailsPanel>
+                    </Grid>
+
                     {/* Submit Error */}
                     {errors.submit && (
                       <Grid item xs={12}>
