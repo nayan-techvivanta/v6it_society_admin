@@ -48,15 +48,16 @@ import {
   DriveEta as DriveEtaIcon,
   Security as SecurityIcon,
 } from "@mui/icons-material";
+
 import { styled } from "@mui/material/styles";
 import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../../api/supabaseClient";
+import { getFaceEmbedding } from "../../../Hooks/faceRecognition";
 import { uploadImage } from "../../../api/uploadImage";
 
-// Main container
 const PageContainer = styled(Box)(({ theme }) => ({
   minHeight: "80vh",
   [theme.breakpoints.down("sm")]: {
@@ -64,13 +65,11 @@ const PageContainer = styled(Box)(({ theme }) => ({
   },
 }));
 
-// Main card
 const MainCard = styled(Card)(({ theme }) => ({
   borderRadius: "28px",
   overflow: "hidden",
 }));
 
-// Header section
 const HeaderSection = styled(Box)(({ theme }) => ({
   background: "linear-gradient(120deg, #6F0B14 0%, #a82834 50%, #6F0B14 100%)",
   color: "#FFFFFF",
@@ -103,7 +102,6 @@ const DetailsPanel = styled(Paper)(({ theme }) => ({
   boxShadow: "0 4px 20px rgba(0,0,0,0.02)",
 }));
 
-// Right panel - Upload Section
 const UploadPanel = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(3),
   height: "100%",
@@ -140,7 +138,6 @@ const StyledSelect = styled(Select)({
   },
 });
 
-// Section title
 const SectionTitle = styled(Box)(({ theme }) => ({
   display: "flex",
   alignItems: "center",
@@ -162,7 +159,6 @@ const SectionTitle = styled(Box)(({ theme }) => ({
   },
 }));
 
-// Styled text field
 const StyledTextField = styled(TextField)({
   "& .MuiOutlinedInput-root": {
     borderRadius: "12px",
@@ -190,7 +186,6 @@ const StyledTextField = styled(TextField)({
   },
 });
 
-// Upload area
 const UploadArea = styled(Paper)(({ theme, error }) => ({
   border: `2px dashed ${error ? "#dc3545" : "#6F0B14"}`,
   borderRadius: "16px",
@@ -212,7 +207,6 @@ const UploadArea = styled(Paper)(({ theme, error }) => ({
   },
 }));
 
-// Preview card
 const PreviewCard = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(2),
   borderRadius: "16px",
@@ -224,7 +218,6 @@ const PreviewCard = styled(Paper)(({ theme }) => ({
   position: "relative",
 }));
 
-// Tab panel for document types (Security only)
 function TabPanel(props) {
   const { children, value, index, ...other } = props;
   return (
@@ -283,7 +276,9 @@ export default function AddVisitorPage() {
     flatId: null,
     flatNumber: "",
   });
-
+  const [faceEmbedding, setFaceEmbedding] = useState(null);
+  const [faceMatchResult, setFaceMatchResult] = useState(null);
+  const [faceLoading, setFaceLoading] = useState(false);
   const [locationInfo, setLocationInfo] = useState({
     societyName: "",
     buildingName: "",
@@ -398,14 +393,12 @@ export default function AddVisitorPage() {
     fetchTenantLocation();
   }, [userId, isTenant]);
 
-  // Auto-focus on photo upload for security when page loads
   useEffect(() => {
     if (isSecurity) {
-      // You can trigger any initialization here
       console.log("Security user - ready for photo upload");
     }
   }, [isSecurity]);
-  // Add this function before your handleSubmit
+
   const generateVisitorOtp = () =>
     Math.floor(1000 + Math.random() * 9000).toString();
   const visitPurposes = [
@@ -539,44 +532,6 @@ export default function AddVisitorPage() {
     }
   };
 
-  // const handlePhotoUpload = (e) => {
-  //   const file = e.target.files[0];
-  //   if (file) {
-  //     if (file.size > 5 * 1024 * 1024) {
-  //       setErrors((prev) => ({
-  //         ...prev,
-  //         photo: "File size should be less than 5MB",
-  //       }));
-  //       return;
-  //     }
-  //     if (!file.type.startsWith("image/")) {
-  //       setErrors((prev) => ({
-  //         ...prev,
-  //         photo: "Please upload an image file",
-  //       }));
-  //       return;
-  //     }
-
-  //     setFormData((prev) => ({ ...prev, visitorPhoto: file }));
-  //     setErrors((prev) => ({ ...prev, photo: null }));
-
-  //     const reader = new FileReader();
-  //     reader.onloadend = () => setPhotoPreview(reader.result);
-  //     reader.readAsDataURL(file);
-
-  //     // TODO: After photo upload, you can call an OCR service or API
-  //     // to extract data and auto-fill the form
-  //     // Example:
-  //     // extractDataFromImage(file).then(extractedData => {
-  //     //   setFormData(prev => ({
-  //     //     ...prev,
-  //     //     fullName: extractedData.name || prev.fullName,
-  //     //     phoneNumber: extractedData.phone || prev.phoneNumber,
-  //     //     // ... other fields
-  //     //   }));
-  //     // });
-  //   }
-  // };
   const handlePhotoUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -588,57 +543,78 @@ export default function AddVisitorPage() {
       }));
       return;
     }
+    if (!file.type.startsWith("image/")) {
+      setErrors((prev) => ({ ...prev, photo: "Please upload an image file" }));
+      return;
+    }
 
+    // Show preview immediately
     setFormData((prev) => ({ ...prev, visitorPhoto: file }));
-
+    setErrors((prev) => ({ ...prev, photo: null }));
     const reader = new FileReader();
     reader.onloadend = () => setPhotoPreview(reader.result);
     reader.readAsDataURL(file);
 
-    if (isSecurity) {
-      try {
-        setLoading(true);
+    // Run face recognition for both security and tenant
+    setFaceLoading(true);
+    setFaceMatchResult(null);
+    setFaceEmbedding(null);
 
+    try {
+      const embedding = await getFaceEmbedding(file);
+
+      if (!embedding) {
+        setErrors((prev) => ({
+          ...prev,
+          photo: "Could not detect a face. Please upload a clear photo.",
+        }));
+        setFaceLoading(false);
+        return;
+      }
+
+      setFaceEmbedding(embedding);
+
+      // Check if visitor already exists using the embedding
+      if (isSecurity) {
         const session = await supabase.auth.getSession();
         const token = session.data.session?.access_token;
 
-        const formDataToSend = new FormData();
-        formDataToSend.append("file", file);
-
         const response = await fetch(
-          `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/match-visitor-face`,
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/visitor_logs`,
           {
             method: "POST",
             headers: {
+              "Content-Type": "application/json",
               Authorization: `Bearer ${token}`,
             },
-            body: formDataToSend,
+            body: JSON.stringify({
+              society_id: Number(societyId),
+              face_embedding: JSON.stringify(embedding),
+            }),
           },
         );
 
         const result = await response.json();
 
-        console.log("Face match result:", result);
+        if (result.success && result.total_entries > 0) {
+          const lastVisit = result.visitors[0];
+          setFaceMatchResult({ found: true, visitor: lastVisit });
 
-        if (result.found) {
           setFormData((prev) => ({
             ...prev,
-            fullName: result.visitor.visitor_name || "",
-            phoneNumber: result.visitor.phone_number || "",
-            visitPurpose: result.visitor.purpose || "",
+            fullName: lastVisit.visitor_name || prev.fullName,
+            phoneNumber: lastVisit.phone_number || prev.phoneNumber,
+            visitPurpose: lastVisit.purpose || prev.visitPurpose,
+            vehicleNumber: lastVisit.vehicle_number || prev.vehicleNumber,
           }));
-
-          alert(
-            `Visitor already exists! Confidence: ${(result.confidence * 100).toFixed(2)}%`,
-          );
         } else {
-          console.log("New visitor detected.");
+          setFaceMatchResult({ found: false });
         }
-      } catch (err) {
-        console.error("Face match error:", err.message);
-      } finally {
-        setLoading(false);
       }
+    } catch (err) {
+      console.error("Face recognition error:", err.message);
+    } finally {
+      setFaceLoading(false);
     }
   };
 
@@ -697,115 +673,6 @@ export default function AddVisitorPage() {
     return fieldsToValidate.every((field) => !errors[field]);
   };
 
-  // const handleSubmit = async (e) => {
-  //   e.preventDefault();
-
-  //   if (!validateForm()) {
-  //     setTouched({
-  //       fullName: true,
-  //       phoneNumber: true,
-  //       visitPurpose: true,
-  //       ...(isTenant && { visitDateTime: true }),
-  //       ...(isSecurity && { flatId: true }),
-  //     });
-  //     return;
-  //   }
-
-  //   setLoading(true);
-  //   setSuccess(false);
-
-  //   try {
-  //     let imageUrl = null;
-  //     let idProofUrl = null;
-
-  //     // Upload visitor photo if exists
-  //     if (formData.visitorPhoto) {
-  //       try {
-  //         const uploadResult = await uploadImage(formData.visitorPhoto);
-  //         imageUrl = uploadResult.url;
-  //       } catch (uploadError) {
-  //         throw new Error(`Image upload failed: ${uploadError.message}`);
-  //       }
-  //     }
-
-  //     // Upload ID proof image if exists (for security)
-  //     if (formData.idProofImage) {
-  //       try {
-  //         const uploadResult = await uploadImage(formData.idProofImage);
-  //         idProofUrl = uploadResult.url;
-  //       } catch (uploadError) {
-  //         throw new Error(`ID proof upload failed: ${uploadError.message}`);
-  //       }
-  //     }
-
-  //     const societyId = isTenant
-  //       ? tenantLocation?.societyId
-  //       : localStorage.getItem("societyId");
-
-  //     const buildingId = isTenant ? tenantLocation?.buildingId : null;
-
-  //     const flatId = isTenant
-  //       ? tenantLocation?.flatId
-  //       : formData.flatId || null;
-
-  //     const flatNumber = isTenant
-  //       ? tenantLocation?.flatNumber
-  //       : formData.flatNumber || null;
-
-  //     const visitType = isTenant ? "PreVisitor" : "Normal";
-  //     const approvedStatus = isTenant ? "Pending" : "Approved";
-
-  //     const inTime = isTenant
-  //       ? formData.visitDateTime.toISOString()
-  //       : new Date().toISOString();
-
-  //     // Base visitor data
-  //     const visitorData = {
-  //       society_id: Number(societyId),
-  //       building_id: buildingId ? Number(buildingId) : null,
-  //       flat_id: flatId ? Number(flatId) : null,
-  //       flat_number: flatNumber,
-  //       visitor_name: formData.fullName,
-  //       phone_number: formData.phoneNumber,
-  //       // whatsapp_number: formData.whatsappNumber || null,
-  //       purpose: formData.visitPurpose,
-  //       visitor_type: formData.visitPurpose,
-  //       visit_type: visitType,
-  //       image_url: imageUrl,
-  //       approved_status: approvedStatus,
-  //       in_time: inTime,
-  //     };
-
-  //     if (isTenant) {
-  //       visitorData.approved_by = Number(userId);
-  //     }
-
-  //     // Add security-specific fields
-  //     if (isSecurity) {
-  //       visitorData.verified_by_guard = Number(userId);
-  //       visitorData.id_proof_image = idProofUrl;
-  //       if (formData.vehicleNumber) {
-  //         visitorData.vehicle_number = formData.vehicleNumber;
-  //       }
-  //     }
-
-  //     console.log("Submitting visitor data:", visitorData);
-
-  //     const { error } = await supabase.from("visitors").insert([visitorData]);
-
-  //     if (error) throw error;
-
-  //     setSuccess(true);
-  //     setTimeout(() => {
-  //       navigate("/user/dashboard");
-  //     }, 2000);
-  //   } catch (err) {
-  //     console.error("Error:", err.message);
-  //     setErrors((prev) => ({ ...prev, submit: err.message }));
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -918,6 +785,7 @@ export default function AddVisitorPage() {
         approved_status: "Pending",
         in_time: inTime,
         visitor_otp: otp,
+        face_embedding: faceEmbedding ? JSON.stringify(faceEmbedding) : null,
       };
 
       if (isTenant) {
@@ -1460,14 +1328,14 @@ export default function AddVisitorPage() {
                     </Grid>
 
                     {/* RIGHT COLUMN - Upload Section */}
-                    <Grid item xs={12} md={6}>
+                    {/* <Grid item xs={12} md={6}>
                       <UploadPanel>
                         <SectionTitle>
                           <CloudUploadIcon />
                           <Typography>Upload Files</Typography>
                         </SectionTitle>
 
-                        {/* Tabs for Security (Photo + ID Proof) */}
+                        
                         {isSecurity ? (
                           <>
                             <Tabs
@@ -1494,7 +1362,7 @@ export default function AddVisitorPage() {
                               />
                             </Tabs>
 
-                            {/* Photo Tab */}
+                         
                             <TabPanel value={uploadTab} index={0}>
                               {photoPreview ? (
                                 <PreviewCard>
@@ -1583,7 +1451,7 @@ export default function AddVisitorPage() {
                               )}
                             </TabPanel>
 
-                            {/* ID Proof Tab */}
+                            
                             <TabPanel value={uploadTab} index={1}>
                               {idProofPreview ? (
                                 <PreviewCard>
@@ -1747,7 +1615,7 @@ export default function AddVisitorPage() {
                           </>
                         )}
 
-                        {/* Photo Error */}
+                       
                         {errors.photo && uploadTab === 0 && (
                           <Alert
                             severity="error"
@@ -1757,7 +1625,7 @@ export default function AddVisitorPage() {
                           </Alert>
                         )}
 
-                        {/* ID Proof Error */}
+                        
                         {errors.idProof && uploadTab === 1 && (
                           <Alert
                             severity="error"
@@ -1767,8 +1635,502 @@ export default function AddVisitorPage() {
                           </Alert>
                         )}
                       </UploadPanel>
-                    </Grid>
+                    </Grid> */}
+                    <Grid item xs={12} md={6}>
+                      <UploadPanel>
+                        <SectionTitle>
+                          <CloudUploadIcon />
+                          <Typography>Upload Files</Typography>
+                        </SectionTitle>
 
+                        {/* ── SECURITY: Tabs (Photo + ID Proof) ── */}
+                        {isSecurity ? (
+                          <>
+                            <Tabs
+                              value={uploadTab}
+                              onChange={(e, val) => setUploadTab(val)}
+                              sx={{
+                                borderBottom: 1,
+                                borderColor: "divider",
+                                "& .MuiTab-root.Mui-selected": {
+                                  color: "#6F0B14",
+                                },
+                                "& .MuiTabs-indicator": { bgcolor: "#6F0B14" },
+                              }}
+                            >
+                              <Tab
+                                icon={<CameraAltIcon />}
+                                label="Photo"
+                                iconPosition="start"
+                              />
+                              <Tab
+                                icon={<DescriptionIcon />}
+                                label="ID Proof"
+                                iconPosition="start"
+                              />
+                            </Tabs>
+
+                            {/* ── Photo Tab ── */}
+                            <TabPanel value={uploadTab} index={0}>
+                              {photoPreview ? (
+                                <PreviewCard>
+                                  <Avatar
+                                    src={photoPreview}
+                                    variant="rounded"
+                                    sx={{
+                                      width: 80,
+                                      height: 80,
+                                      borderRadius: "10px",
+                                    }}
+                                  />
+                                  <Box sx={{ flex: 1 }}>
+                                    <Typography variant="subtitle2">
+                                      Visitor Photo
+                                    </Typography>
+                                    <Typography
+                                      variant="caption"
+                                      color="text.secondary"
+                                    >
+                                      Ready to upload
+                                    </Typography>
+                                  </Box>
+                                  <IconButton
+                                    onClick={removePhoto}
+                                    size="small"
+                                    sx={{ color: "#dc3545" }}
+                                  >
+                                    <DeleteIcon />
+                                  </IconButton>
+                                </PreviewCard>
+                              ) : (
+                                <UploadArea error={!!errors.photo}>
+                                  <input
+                                    accept="image/*"
+                                    id="photo-upload"
+                                    type="file"
+                                    onChange={handlePhotoUpload}
+                                    style={{ display: "none" }}
+                                    autoFocus={isSecurity}
+                                  />
+                                  <label
+                                    htmlFor="photo-upload"
+                                    style={{ cursor: "pointer", width: "100%" }}
+                                  >
+                                    <Box sx={{ textAlign: "center" }}>
+                                      <CameraAltIcon
+                                        sx={{
+                                          fontSize: 48,
+                                          color: "#6F0B14",
+                                          mb: 1,
+                                        }}
+                                      />
+                                      <Typography
+                                        variant="subtitle1"
+                                        sx={{
+                                          color: "#6F0B14",
+                                          fontWeight: 600,
+                                        }}
+                                      >
+                                        Click to upload photo
+                                      </Typography>
+                                      <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                      >
+                                        JPG, PNG • Max 5MB
+                                      </Typography>
+                                      <Typography
+                                        variant="caption"
+                                        display="block"
+                                        sx={{
+                                          mt: 1,
+                                          color: "#6F0B14",
+                                          fontStyle: "italic",
+                                        }}
+                                      >
+                                        Photo will auto-detect returning
+                                        visitors
+                                      </Typography>
+                                    </Box>
+                                  </label>
+                                </UploadArea>
+                              )}
+
+                              {/* Face Recognition Status */}
+                              {faceLoading && (
+                                <Box
+                                  sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 1.5,
+                                    mt: 2,
+                                    p: 2,
+                                    bgcolor: "#FFF8E1",
+                                    borderRadius: 2,
+                                    border: "1px solid #FFE082",
+                                  }}
+                                >
+                                  <CircularProgress
+                                    size={18}
+                                    sx={{ color: "#E86100" }}
+                                  />
+                                  <Box>
+                                    <Typography
+                                      variant="body2"
+                                      color="#E86100"
+                                      fontWeight={600}
+                                    >
+                                      Analyzing face...
+                                    </Typography>
+                                    <Typography
+                                      variant="caption"
+                                      color="text.secondary"
+                                    >
+                                      Checking visitor history in the system
+                                    </Typography>
+                                  </Box>
+                                </Box>
+                              )}
+
+                              {!faceLoading && faceMatchResult?.found && (
+                                <Alert
+                                  severity="warning"
+                                  sx={{ mt: 2, borderRadius: 2 }}
+                                  icon={
+                                    <PersonIcon sx={{ color: "#E86100" }} />
+                                  }
+                                >
+                                  <Typography variant="body2" fontWeight={700}>
+                                    Returning Visitor Detected!
+                                  </Typography>
+                                  <Typography
+                                    variant="caption"
+                                    display="block"
+                                    sx={{ mt: 0.5 }}
+                                  >
+                                    Last visit:{" "}
+                                    {faceMatchResult.visitor.in_time
+                                      ? new Date(
+                                          faceMatchResult.visitor.in_time,
+                                        ).toLocaleDateString("en-IN", {
+                                          day: "2-digit",
+                                          month: "short",
+                                          year: "numeric",
+                                        })
+                                      : "—"}{" "}
+                                    • Status:{" "}
+                                    <strong>
+                                      {faceMatchResult.visitor.approved_status}
+                                    </strong>
+                                  </Typography>
+                                  <Typography
+                                    variant="caption"
+                                    display="block"
+                                    sx={{ mt: 0.3 }}
+                                  >
+                                    Flat:{" "}
+                                    <strong>
+                                      {faceMatchResult.visitor.flat_number ||
+                                        "—"}
+                                    </strong>
+                                  </Typography>
+                                  <Typography
+                                    variant="caption"
+                                    color="text.secondary"
+                                    display="block"
+                                    sx={{ mt: 0.5 }}
+                                  >
+                                    Form auto-filled with last known details.
+                                    Please verify before submitting.
+                                  </Typography>
+                                </Alert>
+                              )}
+
+                              {!faceLoading &&
+                                faceMatchResult?.found === false && (
+                                  <Alert
+                                    severity="success"
+                                    sx={{ mt: 2, borderRadius: 2 }}
+                                  >
+                                    <Typography
+                                      variant="body2"
+                                      fontWeight={700}
+                                    >
+                                      New Visitor
+                                    </Typography>
+                                    <Typography variant="caption">
+                                      No previous visit records found. Please
+                                      fill in the details.
+                                    </Typography>
+                                  </Alert>
+                                )}
+
+                              {!faceLoading && faceEmbedding && (
+                                <Box
+                                  sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 0.5,
+                                    mt: 1.5,
+                                  }}
+                                >
+                                  <CheckCircleIcon
+                                    sx={{ fontSize: 16, color: "#008000" }}
+                                  />
+                                  <Typography
+                                    variant="caption"
+                                    color="#008000"
+                                    fontWeight={500}
+                                  >
+                                    Face captured & saved successfully
+                                  </Typography>
+                                </Box>
+                              )}
+
+                              {/* Photo error — only here, removed from outside */}
+                              {errors.photo && (
+                                <Alert
+                                  severity="error"
+                                  sx={{ mt: 2, borderRadius: 2 }}
+                                >
+                                  {errors.photo}
+                                </Alert>
+                              )}
+                            </TabPanel>
+
+                            {/* ── ID Proof Tab ── */}
+                            <TabPanel value={uploadTab} index={1}>
+                              {idProofPreview ? (
+                                <PreviewCard>
+                                  {idProofPreview === "pdf" ? (
+                                    <DescriptionIcon
+                                      sx={{ fontSize: 50, color: "#6F0B14" }}
+                                    />
+                                  ) : (
+                                    <Avatar
+                                      src={idProofPreview}
+                                      variant="rounded"
+                                      sx={{
+                                        width: 80,
+                                        height: 80,
+                                        borderRadius: "10px",
+                                      }}
+                                    />
+                                  )}
+                                  <Box sx={{ flex: 1 }}>
+                                    <Typography variant="subtitle2">
+                                      ID Proof
+                                    </Typography>
+                                    <Typography
+                                      variant="caption"
+                                      color="text.secondary"
+                                    >
+                                      {formData.idProofImage?.name ||
+                                        "Ready to upload"}
+                                    </Typography>
+                                  </Box>
+                                  <IconButton
+                                    onClick={removeIdProof}
+                                    size="small"
+                                    sx={{ color: "#dc3545" }}
+                                  >
+                                    <DeleteIcon />
+                                  </IconButton>
+                                </PreviewCard>
+                              ) : (
+                                <UploadArea error={!!errors.idProof}>
+                                  <input
+                                    accept="image/*,application/pdf"
+                                    id="idproof-upload"
+                                    type="file"
+                                    onChange={handleIdProofUpload}
+                                    style={{ display: "none" }}
+                                  />
+                                  <label
+                                    htmlFor="idproof-upload"
+                                    style={{ cursor: "pointer", width: "100%" }}
+                                  >
+                                    <Box sx={{ textAlign: "center" }}>
+                                      <DescriptionIcon
+                                        sx={{
+                                          fontSize: 48,
+                                          color: "#6F0B14",
+                                          mb: 1,
+                                        }}
+                                      />
+                                      <Typography
+                                        variant="subtitle1"
+                                        sx={{
+                                          color: "#6F0B14",
+                                          fontWeight: 600,
+                                        }}
+                                      >
+                                        Upload ID Proof
+                                      </Typography>
+                                      <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                      >
+                                        JPG, PNG, PDF • Max 10MB
+                                      </Typography>
+                                      <Typography
+                                        variant="caption"
+                                        display="block"
+                                        color="text.secondary"
+                                        sx={{ mt: 1 }}
+                                      >
+                                        Aadhar Card, Driving License, etc.
+                                      </Typography>
+                                    </Box>
+                                  </label>
+                                </UploadArea>
+                              )}
+
+                              {/* ID Proof error — only here, removed from outside */}
+                              {errors.idProof && (
+                                <Alert
+                                  severity="error"
+                                  sx={{ mt: 2, borderRadius: 2 }}
+                                >
+                                  {errors.idProof}
+                                </Alert>
+                              )}
+                            </TabPanel>
+                          </>
+                        ) : (
+                          /* ── TENANT: Single Photo Upload ── */
+                          <>
+                            {photoPreview ? (
+                              <PreviewCard>
+                                <Avatar
+                                  src={photoPreview}
+                                  variant="rounded"
+                                  sx={{
+                                    width: 80,
+                                    height: 80,
+                                    borderRadius: "10px",
+                                  }}
+                                />
+                                <Box sx={{ flex: 1 }}>
+                                  <Typography variant="subtitle2">
+                                    Visitor Photo
+                                  </Typography>
+                                  <Typography
+                                    variant="caption"
+                                    color="text.secondary"
+                                  >
+                                    Ready to upload
+                                  </Typography>
+                                </Box>
+                                <IconButton
+                                  onClick={removePhoto}
+                                  size="small"
+                                  sx={{ color: "#dc3545" }}
+                                >
+                                  <DeleteIcon />
+                                </IconButton>
+                              </PreviewCard>
+                            ) : (
+                              <UploadArea error={!!errors.photo}>
+                                <input
+                                  accept="image/*"
+                                  id="photo-upload"
+                                  type="file"
+                                  onChange={handlePhotoUpload}
+                                  style={{ display: "none" }}
+                                />
+                                <label
+                                  htmlFor="photo-upload"
+                                  style={{ cursor: "pointer", width: "100%" }}
+                                >
+                                  <Box sx={{ textAlign: "center" }}>
+                                    <CloudUploadIcon
+                                      sx={{
+                                        fontSize: 48,
+                                        color: "#6F0B14",
+                                        mb: 1,
+                                      }}
+                                    />
+                                    <Typography
+                                      variant="subtitle1"
+                                      sx={{ color: "#6F0B14", fontWeight: 600 }}
+                                    >
+                                      Upload Visitor Photo
+                                    </Typography>
+                                    <Typography
+                                      variant="caption"
+                                      color="text.secondary"
+                                    >
+                                      JPG, PNG • Max 5MB (Optional)
+                                    </Typography>
+                                  </Box>
+                                </label>
+                              </UploadArea>
+                            )}
+
+                            {/* Face Recognition Status (Tenant) */}
+                            {faceLoading && (
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 1.5,
+                                  mt: 2,
+                                  p: 2,
+                                  bgcolor: "#FFF8E1",
+                                  borderRadius: 2,
+                                  border: "1px solid #FFE082",
+                                }}
+                              >
+                                <CircularProgress
+                                  size={18}
+                                  sx={{ color: "#E86100" }}
+                                />
+                                <Typography
+                                  variant="body2"
+                                  color="#E86100"
+                                  fontWeight={500}
+                                >
+                                  Processing face data...
+                                </Typography>
+                              </Box>
+                            )}
+
+                            {!faceLoading && faceEmbedding && (
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 0.5,
+                                  mt: 1.5,
+                                }}
+                              >
+                                <CheckCircleIcon
+                                  sx={{ fontSize: 16, color: "#008000" }}
+                                />
+                                <Typography
+                                  variant="caption"
+                                  color="#008000"
+                                  fontWeight={500}
+                                >
+                                  Face captured successfully
+                                </Typography>
+                              </Box>
+                            )}
+
+                            {/* Photo error */}
+                            {errors.photo && (
+                              <Alert
+                                severity="error"
+                                sx={{ mt: 2, borderRadius: 2 }}
+                              >
+                                {errors.photo}
+                              </Alert>
+                            )}
+                          </>
+                        )}
+                      </UploadPanel>
+                    </Grid>
                     {/* Submit Error */}
                     {errors.submit && (
                       <Grid item xs={12}>

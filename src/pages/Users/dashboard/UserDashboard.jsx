@@ -67,6 +67,7 @@ import {
   NavigateNext,
   Visibility,
 } from "@mui/icons-material";
+import { History } from "@mui/icons-material";
 import { supabase } from "../../../api/supabaseClient";
 import { format, formatDistanceToNow } from "date-fns";
 
@@ -108,6 +109,7 @@ export default function UserDashboard() {
   });
 
   const [visitors, setVisitors] = useState([]);
+
   const [filteredVisitors, setFilteredVisitors] = useState([]);
 
   // Pagination states
@@ -148,6 +150,13 @@ export default function UserDashboard() {
     open: false,
     visitor: null,
     cardNumber: "",
+  });
+  const [visitorLogDialog, setVisitorLogDialog] = useState({
+    open: false,
+    visitor: null,
+    logs: [],
+    loading: false,
+    error: null,
   });
   const [stats, setStats] = useState({
     total: 0,
@@ -349,7 +358,49 @@ export default function UserDashboard() {
       showSnackbar("Error fetching visitors: " + err.message, "error");
     }
   };
+  const fetchVisitorLog = async (visitor) => {
+    setVisitorLogDialog({
+      open: true,
+      visitor,
+      logs: [],
+      loading: true,
+      error: null,
+    });
 
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/visitor_logs`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            society_id: userDetails.societyId,
+            face_embedding: visitor.face_embedding,
+          }),
+        },
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) throw new Error(result.error || "Failed to fetch logs");
+
+      setVisitorLogDialog((prev) => ({
+        ...prev,
+        logs: result.visitors || [],
+        loading: false,
+      }));
+    } catch (err) {
+      setVisitorLogDialog((prev) => ({
+        ...prev,
+        loading: false,
+        error: err.message,
+      }));
+    }
+  };
   const filterVisitors = () => {
     if (!visitors.length) {
       setFilteredVisitors([]);
@@ -1186,93 +1237,145 @@ export default function UserDashboard() {
                             justifyContent="center"
                           >
                             {/* Tenant Actions */}
+
                             {(role === "tenant_o" || role === "tenant_m") &&
                               visitor.approved_status === "Pending" && (
-                                <>
-                                  <Tooltip title="Approve">
-                                    <IconButton
-                                      size="small"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleVisitorAction(visitor, "approve");
-                                      }}
-                                      disabled={
-                                        actionLoading[`${visitor.id}-approve`]
-                                      }
-                                      sx={{
-                                        backgroundColor: "#00800020",
-                                        color: "#008000",
-                                        "&:hover": {
-                                          backgroundColor: "#008000",
-                                          color: "white",
-                                        },
-                                      }}
-                                    >
-                                      {actionLoading[
-                                        `${visitor.id}-approve`
-                                      ] ? (
-                                        <CircularProgress size={20} />
-                                      ) : (
-                                        <CheckCircle fontSize="small" />
-                                      )}
-                                    </IconButton>
+                                <Box
+                                  sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 1.2,
+                                  }}
+                                >
+                                  {/* Approve */}
+                                  <Tooltip title="Approve Visitor">
+                                    <span>
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleVisitorAction(
+                                            visitor,
+                                            "approve",
+                                          );
+                                        }}
+                                        disabled={
+                                          actionLoading[`${visitor.id}-approve`]
+                                        }
+                                        sx={{
+                                          width: 38,
+                                          height: 38,
+                                          borderRadius: "10px",
+                                          backgroundColor: "#E6F7EC",
+                                          color: "#1B8F3A",
+                                          transition: "all 0.2s ease",
+                                          boxShadow:
+                                            "0 2px 6px rgba(0,0,0,0.05)",
+                                          "&:hover": {
+                                            backgroundColor: "#1B8F3A",
+                                            color: "#fff",
+                                            transform: "translateY(-2px)",
+                                            boxShadow:
+                                              "0 4px 12px rgba(0,0,0,0.15)",
+                                          },
+                                        }}
+                                      >
+                                        {actionLoading[
+                                          `${visitor.id}-approve`
+                                        ] ? (
+                                          <CircularProgress size={18} />
+                                        ) : (
+                                          <CheckCircle fontSize="small" />
+                                        )}
+                                      </IconButton>
+                                    </span>
                                   </Tooltip>
-                                  <Tooltip title="Reject">
-                                    <IconButton
-                                      size="small"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setConfirmDialog({
-                                          open: true,
-                                          action: "reject",
-                                          visitor,
-                                          requiresReason: true,
-                                          reason: "",
-                                        });
-                                      }}
-                                      disabled={
-                                        actionLoading[`${visitor.id}-reject`]
-                                      }
-                                      sx={{
-                                        backgroundColor: "#B31B1B20",
-                                        color: "#B31B1B",
-                                        "&:hover": {
-                                          backgroundColor: "#B31B1B",
-                                          color: "white",
-                                        },
-                                      }}
-                                    >
-                                      {actionLoading[`${visitor.id}-reject`] ? (
-                                        <CircularProgress size={20} />
-                                      ) : (
-                                        <Cancel fontSize="small" />
-                                      )}
-                                    </IconButton>
+
+                                  {/* Reject */}
+                                  <Tooltip title="Reject Visitor">
+                                    <span>
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setConfirmDialog({
+                                            open: true,
+                                            action: "reject",
+                                            visitor,
+                                            requiresReason: true,
+                                            reason: "",
+                                          });
+                                        }}
+                                        disabled={
+                                          actionLoading[`${visitor.id}-reject`]
+                                        }
+                                        sx={{
+                                          width: 38,
+                                          height: 38,
+                                          borderRadius: "10px",
+                                          backgroundColor: "#FDECEC",
+                                          color: "#C62828",
+                                          transition: "all 0.2s ease",
+                                          boxShadow:
+                                            "0 2px 6px rgba(0,0,0,0.05)",
+                                          "&:hover": {
+                                            backgroundColor: "#C62828",
+                                            color: "#fff",
+                                            transform: "translateY(-2px)",
+                                            boxShadow:
+                                              "0 4px 12px rgba(0,0,0,0.15)",
+                                          },
+                                        }}
+                                      >
+                                        {actionLoading[
+                                          `${visitor.id}-reject`
+                                        ] ? (
+                                          <CircularProgress size={18} />
+                                        ) : (
+                                          <Cancel fontSize="small" />
+                                        )}
+                                      </IconButton>
+                                    </span>
                                   </Tooltip>
-                                  <Tooltip title="Reschedule">
-                                    <Button
-                                      size="small"
-                                      variant="contained"
-                                      sx={{
-                                        bgcolor: "#E86100",
-                                        "&:hover": { bgcolor: "#C65100" },
-                                      }}
-                                      startIcon={<Schedule />}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setRescheduleDialog({
-                                          open: true,
-                                          visitor,
-                                          date: "",
-                                          time: "",
-                                          reason: "",
-                                        });
-                                      }}
-                                    >
-                                      Reschedule
-                                    </Button>
+
+                                  {/* Reschedule */}
+                                  <Tooltip title="Reschedule Visit">
+                                    <span>
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setRescheduleDialog({
+                                            open: true,
+                                            visitor,
+                                            date: "",
+                                            time: "",
+                                            reason: "",
+                                          });
+                                        }}
+                                        sx={{
+                                          width: 38,
+                                          height: 38,
+                                          borderRadius: "10px",
+                                          backgroundColor: "#FFF4E8",
+                                          color: "#E86100",
+                                          transition: "all 0.2s ease",
+                                          boxShadow:
+                                            "0 2px 6px rgba(0,0,0,0.05)",
+                                          "&:hover": {
+                                            backgroundColor: "#E86100",
+                                            color: "#fff",
+                                            transform: "translateY(-2px)",
+                                            boxShadow:
+                                              "0 4px 12px rgba(0,0,0,0.15)",
+                                          },
+                                        }}
+                                      >
+                                        <Schedule fontSize="small" />
+                                      </IconButton>
+                                    </span>
                                   </Tooltip>
-                                </>
+                                </Box>
                               )}
 
                             {/* Security Actions */}
@@ -1351,6 +1454,26 @@ export default function UserDashboard() {
                                 </Tooltip>
                               </>
                             )}
+                            <Tooltip title="Visit History">
+                              <IconButton
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  fetchVisitorLog(visitor);
+                                }}
+                                disabled={!visitor.face_embedding}
+                                sx={{
+                                  backgroundColor: "#E8F0FE",
+                                  color: "#1A73E8",
+                                  "&:hover": {
+                                    backgroundColor: "#1A73E8",
+                                    color: "white",
+                                  },
+                                }}
+                              >
+                                <History fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
                           </Stack>
                         </TableCell>
                       )}
@@ -1601,6 +1724,18 @@ export default function UserDashboard() {
                                   View ID Proof
                                 </Button>
                               )}
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                startIcon={<History />}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  fetchVisitorLog(visitor);
+                                }}
+                                disabled={!visitor.face_embedding}
+                              >
+                                Visit History
+                              </Button>
                             </Grid>
 
                             {/* Additional Action Buttons inside expanded view for better UX */}
@@ -2154,6 +2289,246 @@ export default function UserDashboard() {
             }}
           >
             Submit
+          </Button>
+        </DialogActions>
+      </Dialog>
+      {/* Visitor Log Dialog */}
+
+      <Dialog
+        open={visitorLogDialog.open}
+        onClose={() =>
+          setVisitorLogDialog({
+            open: false,
+            visitor: null,
+            logs: [],
+            loading: false,
+            error: null,
+          })
+        }
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle
+          sx={{
+            bgcolor: "#6F0B14",
+            color: "white",
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, flex: 1 }}>
+            <History />
+            <Box>
+              <Typography variant="h6" fontWeight="bold">
+                Visit History
+              </Typography>
+              <Typography variant="caption" sx={{ opacity: 0.85 }}>
+                {visitorLogDialog.visitor?.visitor_name} •{" "}
+                {visitorLogDialog.visitor?.phone_number}
+              </Typography>
+            </Box>
+          </Box>
+          <IconButton
+            onClick={() =>
+              setVisitorLogDialog({
+                open: false,
+                visitor: null,
+                logs: [],
+                loading: false,
+                error: null,
+              })
+            }
+            sx={{ color: "white" }}
+          >
+            <Close />
+          </IconButton>
+        </DialogTitle>
+
+        <DialogContent sx={{ p: 0 }}>
+          {visitorLogDialog.loading ? (
+            <Box sx={{ p: 4, textAlign: "center" }}>
+              <CircularProgress sx={{ color: "#6F0B14" }} />
+              <Typography sx={{ mt: 2 }} color="text.secondary">
+                Loading visit history...
+              </Typography>
+            </Box>
+          ) : visitorLogDialog.error ? (
+            <Box sx={{ p: 3 }}>
+              <Alert severity="error">{visitorLogDialog.error}</Alert>
+            </Box>
+          ) : visitorLogDialog.logs.length === 0 ? (
+            <Box sx={{ p: 4, textAlign: "center" }}>
+              <History sx={{ fontSize: 48, color: "#A29EB6", mb: 1 }} />
+              <Typography color="text.secondary">
+                No visit history found
+              </Typography>
+            </Box>
+          ) : (
+            <TableContainer>
+              <Table size="small">
+                <TableHead>
+                  <TableRow sx={{ bgcolor: "#6F0B14" }}>
+                    <TableCell sx={{ fontWeight: "bold", color: "white" }}>
+                      #
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: "bold", color: "white" }}>
+                      Visitor
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: "bold", color: "white" }}>
+                      Date-Time
+                    </TableCell>
+
+                    <TableCell sx={{ fontWeight: "bold", color: "white" }}>
+                      Purpose
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: "bold", color: "white" }}>
+                      Type
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: "bold", color: "white" }}>
+                      Flat
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: "bold", color: "white" }}>
+                      Status
+                    </TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {visitorLogDialog.logs.map((log, index) => (
+                    <TableRow
+                      key={log.id}
+                      hover
+                      sx={{
+                        "&:hover": { backgroundColor: "rgba(111,11,20,0.04)" },
+                      }}
+                    >
+                      {/* # */}
+                      <TableCell>
+                        <Typography
+                          variant="body2"
+                          fontWeight="600"
+                          sx={{ color: "#6F0B14" }}
+                        >
+                          #{log.id}
+                        </Typography>
+                      </TableCell>
+
+                      {/* Visitor Info */}
+                      <TableCell>
+                        <Box
+                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                        >
+                          <Avatar
+                            src={log.image_url}
+                            alt={log.visitor_name}
+                            sx={{
+                              width: 32,
+                              height: 32,
+                              bgcolor: "#6F0B14",
+                              fontSize: 14,
+                            }}
+                          >
+                            {log.visitor_name?.charAt(0)?.toUpperCase()}
+                          </Avatar>
+                          <Box>
+                            <Typography variant="body2" fontWeight="600">
+                              {log.visitor_name}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              {log.phone_number}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </TableCell>
+
+                      {/* In Time */}
+                      <TableCell>
+                        <Typography variant="body2">
+                          {log.in_time
+                            ? format(new Date(log.in_time), "dd MMM yyyy")
+                            : "—"}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {log.in_time
+                            ? format(new Date(log.in_time), "hh:mm a")
+                            : ""}
+                        </Typography>
+                      </TableCell>
+
+                      {/* Checkout */}
+
+                      {/* Purpose */}
+                      <TableCell>
+                        <Typography variant="body2">
+                          {log.purpose || "—"}
+                        </Typography>
+                        {log.vehicle_number && (
+                          <Typography variant="caption" color="text.secondary">
+                            🚗 {log.vehicle_number}
+                          </Typography>
+                        )}
+                      </TableCell>
+
+                      {/* Visitor Type */}
+                      <TableCell>
+                        {getVisitorTypeChip(log.visitor_type)}
+                      </TableCell>
+
+                      {/* Flat */}
+                      <TableCell>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 0.5,
+                          }}
+                        >
+                          <Home sx={{ fontSize: 14, color: "#A29EB6" }} />
+                          <Typography variant="body2">
+                            {log.flat_number || "—"}
+                          </Typography>
+                        </Box>
+                        {log.card_number && (
+                          <Typography variant="caption" color="text.secondary">
+                            🪪 {log.card_number}
+                          </Typography>
+                        )}
+                      </TableCell>
+
+                      {/* Status */}
+                      <TableCell>
+                        {getStatusChip(log.approved_status)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, py: 2, borderTop: "1px solid #eee" }}>
+          <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
+            {visitorLogDialog.logs.length} visit(s) found for{" "}
+            <strong>{visitorLogDialog.visitor?.visitor_name}</strong>
+          </Typography>
+          <Button
+            onClick={() =>
+              setVisitorLogDialog({
+                open: false,
+                visitor: null,
+                logs: [],
+                loading: false,
+                error: null,
+              })
+            }
+            variant="contained"
+            sx={{ bgcolor: "#6F0B14", "&:hover": { bgcolor: "#5a0910" } }}
+          >
+            Close
           </Button>
         </DialogActions>
       </Dialog>
