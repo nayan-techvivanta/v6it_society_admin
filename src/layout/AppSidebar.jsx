@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { FaRegIdCard, FaUsers } from "react-icons/fa";
-import { BsThreeDots, BsBuildings } from "react-icons/bs";
+import { BsThreeDots, BsBuildings, BsCalendarDate } from "react-icons/bs";
 import { FiLogOut } from "react-icons/fi";
 import { IoTicketSharp } from "react-icons/io5";
 import { IoMdPerson } from "react-icons/io";
@@ -89,7 +89,6 @@ const AppSidebar = () => {
         "security",
       ],
     },
-    // ImUserPlus
     {
       icon: <PiBuildingApartment size={22} />,
       name: "Society",
@@ -101,6 +100,13 @@ const AppSidebar = () => {
       name: "Add Visitor",
       // path: `${basePath}/visitor`,
       path: userRole === "security" ? "/add-visitor" : `${basePath}/visitor`,
+      roles: ["tenantowner", "tenantmember", "security"],
+    },
+    {
+      icon: <BsCalendarDate size={20} />,
+      name: "Date wise Visitor",
+      path: `${basePath}/date-wise-visitor`,
+      // path: userRole === "security" ? "/add-visitor" : `${basePath}/visitor`,
       roles: ["tenantowner", "tenantmember", "security"],
     },
     {

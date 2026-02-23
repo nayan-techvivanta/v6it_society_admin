@@ -46,6 +46,7 @@ import AboutUs from "../pages/About";
 import UserDashboard from "../pages/Users/dashboard/UserDashboard";
 import VisitorsList from "../pages/Users/visitors/VisitorsList";
 import AddVisitorPage from "../pages/Users/visitors/AddVisitorPage";
+import DateWiseVisitors from "../pages/Users/visitors/DateWiseVisitors";
 // import AdminComplaints from "../pages/Admin/Complaints";
 
 export default function Router() {
@@ -166,6 +167,10 @@ export default function Router() {
           <Route path="/user/dashboard" element={<UserDashboard />} />
           <Route path="/user/visitor" element={<VisitorsList />} />
           <Route path="add-visitor" element={<AddVisitorPage />} />
+          <Route
+            path="/user/date-wise-visitor"
+            element={<DateWiseVisitors />}
+          />
         </Route>
 
         {/* Unauthorized */}
