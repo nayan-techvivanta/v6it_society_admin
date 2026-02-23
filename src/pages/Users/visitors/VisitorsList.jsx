@@ -1249,12 +1249,17 @@ export default function VisitorsList() {
                                   </Grid>
                                 )}
                                 {/* Rescheduled At - Only show for Reschedule status */}
+                                {/* Rescheduled At */}
                                 {visitor.approved_status === "Reschedule" &&
                                   visitor.rescheduled_at && (
-                                    <Grid item xs12 sm6 md4>
+                                    <Grid item xs={12} sm={6} md={4}>
                                       <Paper
                                         variant="outlined"
-                                        sx={{ p: 2, borderColor: "#6F0B1420" }}
+                                        sx={{
+                                          p: 2,
+                                          borderColor: "#E8610030",
+                                          backgroundColor: "#FFF4E815",
+                                        }}
                                       >
                                         <Typography
                                           variant="caption"
@@ -1269,24 +1274,35 @@ export default function VisitorsList() {
                                           <Schedule
                                             sx={{
                                               fontSize: 16,
-                                              color: "#6F0B14",
+                                              color: "#E86100",
                                             }}
                                           />
-                                          Rescheduled At
+                                          Rescheduled For
                                         </Typography>
                                         <Typography
                                           variant="body2"
-                                          fontWeight={500}
+                                          fontWeight={600}
+                                          sx={{ color: "#E86100" }}
                                         >
                                           {format(
                                             new Date(visitor.rescheduled_at),
-                                            "dd MMM, HH:mm",
+                                            "dd MMM yyyy",
                                           )}
                                         </Typography>
                                         <Typography
                                           variant="caption"
                                           color="text.secondary"
-                                          sx={{ mt: 0.5 }}
+                                          sx={{ display: "block", mt: 0.3 }}
+                                        >
+                                          {format(
+                                            new Date(visitor.rescheduled_at),
+                                            "hh:mm a",
+                                          )}
+                                        </Typography>
+                                        <Typography
+                                          variant="caption"
+                                          color="text.secondary"
+                                          sx={{ display: "block", mt: 0.3 }}
                                         >
                                           {getTimeAgo(visitor.rescheduled_at)}
                                         </Typography>
@@ -1294,6 +1310,82 @@ export default function VisitorsList() {
                                     </Grid>
                                   )}
 
+                                {/* Reschedule Reason */}
+                                {visitor.approved_status === "Reschedule" &&
+                                  visitor.rejected_reschedule_reason && (
+                                    <Grid item xs={12} sm={6} md={4}>
+                                      <Paper
+                                        variant="outlined"
+                                        sx={{
+                                          p: 2,
+                                          borderColor: "#E8610030",
+                                          backgroundColor: "#FFF4E815",
+                                        }}
+                                      >
+                                        <Typography
+                                          variant="caption"
+                                          sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 0.5,
+                                            mb: 1,
+                                            color: "#E86100",
+                                          }}
+                                        >
+                                          <Description
+                                            sx={{
+                                              fontSize: 16,
+                                              color: "#E86100",
+                                            }}
+                                          />
+                                          Reschedule Reason
+                                        </Typography>
+                                        <Typography
+                                          variant="body2"
+                                          fontWeight="500"
+                                          sx={{ color: "#E86100" }}
+                                        >
+                                          {visitor.rejected_reschedule_reason}
+                                        </Typography>
+                                      </Paper>
+                                    </Grid>
+                                  )}
+
+                                {/* Rejection Reason */}
+                                {visitor.approved_status === "Rejected" &&
+                                  visitor.rejected_reschedule_reason && (
+                                    <Grid item xs={12}>
+                                      <Paper
+                                        variant="outlined"
+                                        sx={{
+                                          p: 2,
+                                          backgroundColor: "#B31B1B10",
+                                          borderColor: "#B31B1B",
+                                        }}
+                                      >
+                                        <Typography
+                                          variant="caption"
+                                          sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 0.5,
+                                            mb: 1,
+                                            color: "#B31B1B",
+                                          }}
+                                        >
+                                          <Cancel sx={{ fontSize: 16 }} />
+                                          Rejection Reason
+                                        </Typography>
+                                        <Typography
+                                          variant="body2"
+                                          fontWeight="500"
+                                          sx={{ color: "#B31B1B" }}
+                                        >
+                                          {visitor.rejected_reschedule_reason}
+                                        </Typography>
+                                      </Paper>
+                                    </Grid>
+                                  )}
                                 {/* Vehicle Number */}
                                 {visitor.vehicle_number && (
                                   <Grid item xs={12} sm={6} md={4}>
@@ -1365,7 +1457,7 @@ export default function VisitorsList() {
                                 )}
 
                                 {/* OTP */}
-                                {visitor.visitor_otp && (
+                                {/* {visitor.visitor_otp && (
                                   <Grid item xs={12} sm={6} md={4}>
                                     <Paper
                                       variant="outlined"
@@ -1397,7 +1489,7 @@ export default function VisitorsList() {
                                       </Typography>
                                     </Paper>
                                   </Grid>
-                                )}
+                                )} */}
 
                                 {/* Card Status */}
                                 {visitor.card_status && (
@@ -1490,41 +1582,6 @@ export default function VisitorsList() {
                                           )
                                         }
                                       />
-                                    </Paper>
-                                  </Grid>
-                                )}
-
-                                {/* Rejection Reason */}
-                                {visitor.rejected_reschedule_reason && (
-                                  <Grid item xs={12}>
-                                    <Paper
-                                      variant="outlined"
-                                      sx={{
-                                        p: 2,
-                                        backgroundColor: "#B31B1B10",
-                                        borderColor: "#B31B1B",
-                                      }}
-                                    >
-                                      <Typography
-                                        variant="caption"
-                                        sx={{
-                                          display: "flex",
-                                          alignItems: "center",
-                                          gap: 0.5,
-                                          mb: 1,
-                                          color: "#B31B1B",
-                                        }}
-                                      >
-                                        <Cancel sx={{ fontSize: 16 }} />
-                                        Rejection Reason
-                                      </Typography>
-                                      <Typography
-                                        variant="body2"
-                                        fontWeight="500"
-                                        sx={{ color: "#B31B1B" }}
-                                      >
-                                        {visitor.rejected_reschedule_reason}
-                                      </Typography>
                                     </Paper>
                                   </Grid>
                                 )}

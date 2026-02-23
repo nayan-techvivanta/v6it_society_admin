@@ -181,8 +181,6 @@ export default function UserDashboard() {
     const start = page * rowsPerPage;
     const end = start + rowsPerPage;
     setPaginatedVisitors(filteredVisitors.slice(start, end));
-
-    // Close any expanded rows when page changes
     setExpandedRows({});
   }, [filteredVisitors, page, rowsPerPage]);
 
@@ -444,7 +442,6 @@ export default function UserDashboard() {
       return;
     }
 
-    // Combine date and time
     const scheduledDateTime = new Date(`${date}T${time}`).toISOString();
 
     await handleVisitorAction(visitor, "reschedule", {
@@ -455,6 +452,16 @@ export default function UserDashboard() {
     setRescheduleDialog({
       open: false,
       visitor: null,
+      date: "",
+      time: "",
+      reason: "",
+    });
+  };
+  const handleReschedule = (visitor) => {
+    if (role === "security") return;
+    setRescheduleDialog({
+      open: true,
+      visitor,
       date: "",
       time: "",
       reason: "",
@@ -491,8 +498,7 @@ export default function UserDashboard() {
         case "reschedule":
           updateData = {
             approved_status: "Reschedule",
-            rescheduled_at: now,
-            scheduled_time: data.scheduled_time,
+            rescheduled_at: data.scheduled_time,
             rejected_reschedule_reason: data.reason,
             updated_at: now,
           };
@@ -1236,8 +1242,7 @@ export default function UserDashboard() {
                             spacing={0.5}
                             justifyContent="center"
                           >
-                            {/* Tenant Actions */}
-
+                            {/* Tenant: Only Approve + Reject in main row */}
                             {(role === "tenant_o" || role === "tenant_m") &&
                               visitor.approved_status === "Pending" && (
                                 <Box
@@ -1247,7 +1252,6 @@ export default function UserDashboard() {
                                     gap: 1.2,
                                   }}
                                 >
-                                  {/* Approve */}
                                   <Tooltip title="Approve Visitor">
                                     <span>
                                       <IconButton
@@ -1268,15 +1272,9 @@ export default function UserDashboard() {
                                           borderRadius: "10px",
                                           backgroundColor: "#E6F7EC",
                                           color: "#1B8F3A",
-                                          transition: "all 0.2s ease",
-                                          boxShadow:
-                                            "0 2px 6px rgba(0,0,0,0.05)",
                                           "&:hover": {
                                             backgroundColor: "#1B8F3A",
                                             color: "#fff",
-                                            transform: "translateY(-2px)",
-                                            boxShadow:
-                                              "0 4px 12px rgba(0,0,0,0.15)",
                                           },
                                         }}
                                       >
@@ -1291,7 +1289,6 @@ export default function UserDashboard() {
                                     </span>
                                   </Tooltip>
 
-                                  {/* Reject */}
                                   <Tooltip title="Reject Visitor">
                                     <span>
                                       <IconButton
@@ -1315,15 +1312,9 @@ export default function UserDashboard() {
                                           borderRadius: "10px",
                                           backgroundColor: "#FDECEC",
                                           color: "#C62828",
-                                          transition: "all 0.2s ease",
-                                          boxShadow:
-                                            "0 2px 6px rgba(0,0,0,0.05)",
                                           "&:hover": {
                                             backgroundColor: "#C62828",
                                             color: "#fff",
-                                            transform: "translateY(-2px)",
-                                            boxShadow:
-                                              "0 4px 12px rgba(0,0,0,0.15)",
                                           },
                                         }}
                                       >
@@ -1337,81 +1328,12 @@ export default function UserDashboard() {
                                       </IconButton>
                                     </span>
                                   </Tooltip>
-
-                                  {/* Reschedule */}
-                                  <Tooltip title="Reschedule Visit">
-                                    <span>
-                                      <IconButton
-                                        size="small"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setRescheduleDialog({
-                                            open: true,
-                                            visitor,
-                                            date: "",
-                                            time: "",
-                                            reason: "",
-                                          });
-                                        }}
-                                        sx={{
-                                          width: 38,
-                                          height: 38,
-                                          borderRadius: "10px",
-                                          backgroundColor: "#FFF4E8",
-                                          color: "#E86100",
-                                          transition: "all 0.2s ease",
-                                          boxShadow:
-                                            "0 2px 6px rgba(0,0,0,0.05)",
-                                          "&:hover": {
-                                            backgroundColor: "#E86100",
-                                            color: "#fff",
-                                            transform: "translateY(-2px)",
-                                            boxShadow:
-                                              "0 4px 12px rgba(0,0,0,0.15)",
-                                          },
-                                        }}
-                                      >
-                                        <Schedule fontSize="small" />
-                                      </IconButton>
-                                    </span>
-                                  </Tooltip>
                                 </Box>
                               )}
 
-                            {/* Security Actions */}
+                            {/* Security: Only Call + Checkout in main row */}
                             {role === "security" && (
                               <>
-                                <Tooltip title="Assign Card">
-                                  <IconButton
-                                    size="small"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      fetchAvailableCards();
-                                      setAssignCardDialog({
-                                        open: true,
-                                        visitor,
-                                        cardNumber: "",
-                                      });
-                                    }}
-                                    disabled={!!visitor.card_number}
-                                    sx={{
-                                      backgroundColor: visitor.card_number
-                                        ? "#A29EB620"
-                                        : "#6F0B1420",
-                                      color: visitor.card_number
-                                        ? "#A29EB6"
-                                        : "#6F0B14",
-                                      "&:hover": {
-                                        backgroundColor: visitor.card_number
-                                          ? "#A29EB6"
-                                          : "#6F0B14",
-                                        color: "white",
-                                      },
-                                    }}
-                                  >
-                                    <CreditCard fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
                                 <Tooltip title="Call">
                                   <IconButton
                                     size="small"
@@ -1454,26 +1376,6 @@ export default function UserDashboard() {
                                 </Tooltip>
                               </>
                             )}
-                            <Tooltip title="Visit History">
-                              <IconButton
-                                size="small"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  fetchVisitorLog(visitor);
-                                }}
-                                disabled={!visitor.face_embedding}
-                                sx={{
-                                  backgroundColor: "#E8F0FE",
-                                  color: "#1A73E8",
-                                  "&:hover": {
-                                    backgroundColor: "#1A73E8",
-                                    color: "white",
-                                  },
-                                }}
-                              >
-                                <History fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
                           </Stack>
                         </TableCell>
                       )}
@@ -1672,209 +1574,890 @@ export default function UserDashboard() {
                                 </Grid>
                               )}
 
-                              {/* Rejection Reason */}
-                              {visitor.rejected_reschedule_reason && (
-                                <Grid item xs={12}>
-                                  <Paper
-                                    variant="outlined"
-                                    sx={{
-                                      p: 2,
-                                      backgroundColor: "#B31B1B10",
-                                      borderColor: "#B31B1B",
-                                    }}
-                                  >
-                                    <Typography
-                                      variant="caption"
+                              {/* Rescheduled At */}
+                              {visitor.approved_status === "Reschedule" &&
+                                visitor.rescheduled_at && (
+                                  <Grid item xs={12} sm={6} md={4}>
+                                    <Paper
+                                      variant="outlined"
                                       sx={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: 0.5,
-                                        mb: 1,
-                                        color: "#B31B1B",
+                                        p: 2,
+                                        borderColor: "#E8610030",
+                                        backgroundColor: "#FFF4E815",
                                       }}
                                     >
-                                      <Cancel sx={{ fontSize: 16 }} />
-                                      Rejection Reason
-                                    </Typography>
-                                    <Typography
-                                      variant="body2"
-                                      fontWeight="500"
-                                      sx={{ color: "#B31B1B" }}
-                                    >
-                                      {visitor.rejected_reschedule_reason}
-                                    </Typography>
-                                  </Paper>
-                                </Grid>
-                              )}
+                                      <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                        sx={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: 0.5,
+                                          mb: 1,
+                                        }}
+                                      >
+                                        <Schedule
+                                          sx={{
+                                            fontSize: 16,
+                                            color: "#E86100",
+                                          }}
+                                        />
+                                        Rescheduled For
+                                      </Typography>
+                                      <Typography
+                                        variant="body2"
+                                        fontWeight={600}
+                                        sx={{ color: "#E86100" }}
+                                      >
+                                        {format(
+                                          new Date(visitor.rescheduled_at),
+                                          "dd MMM yyyy",
+                                        )}
+                                      </Typography>
+                                      <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                        sx={{ display: "block", mt: 0.3 }}
+                                      >
+                                        {format(
+                                          new Date(visitor.rescheduled_at),
+                                          "hh:mm a",
+                                        )}
+                                      </Typography>
+                                      <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                        sx={{ display: "block", mt: 0.3 }}
+                                      >
+                                        {getTimeAgo(visitor.rescheduled_at)}
+                                      </Typography>
+                                    </Paper>
+                                  </Grid>
+                                )}
 
+                              {/* Reschedule Reason */}
+                              {visitor.approved_status === "Reschedule" &&
+                                visitor.rejected_reschedule_reason && (
+                                  <Grid item xs={12} sm={6} md={4}>
+                                    <Paper
+                                      variant="outlined"
+                                      sx={{
+                                        p: 2,
+                                        borderColor: "#E8610030",
+                                        backgroundColor: "#FFF4E815",
+                                      }}
+                                    >
+                                      <Typography
+                                        variant="caption"
+                                        sx={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: 0.5,
+                                          mb: 1,
+                                          color: "#E86100",
+                                        }}
+                                      >
+                                        <Description
+                                          sx={{
+                                            fontSize: 16,
+                                            color: "#E86100",
+                                          }}
+                                        />
+                                        Reschedule Reason
+                                      </Typography>
+                                      <Typography
+                                        variant="body2"
+                                        fontWeight="500"
+                                        sx={{ color: "#E86100" }}
+                                      >
+                                        {visitor.rejected_reschedule_reason}
+                                      </Typography>
+                                    </Paper>
+                                  </Grid>
+                                )}
+
+                              {/* Rejection Reason */}
+                              {visitor.approved_status === "Rejected" &&
+                                visitor.rejected_reschedule_reason && (
+                                  <Grid item xs={12}>
+                                    <Paper
+                                      variant="outlined"
+                                      sx={{
+                                        p: 2,
+                                        backgroundColor: "#B31B1B10",
+                                        borderColor: "#B31B1B",
+                                      }}
+                                    >
+                                      <Typography
+                                        variant="caption"
+                                        sx={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: 0.5,
+                                          mb: 1,
+                                          color: "#B31B1B",
+                                        }}
+                                      >
+                                        <Cancel sx={{ fontSize: 16 }} />
+                                        Rejection Reason
+                                      </Typography>
+                                      <Typography
+                                        variant="body2"
+                                        fontWeight="500"
+                                        sx={{ color: "#B31B1B" }}
+                                      >
+                                        {visitor.rejected_reschedule_reason}
+                                      </Typography>
+                                    </Paper>
+                                  </Grid>
+                                )}
                               {/* ID Proof Image */}
-                              {visitor.id_proof_image && (
-                                <Button
-                                  size="small"
-                                  variant="outlined"
-                                  startIcon={<Visibility />}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setImagePreview({
-                                      url: visitor.id_proof_image,
-                                      type: "id",
-                                    });
-                                  }}
-                                >
-                                  View ID Proof
-                                </Button>
-                              )}
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                startIcon={<History />}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  fetchVisitorLog(visitor);
-                                }}
-                                disabled={!visitor.face_embedding}
-                              >
-                                Visit History
-                              </Button>
                             </Grid>
 
                             {/* Additional Action Buttons inside expanded view for better UX */}
                             {!isMobile && (
                               <>
+                                {/* Tenant Actions */}
                                 {(role === "tenant_o" || role === "tenant_m") &&
                                   visitor.approved_status === "Pending" && (
+                                    <Box sx={{ mt: 3 }}>
+                                      <Divider
+                                        sx={{ mb: 2, borderColor: "#6F0B1420" }}
+                                      />
+                                      <Typography
+                                        variant="caption"
+                                        sx={{
+                                          color: "#94a3b8",
+                                          fontWeight: 700,
+                                          letterSpacing: 1.2,
+                                          textTransform: "uppercase",
+                                          mb: 1.5,
+                                          display: "block",
+                                        }}
+                                      >
+                                        Quick Actions
+                                      </Typography>
+                                      <Stack
+                                        direction="row"
+                                        flexWrap="wrap"
+                                        sx={{ gap: 1.5 }}
+                                      >
+                                        {/* Approve */}
+                                        <Box
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleVisitorAction(
+                                              visitor,
+                                              "approve",
+                                            );
+                                          }}
+                                          sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 1,
+                                            px: 2,
+                                            py: 1,
+                                            borderRadius: "999px",
+                                            bgcolor: "#E6F7EC",
+                                            cursor: "pointer",
+                                            border: "1.5px solid #1B8F3A30",
+                                            transition: "all 0.2s ease",
+                                            "&:hover": {
+                                              bgcolor: "#1B8F3A",
+                                              "& *": { color: "#fff" },
+                                              boxShadow:
+                                                "0 4px 14px rgba(27,143,58,0.3)",
+                                              transform: "translateY(-1px)",
+                                            },
+                                          }}
+                                        >
+                                          {actionLoading[
+                                            `${visitor.id}-approve`
+                                          ] ? (
+                                            <CircularProgress
+                                              size={14}
+                                              sx={{ color: "#1B8F3A" }}
+                                            />
+                                          ) : (
+                                            <CheckCircle
+                                              sx={{
+                                                fontSize: 15,
+                                                color: "#1B8F3A",
+                                              }}
+                                            />
+                                          )}
+                                          <Typography
+                                            variant="caption"
+                                            sx={{
+                                              color: "#1B8F3A",
+                                              fontWeight: 700,
+                                              fontSize: "0.72rem",
+                                            }}
+                                          >
+                                            Approve
+                                          </Typography>
+                                        </Box>
+
+                                        {/* Reject */}
+                                        <Box
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setConfirmDialog({
+                                              open: true,
+                                              action: "reject",
+                                              visitor,
+                                              requiresReason: true,
+                                              reason: "",
+                                            });
+                                          }}
+                                          sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 1,
+                                            px: 2,
+                                            py: 1,
+                                            borderRadius: "999px",
+                                            bgcolor: "#FDECEC",
+                                            cursor: "pointer",
+                                            border: "1.5px solid #C6282830",
+                                            transition: "all 0.2s ease",
+                                            "&:hover": {
+                                              bgcolor: "#C62828",
+                                              "& *": { color: "#fff" },
+                                              boxShadow:
+                                                "0 4px 14px rgba(198,40,40,0.3)",
+                                              transform: "translateY(-1px)",
+                                            },
+                                          }}
+                                        >
+                                          <Cancel
+                                            sx={{
+                                              fontSize: 15,
+                                              color: "#C62828",
+                                            }}
+                                          />
+                                          <Typography
+                                            variant="caption"
+                                            sx={{
+                                              color: "#C62828",
+                                              fontWeight: 700,
+                                              fontSize: "0.72rem",
+                                            }}
+                                          >
+                                            Reject
+                                          </Typography>
+                                        </Box>
+
+                                        {/* Reschedule */}
+                                        <Box
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleReschedule(visitor);
+                                          }}
+                                          sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 1,
+                                            px: 2,
+                                            py: 1,
+                                            borderRadius: "999px",
+                                            bgcolor: "#FFF4E8",
+                                            cursor: "pointer",
+                                            border: "1.5px solid #E8610030",
+                                            transition: "all 0.2s ease",
+                                            "&:hover": {
+                                              bgcolor: "#E86100",
+                                              "& *": { color: "#fff" },
+                                              boxShadow:
+                                                "0 4px 14px rgba(232,97,0,0.3)",
+                                              transform: "translateY(-1px)",
+                                            },
+                                          }}
+                                        >
+                                          <Schedule
+                                            sx={{
+                                              fontSize: 15,
+                                              color: "#E86100",
+                                            }}
+                                          />
+                                          <Typography
+                                            variant="caption"
+                                            sx={{
+                                              color: "#E86100",
+                                              fontWeight: 700,
+                                              fontSize: "0.72rem",
+                                            }}
+                                          >
+                                            Reschedule
+                                          </Typography>
+                                        </Box>
+
+                                        {/* View ID Proof */}
+                                        {visitor.id_proof_image && (
+                                          <Box
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setImagePreview({
+                                                url: visitor.id_proof_image,
+                                                type: "id",
+                                              });
+                                            }}
+                                            sx={{
+                                              display: "flex",
+                                              alignItems: "center",
+                                              gap: 1,
+                                              px: 2,
+                                              py: 1,
+                                              borderRadius: "999px",
+                                              bgcolor: "#F3E8FF",
+                                              cursor: "pointer",
+                                              border: "1.5px solid #7B1FA230",
+                                              transition: "all 0.2s ease",
+                                              "&:hover": {
+                                                bgcolor: "#7B1FA2",
+                                                "& *": { color: "#fff" },
+                                                boxShadow:
+                                                  "0 4px 14px rgba(123,31,162,0.3)",
+                                                transform: "translateY(-1px)",
+                                              },
+                                            }}
+                                          >
+                                            <Visibility
+                                              sx={{
+                                                fontSize: 15,
+                                                color: "#7B1FA2",
+                                              }}
+                                            />
+                                            <Typography
+                                              variant="caption"
+                                              sx={{
+                                                color: "#7B1FA2",
+                                                fontWeight: 700,
+                                                fontSize: "0.72rem",
+                                              }}
+                                            >
+                                              ID Proof
+                                            </Typography>
+                                          </Box>
+                                        )}
+
+                                        {/* Visit History */}
+                                        <Box
+                                          onClick={(e) => {
+                                            if (!visitor.face_embedding) return;
+                                            e.stopPropagation();
+                                            fetchVisitorLog(visitor);
+                                          }}
+                                          sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 1,
+                                            px: 2,
+                                            py: 1,
+                                            borderRadius: "999px",
+                                            bgcolor: visitor.face_embedding
+                                              ? "#E8F0FE"
+                                              : "#f5f5f5",
+                                            cursor: visitor.face_embedding
+                                              ? "pointer"
+                                              : "not-allowed",
+                                            border: `1.5px solid ${visitor.face_embedding ? "#1A73E830" : "#e0e0e0"}`,
+                                            transition: "all 0.2s ease",
+                                            ...(visitor.face_embedding && {
+                                              "&:hover": {
+                                                bgcolor: "#1A73E8",
+                                                "& *": { color: "#fff" },
+                                                boxShadow:
+                                                  "0 4px 14px rgba(26,115,232,0.3)",
+                                                transform: "translateY(-1px)",
+                                              },
+                                            }),
+                                          }}
+                                        >
+                                          <History
+                                            sx={{
+                                              fontSize: 15,
+                                              color: visitor.face_embedding
+                                                ? "#1A73E8"
+                                                : "#ccc",
+                                            }}
+                                          />
+                                          <Typography
+                                            variant="caption"
+                                            sx={{
+                                              color: visitor.face_embedding
+                                                ? "#1A73E8"
+                                                : "#ccc",
+                                              fontWeight: 700,
+                                              fontSize: "0.72rem",
+                                            }}
+                                          >
+                                            History
+                                          </Typography>
+                                        </Box>
+
+                                        {/* Block */}
+                                        <Box
+                                          onClick={(e) => {
+                                            if (
+                                              visitor.approved_status ===
+                                              "Blocked"
+                                            )
+                                              return;
+                                            e.stopPropagation();
+                                            setConfirmDialog({
+                                              open: true,
+                                              action: "block",
+                                              visitor,
+                                              requiresReason: true,
+                                              reason: "",
+                                            });
+                                          }}
+                                          sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 1,
+                                            px: 2,
+                                            py: 1,
+                                            borderRadius: "999px",
+                                            bgcolor:
+                                              visitor.approved_status ===
+                                              "Blocked"
+                                                ? "#f5f5f5"
+                                                : "#FDECEA",
+                                            cursor:
+                                              visitor.approved_status ===
+                                              "Blocked"
+                                                ? "not-allowed"
+                                                : "pointer",
+                                            border: `1.5px solid ${visitor.approved_status === "Blocked" ? "#e0e0e0" : "#7B000030"}`,
+                                            transition: "all 0.2s ease",
+                                            ...(visitor.approved_status !==
+                                              "Blocked" && {
+                                              "&:hover": {
+                                                bgcolor: "#7B0000",
+                                                "& *": { color: "#fff" },
+                                                boxShadow:
+                                                  "0 4px 14px rgba(123,0,0,0.3)",
+                                                transform: "translateY(-1px)",
+                                              },
+                                            }),
+                                          }}
+                                        >
+                                          <Block
+                                            sx={{
+                                              fontSize: 15,
+                                              color:
+                                                visitor.approved_status ===
+                                                "Blocked"
+                                                  ? "#ccc"
+                                                  : "#7B0000",
+                                            }}
+                                          />
+                                          <Typography
+                                            variant="caption"
+                                            sx={{
+                                              color:
+                                                visitor.approved_status ===
+                                                "Blocked"
+                                                  ? "#ccc"
+                                                  : "#7B0000",
+                                              fontWeight: 700,
+                                              fontSize: "0.72rem",
+                                            }}
+                                          >
+                                            {visitor.approved_status ===
+                                            "Blocked"
+                                              ? "Blocked"
+                                              : "Block"}
+                                          </Typography>
+                                        </Box>
+                                      </Stack>
+                                    </Box>
+                                  )}
+
+                                {/* Security Actions */}
+                                {role === "security" && (
+                                  <Box sx={{ mt: 3 }}>
+                                    <Divider
+                                      sx={{ mb: 2, borderColor: "#6F0B1420" }}
+                                    />
+                                    <Typography
+                                      variant="caption"
+                                      sx={{
+                                        color: "#94a3b8",
+                                        fontWeight: 700,
+                                        letterSpacing: 1.2,
+                                        textTransform: "uppercase",
+                                        mb: 1.5,
+                                        display: "block",
+                                      }}
+                                    >
+                                      Quick Actions
+                                    </Typography>
                                     <Stack
                                       direction="row"
-                                      spacing={1}
-                                      sx={{ mt: 3, flexWrap: "wrap", gap: 1 }}
+                                      flexWrap="wrap"
+                                      sx={{ gap: 1.5 }}
                                     >
-                                      <Button
-                                        size="small"
-                                        variant="contained"
-                                        sx={{
-                                          bgcolor: "#008000",
-                                          "&:hover": { bgcolor: "#006400" },
-                                        }}
-                                        startIcon={<CheckCircle />}
+                                      {/* Assign Card */}
+                                      <Box
                                         onClick={(e) => {
+                                          if (visitor.card_number) return;
+                                          e.stopPropagation();
+                                          fetchAvailableCards();
+                                          setAssignCardDialog({
+                                            open: true,
+                                            visitor,
+                                            cardNumber: "",
+                                          });
+                                        }}
+                                        sx={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: 1,
+                                          px: 2,
+                                          py: 1,
+                                          borderRadius: "999px",
+                                          bgcolor: visitor.card_number
+                                            ? "#f5f5f5"
+                                            : "#E8F0FE",
+                                          cursor: visitor.card_number
+                                            ? "not-allowed"
+                                            : "pointer",
+                                          border: `1.5px solid ${visitor.card_number ? "#e0e0e0" : "#1A73E830"}`,
+                                          transition: "all 0.2s ease",
+                                          ...(!visitor.card_number && {
+                                            "&:hover": {
+                                              bgcolor: "#1A73E8",
+                                              "& *": { color: "#fff" },
+                                              boxShadow:
+                                                "0 4px 14px rgba(26,115,232,0.3)",
+                                              transform: "translateY(-1px)",
+                                            },
+                                          }),
+                                        }}
+                                      >
+                                        <CreditCard
+                                          sx={{
+                                            fontSize: 15,
+                                            color: visitor.card_number
+                                              ? "#ccc"
+                                              : "#1A73E8",
+                                          }}
+                                        />
+                                        <Typography
+                                          variant="caption"
+                                          sx={{
+                                            color: visitor.card_number
+                                              ? "#ccc"
+                                              : "#1A73E8",
+                                            fontWeight: 700,
+                                            fontSize: "0.72rem",
+                                          }}
+                                        >
+                                          {visitor.card_number
+                                            ? "Card Assigned"
+                                            : "Assign Card"}
+                                        </Typography>
+                                      </Box>
+
+                                      {/* Call */}
+                                      <Box
+                                        component="a"
+                                        href={`tel:${visitor.phone_number}`}
+                                        onClick={(e) => e.stopPropagation()}
+                                        sx={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: 1,
+                                          px: 2,
+                                          py: 1,
+                                          borderRadius: "999px",
+                                          bgcolor: "#E6F7EC",
+                                          cursor: "pointer",
+                                          border: "1.5px solid #1B8F3A30",
+                                          textDecoration: "none",
+                                          transition: "all 0.2s ease",
+                                          "&:hover": {
+                                            bgcolor: "#1B8F3A",
+                                            "& *": { color: "#fff" },
+                                            boxShadow:
+                                              "0 4px 14px rgba(27,143,58,0.3)",
+                                            transform: "translateY(-1px)",
+                                          },
+                                        }}
+                                      >
+                                        <Phone
+                                          sx={{
+                                            fontSize: 15,
+                                            color: "#1B8F3A",
+                                          }}
+                                        />
+                                        <Typography
+                                          variant="caption"
+                                          sx={{
+                                            color: "#1B8F3A",
+                                            fontWeight: 700,
+                                            fontSize: "0.72rem",
+                                          }}
+                                        >
+                                          Call
+                                        </Typography>
+                                      </Box>
+
+                                      {/* Checkout */}
+                                      <Box
+                                        onClick={(e) => {
+                                          if (
+                                            visitor.approved_status ===
+                                            "Checkout"
+                                          )
+                                            return;
                                           e.stopPropagation();
                                           handleVisitorAction(
                                             visitor,
-                                            "approve",
+                                            "checkout",
                                           );
                                         }}
-                                        disabled={
-                                          actionLoading[`${visitor.id}-approve`]
-                                        }
+                                        sx={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: 1,
+                                          px: 2,
+                                          py: 1,
+                                          borderRadius: "999px",
+                                          bgcolor:
+                                            visitor.approved_status ===
+                                            "Checkout"
+                                              ? "#f5f5f5"
+                                              : "#FFF4E8",
+                                          cursor:
+                                            visitor.approved_status ===
+                                            "Checkout"
+                                              ? "not-allowed"
+                                              : "pointer",
+                                          border: `1.5px solid ${visitor.approved_status === "Checkout" ? "#e0e0e0" : "#E8610030"}`,
+                                          transition: "all 0.2s ease",
+                                          ...(visitor.approved_status !==
+                                            "Checkout" && {
+                                            "&:hover": {
+                                              bgcolor: "#E86100",
+                                              "& *": { color: "#fff" },
+                                              boxShadow:
+                                                "0 4px 14px rgba(232,97,0,0.3)",
+                                              transform: "translateY(-1px)",
+                                            },
+                                          }),
+                                        }}
                                       >
-                                        {actionLoading[
-                                          `${visitor.id}-approve`
-                                        ] ? (
-                                          <CircularProgress size={20} />
-                                        ) : (
-                                          "Approve"
-                                        )}
-                                      </Button>
+                                        <ExitToApp
+                                          sx={{
+                                            fontSize: 15,
+                                            color:
+                                              visitor.approved_status ===
+                                              "Checkout"
+                                                ? "#ccc"
+                                                : "#E86100",
+                                          }}
+                                        />
+                                        <Typography
+                                          variant="caption"
+                                          sx={{
+                                            color:
+                                              visitor.approved_status ===
+                                              "Checkout"
+                                                ? "#ccc"
+                                                : "#E86100",
+                                            fontWeight: 700,
+                                            fontSize: "0.72rem",
+                                          }}
+                                        >
+                                          Checkout
+                                        </Typography>
+                                      </Box>
 
-                                      <Button
-                                        size="small"
-                                        variant="contained"
-                                        color="error"
-                                        startIcon={<Cancel />}
+                                      {/* View ID Proof */}
+                                      {visitor.id_proof_image && (
+                                        <Box
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setImagePreview({
+                                              url: visitor.id_proof_image,
+                                              type: "id",
+                                            });
+                                          }}
+                                          sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 1,
+                                            px: 2,
+                                            py: 1,
+                                            borderRadius: "999px",
+                                            bgcolor: "#F3E8FF",
+                                            cursor: "pointer",
+                                            border: "1.5px solid #7B1FA230",
+                                            transition: "all 0.2s ease",
+                                            "&:hover": {
+                                              bgcolor: "#7B1FA2",
+                                              "& *": { color: "#fff" },
+                                              boxShadow:
+                                                "0 4px 14px rgba(123,31,162,0.3)",
+                                              transform: "translateY(-1px)",
+                                            },
+                                          }}
+                                        >
+                                          <Visibility
+                                            sx={{
+                                              fontSize: 15,
+                                              color: "#7B1FA2",
+                                            }}
+                                          />
+                                          <Typography
+                                            variant="caption"
+                                            sx={{
+                                              color: "#7B1FA2",
+                                              fontWeight: 700,
+                                              fontSize: "0.72rem",
+                                            }}
+                                          >
+                                            ID Proof
+                                          </Typography>
+                                        </Box>
+                                      )}
+
+                                      {/* Visit History */}
+                                      <Box
                                         onClick={(e) => {
+                                          if (!visitor.face_embedding) return;
+                                          e.stopPropagation();
+                                          fetchVisitorLog(visitor);
+                                        }}
+                                        sx={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: 1,
+                                          px: 2,
+                                          py: 1,
+                                          borderRadius: "999px",
+                                          bgcolor: visitor.face_embedding
+                                            ? "#E8F0FE"
+                                            : "#f5f5f5",
+                                          cursor: visitor.face_embedding
+                                            ? "pointer"
+                                            : "not-allowed",
+                                          border: `1.5px solid ${visitor.face_embedding ? "#1A73E830" : "#e0e0e0"}`,
+                                          transition: "all 0.2s ease",
+                                          ...(visitor.face_embedding && {
+                                            "&:hover": {
+                                              bgcolor: "#1A73E8",
+                                              "& *": { color: "#fff" },
+                                              boxShadow:
+                                                "0 4px 14px rgba(26,115,232,0.3)",
+                                              transform: "translateY(-1px)",
+                                            },
+                                          }),
+                                        }}
+                                      >
+                                        <History
+                                          sx={{
+                                            fontSize: 15,
+                                            color: visitor.face_embedding
+                                              ? "#1A73E8"
+                                              : "#ccc",
+                                          }}
+                                        />
+                                        <Typography
+                                          variant="caption"
+                                          sx={{
+                                            color: visitor.face_embedding
+                                              ? "#1A73E8"
+                                              : "#ccc",
+                                            fontWeight: 700,
+                                            fontSize: "0.72rem",
+                                          }}
+                                        >
+                                          History
+                                        </Typography>
+                                      </Box>
+
+                                      {/* Block */}
+                                      <Box
+                                        onClick={(e) => {
+                                          if (
+                                            visitor.approved_status ===
+                                            "Blocked"
+                                          )
+                                            return;
                                           e.stopPropagation();
                                           setConfirmDialog({
                                             open: true,
-                                            action: "reject",
+                                            action: "block",
                                             visitor,
                                             requiresReason: true,
                                             reason: "",
                                           });
                                         }}
-                                      >
-                                        Reject
-                                      </Button>
-
-                                      <Button
-                                        size="small"
-                                        variant="contained"
                                         sx={{
-                                          bgcolor: "#E86100",
-                                          "&:hover": { bgcolor: "#C65100" },
-                                        }}
-                                        startIcon={<Schedule />}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-
-                                          setRescheduleDialog({
-                                            open: true,
-                                            visitor: visitor,
-                                            date: "",
-                                            time: "",
-                                            reason: "",
-                                          });
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: 1,
+                                          px: 2,
+                                          py: 1,
+                                          borderRadius: "999px",
+                                          bgcolor:
+                                            visitor.approved_status ===
+                                            "Blocked"
+                                              ? "#f5f5f5"
+                                              : "#FDECEA",
+                                          cursor:
+                                            visitor.approved_status ===
+                                            "Blocked"
+                                              ? "not-allowed"
+                                              : "pointer",
+                                          border: `1.5px solid ${visitor.approved_status === "Blocked" ? "#e0e0e0" : "#7B000030"}`,
+                                          transition: "all 0.2s ease",
+                                          ...(visitor.approved_status !==
+                                            "Blocked" && {
+                                            "&:hover": {
+                                              bgcolor: "#7B0000",
+                                              "& *": { color: "#fff" },
+                                              boxShadow:
+                                                "0 4px 14px rgba(123,0,0,0.3)",
+                                              transform: "translateY(-1px)",
+                                            },
+                                          }),
                                         }}
                                       >
-                                        Reschedule
-                                      </Button>
+                                        <Block
+                                          sx={{
+                                            fontSize: 15,
+                                            color:
+                                              visitor.approved_status ===
+                                              "Blocked"
+                                                ? "#ccc"
+                                                : "#7B0000",
+                                          }}
+                                        />
+                                        <Typography
+                                          variant="caption"
+                                          sx={{
+                                            color:
+                                              visitor.approved_status ===
+                                              "Blocked"
+                                                ? "#ccc"
+                                                : "#7B0000",
+                                            fontWeight: 700,
+                                            fontSize: "0.72rem",
+                                          }}
+                                        >
+                                          {visitor.approved_status === "Blocked"
+                                            ? "Blocked"
+                                            : "Block"}
+                                        </Typography>
+                                      </Box>
                                     </Stack>
-                                  )}
-
-                                {role === "security" && (
-                                  <Stack
-                                    direction="row"
-                                    spacing={1}
-                                    sx={{ mt: 3, flexWrap: "wrap", gap: 1 }}
-                                  >
-                                    <Button
-                                      size="small"
-                                      variant="contained"
-                                      color="primary"
-                                      startIcon={<CreditCard />}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        fetchAvailableCards();
-                                        setAssignCardDialog({
-                                          open: true,
-                                          visitor,
-                                          cardNumber: "",
-                                        });
-                                      }}
-                                      disabled={!!visitor.card_number}
-                                    >
-                                      Assign Card
-                                    </Button>
-
-                                    <Button
-                                      size="small"
-                                      variant="outlined"
-                                      color="primary"
-                                      startIcon={<Phone />}
-                                      href={`tel:${visitor.phone_number}`}
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      Call
-                                    </Button>
-
-                                    <Button
-                                      size="small"
-                                      variant="contained"
-                                      color="secondary"
-                                      startIcon={<ExitToApp />}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleVisitorAction(
-                                          visitor,
-                                          "checkout",
-                                        );
-                                      }}
-                                      disabled={
-                                        visitor.approved_status === "Checkout"
-                                      }
-                                    >
-                                      Checkout
-                                    </Button>
-                                  </Stack>
+                                  </Box>
                                 )}
                               </>
                             )}
