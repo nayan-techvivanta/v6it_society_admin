@@ -8,28 +8,51 @@ import { CiViewList } from "react-icons/ci";
 import { CgProfile } from "react-icons/cg";
 import { MdOutlineInfo } from "react-icons/md";
 import { MdOutlinePrivacyTip } from "react-icons/md";
+const DEFAULT_AVATAR =
+  "https://png.pngtree.com/png-vector/20231019/ourmid/pngtree-user-profile-avatar-png-image_10211471.png";
+
 export default function UserDropdown() {
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
   const [role, setRole] = useState(localStorage.getItem("role") || "");
   const [email, setEmail] = useState(localStorage.getItem("email") || "");
   const [profileImage, setProfileImage] = useState(
-    localStorage.getItem("profileImage") ||
-      "https://png.pngtree.com/png-vector/20231019/ourmid/pngtree-user-profile-avatar-png-image_10211471.png",
+    localStorage.getItem("profileImage") || DEFAULT_AVATAR,
   );
 
+  // useEffect(() => {
+  //   const handleProfileUpdate = () => {
+  //     setRole(localStorage.getItem("role") || "");
+  //     setEmail(localStorage.getItem("email") || "");
+  //     setProfileImage(
+  //       localStorage.getItem("profileImage") ||
+  //         "https://png.pngtree.com/png-vector/20231019/ourmid/pngtree-user-profile-avatar-png-image_10211471.png",
+  //     );
+  //   };
+
+  //   window.addEventListener("profileImageUpdated", handleProfileUpdate);
+  //   window.addEventListener("storage", handleProfileUpdate);
+
+  //   return () => {
+  //     window.removeEventListener("profileImageUpdated", handleProfileUpdate);
+  //     window.removeEventListener("storage", handleProfileUpdate);
+  //   };
+  // }, []);
   useEffect(() => {
     const handleProfileUpdate = () => {
-      setRole(localStorage.getItem("role") || "");
-      setEmail(localStorage.getItem("email") || "");
-      setProfileImage(
-        localStorage.getItem("profileImage") ||
-          "https://png.pngtree.com/png-vector/20231019/ourmid/pngtree-user-profile-avatar-png-image_10211471.png",
-      );
+      const storedRole = localStorage.getItem("role");
+      const storedEmail = localStorage.getItem("email");
+      const storedImage = localStorage.getItem("profileImage");
+
+      setRole(storedRole || "");
+      setEmail(storedEmail || "");
+      setProfileImage(storedImage || DEFAULT_AVATAR);
     };
 
+    // Run once on mount
+    handleProfileUpdate();
+
     window.addEventListener("profileImageUpdated", handleProfileUpdate);
-    // Also listen for storage events (cross-tab)
     window.addEventListener("storage", handleProfileUpdate);
 
     return () => {
@@ -40,12 +63,19 @@ export default function UserDropdown() {
   if (!role && !email) return null;
   const toggleDropdown = () => setIsOpen((prev) => !prev);
   const closeDropdown = () => setIsOpen(false);
+  // const handleLogout = () => {
+  //   localStorage.clear();
+  //   closeDropdown();
+  //   navigate("/login");
+  // };
   const handleLogout = () => {
     localStorage.clear();
+
+    window.dispatchEvent(new Event("profileImageUpdated"));
+
     closeDropdown();
     navigate("/login");
   };
-
   return (
     <div className="relative">
       <button
@@ -56,6 +86,9 @@ export default function UserDropdown() {
           <img
             src={profileImage}
             alt="User"
+            onError={(e) => {
+              e.target.src = DEFAULT_AVATAR;
+            }}
             className="w-full h-full object-cover"
           />
         </span>

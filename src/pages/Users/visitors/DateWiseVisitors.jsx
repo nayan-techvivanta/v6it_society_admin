@@ -9,7 +9,6 @@ import {
   Chip,
   Avatar,
   IconButton,
-  TextField,
   Button,
   CircularProgress,
   Alert,
@@ -31,7 +30,6 @@ import {
   Select,
   FormControl,
   InputLabel,
-  InputAdornment,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -69,6 +67,12 @@ import {
 } from "@mui/icons-material";
 import { styled } from "@mui/material/styles";
 import { useNavigate } from "react-router-dom";
+import dayjs from "dayjs";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import { InputAdornment, TextField } from "@mui/material";
+
 import { supabase } from "../../../api/supabaseClient";
 import { format, formatDistanceToNow } from "date-fns";
 
@@ -152,6 +156,63 @@ const StatCard = styled(Paper)(({ theme, color }) => ({
   alignItems: "center",
   gap: theme.spacing(1.5),
   boxShadow: `0 2px 12px ${color}18`,
+}));
+
+const StyledTableContainer = styled(TableContainer)(({ theme }) => ({
+  borderRadius: "16px",
+  border: "1px solid rgba(111,11,20,0.08)",
+  boxShadow: "none",
+  maxHeight: "600px", // Set a fixed max height for the table container
+  overflow: "auto",
+  position: "relative",
+  "&::-webkit-scrollbar": {
+    width: "8px",
+    height: "8px",
+  },
+  "&::-webkit-scrollbar-track": {
+    background: "#f1f1f1",
+    borderRadius: "4px",
+  },
+  "&::-webkit-scrollbar-thumb": {
+    background: "#6F0B14",
+    borderRadius: "4px",
+    "&:hover": {
+      background: "#a82834",
+    },
+  },
+}));
+
+const StyledTable = styled(Table)({
+  minWidth: 650,
+  borderCollapse: "separate",
+  borderSpacing: 0,
+});
+
+const StyledTableHead = styled(TableHead)({
+  position: "sticky",
+  top: 0,
+  zIndex: 10,
+  backgroundColor: "#fff",
+});
+
+const StyledHeaderRow = styled(TableRow)(({ theme }) => ({
+  backgroundColor: "rgba(111,11,20,0.04)",
+  "& th": {
+    backgroundColor: "rgba(111,11,20,0.04)",
+    fontWeight: 700,
+    color: "#6F0B14",
+    py: 1.5,
+    borderBottom: "2px solid rgba(111,11,20,0.2)",
+    position: "sticky",
+    top: 0,
+    zIndex: 10,
+    "&:first-of-type": {
+      borderTopLeftRadius: "16px",
+    },
+    "&:last-of-type": {
+      borderTopRightRadius: "16px",
+    },
+  },
 }));
 
 const StyledTableRow = styled(TableRow)(() => ({
@@ -690,69 +751,6 @@ export default function DateWiseVisitors() {
             </HeaderSection>
 
             <CardContent sx={{ p: { xs: 2, md: 3 } }}>
-              {/* ── Stats Row with all statuses ── */}
-              {/* <div className="grid grid-cols-2 md:grid-cols-6 gap-2 mb-4">
-                {[
-                  {
-                    label: "Total",
-                    value: stats.total,
-                    color: "#6F0B14",
-                    icon: <PeopleIcon />,
-                  },
-                  {
-                    label: "Approved",
-                    value: stats.approved,
-                    color: "#16a34a",
-                    icon: <CheckCircleIcon />,
-                  },
-                  {
-                    label: "Pending",
-                    value: stats.pending,
-                    color: "#d97706",
-                    icon: <ScheduleIcon />,
-                  },
-                  {
-                    label: "Rejected",
-                    value: stats.rejected,
-                    color: "#dc2626",
-                    icon: <CancelIcon />,
-                  },
-                  {
-                    label: "Rescheduled",
-                    value: stats.rescheduled,
-                    color: "#9333ea",
-                    icon: <ScheduleIcon />,
-                  },
-                  {
-                    label: "Checked Out",
-                    value: stats.checkout,
-                    color: "#64748b",
-                    icon: <ExitToApp />,
-                  },
-                ].map((s) => (
-                  <StatCard key={s.label} color={s.color}>
-                    <Box sx={{ color: s.color, display: "flex" }}>{s.icon}</Box>
-                    <Box>
-                      <Typography
-                        variant="h6"
-                        fontWeight={700}
-                        color={s.color}
-                        lineHeight={1.1}
-                      >
-                        {s.value}
-                      </Typography>
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        fontWeight={500}
-                      >
-                        {s.label}
-                      </Typography>
-                    </Box>
-                  </StatCard>
-                ))}
-              </div> */}
-
               {/* ── Filter Panel ── */}
               <FilterPanel sx={{ mb: 3 }}>
                 {/* Date presets */}
@@ -780,79 +778,115 @@ export default function DateWiseVisitors() {
                   ))}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                  <StyledTextField
-                    label="From Date"
-                    type="date"
-                    value={fromDate}
-                    onChange={(e) => setFromDate(e.target.value)}
-                    InputLabelProps={{ shrink: true }}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <CalendarIcon
-                            sx={{ color: "#6F0B14", fontSize: 20 }}
-                          />
-                        </InputAdornment>
-                      ),
-                    }}
-                    fullWidth
-                  />
-                  <StyledTextField
-                    label="To Date"
-                    type="date"
-                    value={toDate}
-                    onChange={(e) => setToDate(e.target.value)}
-                    InputLabelProps={{ shrink: true }}
-                    inputProps={{ min: fromDate }}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <CalendarIcon
-                            sx={{ color: "#6F0B14", fontSize: 20 }}
-                          />
-                        </InputAdornment>
-                      ),
-                    }}
-                    fullWidth
-                  />
-                  <FormControl fullWidth>
-                    <InputLabel>Status</InputLabel>
-                    <StyledSelect
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
-                      label="Status"
-                    >
-                      <MenuItem value="All">All Statuses</MenuItem>
-                      {Object.keys(statusConfig).map((status) => (
-                        <MenuItem key={status} value={status}>
-                          <Stack
-                            direction="row"
-                            spacing={1}
-                            alignItems="center"
-                          >
-                            {statusConfig[status].icon}
-                            <span>{statusConfig[status].label}</span>
-                          </Stack>
-                        </MenuItem>
-                      ))}
-                    </StyledSelect>
-                  </FormControl>
-                  <FormControl fullWidth>
-                    <InputLabel>Visitor Type</InputLabel>
-                    <StyledSelect
-                      value={visitorTypeFilter}
-                      onChange={(e) => setVisitorTypeFilter(e.target.value)}
-                      label="Visitor Type"
-                    >
-                      <MenuItem value="All">All Types</MenuItem>
-                      <MenuItem value="Guest">Guest</MenuItem>
-                      <MenuItem value="Delivery">Delivery</MenuItem>
-                      <MenuItem value="Cab">Cab</MenuItem>
-                      <MenuItem value="Maintenance">Maintenance</MenuItem>
-                      <MenuItem value="Other">Other</MenuItem>
-                    </StyledSelect>
-                  </FormControl>
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+                  {/* Date Range - Takes 6 columns on large screens */}
+                  <div className="lg:col-span-5">
+                    <LocalizationProvider dateAdapter={AdapterDayjs}>
+                      <div className="grid grid-cols-2 gap-3">
+                        <DatePicker
+                          label="From"
+                          format="DD-MM-YYYY"
+                          value={fromDate ? dayjs(fromDate) : null}
+                          onChange={(newValue) => {
+                            const formatted = newValue
+                              ? newValue.format("YYYY-MM-DD")
+                              : "";
+                            setFromDate(formatted);
+                            if (toDate && dayjs(toDate).isBefore(newValue)) {
+                              setToDate("");
+                            }
+                          }}
+                          slotProps={{
+                            textField: {
+                              fullWidth: true,
+                              size: "small",
+                              InputProps: {
+                                startAdornment: (
+                                  <InputAdornment position="start">
+                                    <CalendarIcon
+                                      sx={{ color: "#6F0B14", fontSize: 18 }}
+                                    />
+                                  </InputAdornment>
+                                ),
+                              },
+                            },
+                          }}
+                        />
+
+                        <DatePicker
+                          label="To"
+                          format="DD-MM-YYYY"
+                          value={toDate ? dayjs(toDate) : null}
+                          minDate={fromDate ? dayjs(fromDate) : undefined}
+                          onChange={(newValue) => {
+                            setToDate(
+                              newValue ? newValue.format("YYYY-MM-DD") : "",
+                            );
+                          }}
+                          slotProps={{
+                            textField: {
+                              fullWidth: true,
+                              size: "small",
+                              InputProps: {
+                                startAdornment: (
+                                  <InputAdornment position="start">
+                                    <CalendarIcon
+                                      sx={{ color: "#6F0B14", fontSize: 18 }}
+                                    />
+                                  </InputAdornment>
+                                ),
+                              },
+                            },
+                          }}
+                        />
+                      </div>
+                    </LocalizationProvider>
+                  </div>
+
+                  {/* Status Filter - Takes 3 columns */}
+                  <div className="lg:col-span-3">
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Status</InputLabel>
+                      <StyledSelect
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        label="Status"
+                      >
+                        <MenuItem value="All">All Statuses</MenuItem>
+                        {Object.keys(statusConfig).map((status) => (
+                          <MenuItem key={status} value={status}>
+                            <Stack
+                              direction="row"
+                              spacing={1}
+                              alignItems="center"
+                            >
+                              {statusConfig[status].icon}
+                              <span>{statusConfig[status].label}</span>
+                            </Stack>
+                          </MenuItem>
+                        ))}
+                      </StyledSelect>
+                    </FormControl>
+                  </div>
+
+                  {/* Visitor Type Filter - Takes 4 columns */}
+                  <div className="lg:col-span-4">
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Visitor Type</InputLabel>
+                      <StyledSelect
+                        value={visitorTypeFilter}
+                        onChange={(e) => setVisitorTypeFilter(e.target.value)}
+                        label="Visitor Type"
+                      >
+                        <MenuItem value="All">All Types</MenuItem>
+                        <MenuItem value="Guest">Guest</MenuItem>
+                        <MenuItem value="Delivery">Delivery</MenuItem>
+                        <MenuItem value="Cab">Cab</MenuItem>
+                        <MenuItem value="Maintenance">Maintenance</MenuItem>
+                        <MenuItem value="Other">Other</MenuItem>
+                      </StyledSelect>
+                    </FormControl>
+                  </div>
                 </div>
 
                 {/* Search */}
@@ -969,104 +1003,22 @@ export default function DateWiseVisitors() {
                 </Box>
               ) : (
                 <>
-                  {/* Desktop Table */}
+                  {/* Desktop Table with Sticky Header */}
                   {!isMobile ? (
-                    <TableContainer
-                      component={Paper}
-                      sx={{
-                        borderRadius: "16px",
-                        border: "1px solid rgba(111,11,20,0.08)",
-                        boxShadow: "none",
-                      }}
-                    >
-                      <Table>
-                        <TableHead>
-                          <TableRow
-                            sx={{ backgroundColor: "rgba(111,11,20,0.04)" }}
-                          >
-                            <TableCell
-                              sx={{
-                                fontWeight: 700,
-                                color: "#6F0B14",
-                                py: 1.5,
-                              }}
-                            >
-                              Visitor
-                            </TableCell>
-                            <TableCell
-                              sx={{
-                                fontWeight: 700,
-                                color: "#6F0B14",
-                                py: 1.5,
-                              }}
-                            >
-                              Flat
-                            </TableCell>
-                            <TableCell
-                              sx={{
-                                fontWeight: 700,
-                                color: "#6F0B14",
-                                py: 1.5,
-                              }}
-                            >
-                              Type
-                            </TableCell>
-                            <TableCell
-                              sx={{
-                                fontWeight: 700,
-                                color: "#6F0B14",
-                                py: 1.5,
-                              }}
-                            >
-                              Purpose
-                            </TableCell>
-                            <TableCell
-                              sx={{
-                                fontWeight: 700,
-                                color: "#6F0B14",
-                                py: 1.5,
-                              }}
-                            >
-                              In Time
-                            </TableCell>
-                            <TableCell
-                              sx={{
-                                fontWeight: 700,
-                                color: "#6F0B14",
-                                py: 1.5,
-                              }}
-                            >
-                              Out Time
-                            </TableCell>
-                            <TableCell
-                              sx={{
-                                fontWeight: 700,
-                                color: "#6F0B14",
-                                py: 1.5,
-                              }}
-                            >
-                              Status
-                            </TableCell>
-                            <TableCell
-                              sx={{
-                                fontWeight: 700,
-                                color: "#6F0B14",
-                                py: 1.5,
-                              }}
-                            >
-                              Block Status
-                            </TableCell>
-                            <TableCell
-                              sx={{
-                                fontWeight: 700,
-                                color: "#6F0B14",
-                                py: 1.5,
-                              }}
-                            >
-                              Actions
-                            </TableCell>
-                          </TableRow>
-                        </TableHead>
+                    <StyledTableContainer>
+                      <StyledTable stickyHeader>
+                        <StyledTableHead>
+                          <StyledHeaderRow>
+                            <TableCell>Visitor</TableCell>
+                            <TableCell>Flat</TableCell>
+                            <TableCell>Type</TableCell>
+                            <TableCell>Purpose</TableCell>
+                            <TableCell>In Time</TableCell>
+                            <TableCell>Out Time</TableCell>
+                            <TableCell>Status</TableCell>
+                            <TableCell>Actions</TableCell>
+                          </StyledHeaderRow>
+                        </StyledTableHead>
                         <TableBody>
                           {paginated.map((v) => (
                             <React.Fragment key={v.id}>
@@ -1189,26 +1141,11 @@ export default function DateWiseVisitors() {
                                 <TableCell>
                                   {getStatusChip(v.approved_status)}
                                 </TableCell>
-                                <TableCell>
-                                  <Chip
-                                    label={v.is_blocked ? "Blocked" : "Active"}
-                                    size="small"
-                                    sx={{
-                                      bgcolor: v.is_blocked
-                                        ? "#fee2e2"
-                                        : "#dcfce7",
-                                      color: v.is_blocked
-                                        ? "#dc2626"
-                                        : "#16a34a",
-                                      fontWeight: 600,
-                                    }}
-                                  />
-                                </TableCell>
                                 <TableCell>{renderActionButtons(v)}</TableCell>
                               </StyledTableRow>
                               {expandedRows[v.id] && (
                                 <TableRow>
-                                  <TableCell colSpan={9} sx={{ py: 0 }}>
+                                  <TableCell colSpan={8} sx={{ py: 0 }}>
                                     <Collapse
                                       in={expandedRows[v.id]}
                                       timeout="auto"
@@ -1222,8 +1159,8 @@ export default function DateWiseVisitors() {
                             </React.Fragment>
                           ))}
                         </TableBody>
-                      </Table>
-                    </TableContainer>
+                      </StyledTable>
+                    </StyledTableContainer>
                   ) : (
                     /* Mobile Cards */
                     <div className="space-y-3">

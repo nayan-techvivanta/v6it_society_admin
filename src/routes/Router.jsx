@@ -47,6 +47,8 @@ import UserDashboard from "../pages/Users/dashboard/UserDashboard";
 import VisitorsList from "../pages/Users/visitors/VisitorsList";
 import AddVisitorPage from "../pages/Users/visitors/AddVisitorPage";
 import DateWiseVisitors from "../pages/Users/visitors/DateWiseVisitors";
+import ChatListPage from "../pages/Users/chatModule/Chatlistpage";
+import ChatRoomPage from "../pages/Users/chatModule/Chatroompage";
 // import AdminComplaints from "../pages/Admin/Complaints";
 
 export default function Router() {
@@ -171,6 +173,8 @@ export default function Router() {
             path="/user/date-wise-visitor"
             element={<DateWiseVisitors />}
           />
+          <Route path="/user/chat" element={<ChatListPage />} />
+          <Route path="/user/chat/:roomId" element={<ChatRoomPage />} />
         </Route>
 
         {/* Unauthorized */}

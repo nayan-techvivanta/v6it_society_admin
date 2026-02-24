@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router";
 import { FaRegIdCard, FaUsers } from "react-icons/fa";
 import { BsThreeDots, BsBuildings, BsCalendarDate } from "react-icons/bs";
 import { FiLogOut } from "react-icons/fi";
-import { IoTicketSharp } from "react-icons/io5";
+import { IoChatbubblesOutline, IoTicketSharp } from "react-icons/io5";
 import { IoMdPerson } from "react-icons/io";
 import { MdCampaign, MdDevices, MdOutlineHowToReg } from "react-icons/md";
 import { PiBuildingApartment } from "react-icons/pi";
@@ -106,7 +106,12 @@ const AppSidebar = () => {
       icon: <BsCalendarDate size={20} />,
       name: "Date wise Visitor",
       path: `${basePath}/date-wise-visitor`,
-      // path: userRole === "security" ? "/add-visitor" : `${basePath}/visitor`,
+      roles: ["tenantowner", "tenantmember", "security"],
+    },
+    {
+      icon: <IoChatbubblesOutline size={20} />,
+      name: "Chat",
+      path: `${basePath}/Chat`,
       roles: ["tenantowner", "tenantmember", "security"],
     },
     {
