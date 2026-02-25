@@ -12,7 +12,13 @@ import { FiChevronDown } from "react-icons/fi";
 import { FaBuildingUser, FaHouse } from "react-icons/fa6";
 import { RxDashboard } from "react-icons/rx";
 import { SlUserFollow } from "react-icons/sl";
+import { supabase } from "../api/supabaseClient";
+import {
+  fetchChatUsers,
+  subscribeGlobal,
+} from "../pages/Users/chatModule/Chatservice";
 import Logo from "../assets/Images/Logo/logo.png";
+import { Badge } from "@mui/material";
 import { useSidebar } from "../context/SidebarContext";
 
 const AppSidebar = () => {
@@ -21,7 +27,78 @@ const AppSidebar = () => {
   const navigate = useNavigate();
   const [openSubmenu, setOpenSubmenu] = useState(null);
   const [subMenuHeight, setSubMenuHeight] = useState({});
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
+
+  const myId = Number(localStorage.getItem("profileId") || 0);
+  const societyId = Number(localStorage.getItem("societyId") || 0);
+
   const subMenuRefs = useRef({});
+  const loadUnreadCount = useCallback(async () => {
+    if (!myId || !societyId) return;
+
+    try {
+      const { totalUnreadCount } = await fetchChatUsers({
+        myId,
+        societyId,
+      });
+      setChatUnreadCount(totalUnreadCount || 0);
+    } catch (err) {
+      console.error("Unread count error:", err);
+    }
+  }, [myId, societyId]);
+  useEffect(() => {
+    if (!myId) return;
+
+    // Initial load
+    loadUnreadCount();
+
+    const channel = supabase
+      .channel("sidebar-chat-realtime")
+
+      // 🔹 NEW MESSAGE
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "chat_message",
+        },
+        (payload) => {
+          const activeChatId = Number(
+            localStorage.getItem("activeChatId") || 0,
+          );
+
+          // If same chat is open → do nothing
+          if (
+            payload.new.sender_id !== myId &&
+            payload.new.chat_id !== activeChatId
+          ) {
+            loadUnreadCount();
+          }
+        },
+      )
+
+      // 🔹 MESSAGE READ
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "chat_message",
+        },
+        (payload) => {
+          if (payload.new.is_read !== payload.old.is_read) {
+            loadUnreadCount();
+          }
+        },
+      )
+
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [myId, loadUnreadCount]);
   // const userRole = localStorage.getItem("role");
 
   // if (!userRole) return null;
@@ -75,110 +152,137 @@ const AppSidebar = () => {
   const displayRole =
     roleDisplayNames[userRole] || userRole?.toUpperCase() || "User";
 
-  const navItems = [
-    {
-      icon: <RxDashboard size={20} />,
-      name: "Dashboard",
-      path: `${basePath}/dashboard`,
-      roles: [
-        "superadmin",
-        "admin",
-        "propertymanager",
-        "tenantowner",
-        "tenantmember",
-        "security",
-      ],
-    },
-    {
-      icon: <PiBuildingApartment size={22} />,
-      name: "Society",
-      path: `${basePath}/society`,
-      roles: ["superadmin", "propertymanager"],
-    },
-    {
-      icon: <SlUserFollow size={20} />,
-      name: "Add Visitor",
-      // path: `${basePath}/visitor`,
-      path: userRole === "security" ? "/add-visitor" : `${basePath}/visitor`,
-      roles: ["tenantowner", "tenantmember", "security"],
-    },
-    {
-      icon: <BsCalendarDate size={20} />,
-      name: "Date wise Visitor",
-      path: `${basePath}/date-wise-visitor`,
-      roles: ["tenantowner", "tenantmember", "security"],
-    },
-    {
-      icon: <IoChatbubblesOutline size={20} />,
-      name: "Chat",
-      path: `${basePath}/Chat`,
-      roles: ["tenantowner", "tenantmember", "security"],
-    },
-    {
-      icon: <BsBuildings size={20} />,
-      name: "Buildings",
-      path: `${basePath}/buildings`,
-      roles: ["superadmin", "admin", "propertymanager"],
-    },
-    {
-      icon: <FaBuildingUser size={20} />,
-      name: "Property Manager",
-      path: `${basePath}/property-managers`,
-      roles: ["superadmin"],
-    },
-    {
-      icon: <IoMdPerson size={20} />,
-      name: "Admin",
-      path: `${basePath}/admin`,
-      roles: ["propertymanager", "superadmin"],
-    },
-    {
-      icon: <FaUsers size={20} />,
-      name: "Users/Tanent",
-      path: `${basePath}/users`,
-      roles: ["superadmin", "admin", "propertymanager"],
-    },
+  // const navItems = [
+  const navItems = useMemo(
+    () => [
+      {
+        icon: <RxDashboard size={20} />,
+        name: "Dashboard",
+        path: `${basePath}/dashboard`,
+        roles: [
+          "superadmin",
+          "admin",
+          "propertymanager",
+          "tenantowner",
+          "tenantmember",
+          "security",
+        ],
+      },
+      {
+        icon: <PiBuildingApartment size={22} />,
+        name: "Society",
+        path: `${basePath}/society`,
+        roles: ["superadmin", "propertymanager"],
+      },
+      {
+        icon: <SlUserFollow size={20} />,
+        name: "Add Visitor",
+        // path: `${basePath}/visitor`,
+        path: userRole === "security" ? "/add-visitor" : `${basePath}/visitor`,
+        roles: ["tenantowner", "tenantmember", "security"],
+      },
+      {
+        icon: <BsCalendarDate size={20} />,
+        name: "Date wise Visitor",
+        path: `${basePath}/date-wise-visitor`,
+        roles: ["tenantowner", "tenantmember", "security"],
+      },
+      // {
+      //   icon: <IoChatbubblesOutline size={20} />,
+      //   name: "Chat",
+      //   path: `${basePath}/Chat`,
+      //   roles: ["tenantowner", "tenantmember", "security"],
+      // },
+      {
+        icon: (
+          <Badge
+            badgeContent={chatUnreadCount > 99 ? "99+" : chatUnreadCount}
+            color="error"
+            overlap="circular"
+            invisible={chatUnreadCount === 0}
+            sx={{
+              "& .MuiBadge-badge": {
+                fontSize: 9,
+                minWidth: 8,
+                height: 15,
+              },
+            }}
+          >
+            <IoChatbubblesOutline size={23} />
+          </Badge>
+        ),
+        name: "Chat",
+        path: `${basePath}/Chat`,
+        roles: ["tenantowner", "tenantmember", "security"],
+      },
+      {
+        icon: <BsBuildings size={20} />,
+        name: "Buildings",
+        path: `${basePath}/buildings`,
+        roles: ["superadmin", "admin", "propertymanager"],
+      },
+      {
+        icon: <FaBuildingUser size={20} />,
+        name: "Property Manager",
+        path: `${basePath}/property-managers`,
+        roles: ["superadmin"],
+      },
+      {
+        icon: <IoMdPerson size={20} />,
+        name: "Admin",
+        path: `${basePath}/admin`,
+        roles: ["propertymanager", "superadmin"],
+      },
+      {
+        icon: <FaUsers size={20} />,
+        name: "Users/Tanent",
+        path: `${basePath}/users`,
+        roles: ["superadmin", "admin", "propertymanager"],
+      },
 
-    {
-      icon: <FaUserShield size={20} />,
-      name: "Security",
-      path: `${basePath}/security`,
-      roles: ["superadmin", "admin"],
-    },
-    {
-      icon: <FaRegIdCard size={20} />,
-      name: "Cards",
-      path: `${basePath}/cards`,
-      roles: ["superadmin", "admin"],
-    },
-    {
-      icon: <MdDevices size={20} />,
-      name: "Devices",
-      path: `${basePath}/devices`,
-      roles: ["superadmin"],
-    },
-    {
-      icon: <IoTicketSharp size={20} />,
-      name: "Tickets",
-      path: `${basePath}/tickets`,
-      roles: ["admin"],
-    },
-    {
-      icon: <MdCampaign size={22} />,
-      name: "Broadcast",
-      path: `${basePath}/broadcast`,
-      roles: ["superadmin", "admin", "propertymanager"],
-    },
-    {
-      icon: <MdOutlineHowToReg size={20} />,
-      name: "Visitors Log",
-      path: `${basePath}/visitors`,
-      roles: ["superadmin", "propertymanager", "admin"],
-    },
-  ];
+      {
+        icon: <FaUserShield size={20} />,
+        name: "Security",
+        path: `${basePath}/security`,
+        roles: ["superadmin", "admin"],
+      },
+      {
+        icon: <FaRegIdCard size={20} />,
+        name: "Cards",
+        path: `${basePath}/cards`,
+        roles: ["superadmin", "admin"],
+      },
+      {
+        icon: <MdDevices size={20} />,
+        name: "Devices",
+        path: `${basePath}/devices`,
+        roles: ["superadmin"],
+      },
+      {
+        icon: <IoTicketSharp size={20} />,
+        name: "Tickets",
+        path: `${basePath}/tickets`,
+        roles: ["admin"],
+      },
+      {
+        icon: <MdCampaign size={22} />,
+        name: "Broadcast",
+        path: `${basePath}/broadcast`,
+        roles: ["superadmin", "admin", "propertymanager"],
+      },
+      {
+        icon: <MdOutlineHowToReg size={20} />,
+        name: "Visitors Log",
+        path: `${basePath}/visitors`,
+        roles: ["superadmin", "propertymanager", "admin"],
+      },
+      // ];
+    ],
+    [chatUnreadCount, basePath, userRole],
+  );
   const filteredNavItems = useMemo(() => {
     return navItems.filter((item) => item.roles.includes(userRole));
-  }, [userRole]);
+  }, [navItems, userRole]);
 
   const handleLogout = () => {
     localStorage.clear();
