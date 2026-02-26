@@ -57,6 +57,7 @@ export const SidebarProvider = ({ children }) => {
         openSubmenu,
         toggleSidebar,
         toggleMobileSidebar,
+        setIsMobileOpen,
         setIsHovered,
         setActiveItem,
         toggleSubmenu,

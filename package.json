@@ -23,6 +23,7 @@
     "dayjs": "^1.11.19",
     "framer-motion": "^12.23.26",
     "html2canvas": "^1.4.1",
+    "lodash.debounce": "^4.0.8",
     "lottie-react": "^2.4.1",
     "lucide-react": "^0.562.0",
     "qrcode.react": "^4.2.0",

@@ -7,11 +7,73 @@ import { GiSiren } from "react-icons/gi";
 import { PiSirenLight } from "react-icons/pi";
 import { IoNotificationsCircleOutline } from "react-icons/io5";
 import { MdOutlineNotificationsActive } from "react-icons/md";
+import { supabase } from "../api/supabaseClient";
+import { useNavigate } from "react-router";
+import { FaFireAlt } from "react-icons/fa";
+import { FaUserInjured } from "react-icons/fa";
+import { MdSecurity } from "react-icons/md";
+import { MdWarningAmber } from "react-icons/md";
+import NotificationDetailModal from "../components/notification/NotificationDetailModal";
+import { toast } from "react-toastify";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
+import { useBulkNotification } from "../Hooks/useBulkNotification";
 const AppHeader = () => {
+  const [notifications, setNotifications] = useState([]);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [selectedNotification, setSelectedNotification] = useState(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const navigate = useNavigate();
+  const notificationButtonRef = useRef(null);
+  const notificationDropdownRef = useRef(null);
+  const userId = localStorage.getItem("profileId");
   const [isApplicationMenuOpen, setApplicationMenuOpen] = useState(false);
   const { isMobileOpen, toggleSidebar, toggleMobileSidebar } = useSidebar();
+  const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
+  const [selectedEmergencyType, setSelectedEmergencyType] = useState("");
+  const [emergencyMessage, setEmergencyMessage] = useState("");
+  const [isSendingEmergency, setIsSendingEmergency] = useState(false);
+
+  const { sendBulkNotification } = useBulkNotification();
+
+  const EMERGENCY_TYPES = [
+    {
+      id: "fire",
+      label: "Fire Emergency",
+      value: "Fire Emergency",
+      color: "text-red-600",
+      bgColor: "bg-red-100",
+      Icon: FaFireAlt,
+    },
+    {
+      id: "medical",
+      label: "Medical Emergency",
+      value: "Medical Emergency",
+      color: "text-red-600",
+      bgColor: "bg-red-100",
+      Icon: FaUserInjured,
+    },
+    {
+      id: "theft",
+      label: "Theft / Intruder",
+      value: "Theft / Intruder",
+      color: "text-red-600",
+      bgColor: "bg-red-100",
+      Icon: MdSecurity,
+    },
+    {
+      id: "other",
+      label: "Other Emergency",
+      value: "Other Emergency",
+      color: "text-red-600",
+      bgColor: "bg-red-100",
+      Icon: MdWarningAmber,
+    },
+  ];
   const storedRole = localStorage.getItem("role");
+
   let userRole = storedRole?.toLowerCase().replace(/-/g, "");
 
   if (userRole === "tanento") userRole = "tenantowner";
@@ -52,9 +114,218 @@ const AppHeader = () => {
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        isNotificationOpen &&
+        notificationButtonRef.current &&
+        !notificationButtonRef.current.contains(event.target)
+      ) {
+        setIsNotificationOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isNotificationOpen]);
+
+  const fetchNotifications = async () => {
+    if (!userId) return;
+
+    setLoadingNotifications(true);
+
+    const { data, error } = await supabase
+      .from("notifications")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+
+    if (!error) {
+      setNotifications(data);
+    }
+
+    setLoadingNotifications(false);
+  };
+
+  const handleNotificationClick = async (notification) => {
+    if (!notification.is_read) {
+      await supabase
+        .from("notifications")
+        .update({ is_read: true })
+        .eq("id", notification.id);
+
+      fetchNotifications();
+    }
+
+    setSelectedNotification(notification);
+    setIsDetailModalOpen(true);
+    setIsNotificationOpen(false);
+  };
+
+  const closeDetailModal = () => {
+    setIsDetailModalOpen(false);
+    setSelectedNotification(null);
+  };
+  // const handleSendEmergency = async () => {
+  //   if (!selectedEmergencyType) {
+  //     alert("Please select an emergency type");
+  //     return;
+  //   }
+
+  //   try {
+  //     const { data: tenantData, error: tenantError } = await supabase
+  //       .from("users")
+  //       .select("society_id")
+  //       .eq("id", userId)
+  //       .single();
+
+  //     if (tenantError || !tenantData?.society_id) {
+  //       alert("Society not found");
+  //       return;
+  //     }
+
+  //     const societyId = tenantData.society_id;
+
+  //     const { data: securityUsers, error: securityError } = await supabase
+  //       .from("users")
+  //       .select("id")
+  //       .eq("society_id", societyId)
+  //       .eq("role_type", "Security");
+
+  //     if (securityError || !securityUsers?.length) {
+  //       alert("No security users found");
+  //       return;
+  //     }
+
+  //     const notificationsToInsert = securityUsers.map((user) => ({
+  //       title: `🚨 EMERGENCY: ${selectedEmergencyType}`,
+  //       body: `Emergency reported: ${selectedEmergencyType}`,
+  //       type: "emergency",
+  //       user_id: user.id,
+  //       society_id: societyId,
+  //       is_read: false,
+  //       is_delete: false,
+  //     }));
+
+  //     // 4️⃣ Insert into notifications table
+  //     const { error: insertError } = await supabase
+  //       .from("notifications")
+  //       .insert(notificationsToInsert);
+
+  //     if (insertError) {
+  //       console.error(insertError);
+  //       alert("Failed to send emergency alert.");
+  //       return;
+  //     }
+
+  //     alert("🚨 Emergency alert sent successfully to security team");
+
+  //     setIsEmergencyModalOpen(false);
+  //     setSelectedEmergencyType("");
+  //   } catch (err) {
+  //     console.error(err);
+  //     alert("Something went wrong.");
+  //   }
+  // };
+
+  const handleSendEmergency = async () => {
+    if (!selectedEmergencyType) {
+      toast.warning("Please select an emergency type");
+      return;
+    }
+
+    if (isSendingEmergency) return;
+
+    try {
+      setIsSendingEmergency(true);
+
+      const { data: tenantData, error: tenantError } = await supabase
+        .from("users")
+        .select("society_id")
+        .eq("id", userId)
+        .single();
+
+      if (tenantError || !tenantData?.society_id) {
+        toast.error("Society not found");
+        return;
+      }
+
+      const societyId = tenantData.society_id;
+
+      const { data: securityUsers, error: securityError } = await supabase
+        .from("users")
+        .select("id")
+        .eq("society_id", societyId)
+        .eq("role_type", "Security");
+
+      if (securityError || !securityUsers?.length) {
+        toast.error("No security users found");
+        return;
+      }
+      const notificationsToInsert = securityUsers.map((user) => ({
+        title: `🚨 EMERGENCY: ${selectedEmergencyType}`,
+        body: `Emergency reported: ${selectedEmergencyType}`,
+        type: "emergency",
+        user_id: user.id,
+        society_id: societyId,
+        is_read: false,
+        is_delete: false,
+      }));
+
+      const { error: insertError } = await supabase
+        .from("notifications")
+        .insert(notificationsToInsert);
+
+      if (insertError) {
+        toast.error("Failed to send emergency alert");
+        return;
+      }
+
+      toast.success("🚨 Emergency alert sent successfully");
+
+      setIsEmergencyModalOpen(false);
+      setSelectedEmergencyType("");
+    } catch (err) {
+      console.error(err);
+      toast.error("Something went wrong");
+    } finally {
+      setIsSendingEmergency(false);
+    }
+  };
+  const navigateToNotificationSource = (notification) => {
+    closeDetailModal();
+
+    switch (notification.type) {
+      case "document":
+        if (notification.document) {
+          window.open(notification.document, "_blank");
+        }
+        break;
+      case "society":
+        if (notification.society_id) {
+          navigate(`/society/${notification.society_id}`);
+        }
+        break;
+      case "building":
+        if (notification.building_id) {
+          navigate(`/building/${notification.building_id}`);
+        }
+        break;
+      case "flat":
+        if (notification.flat_id) {
+          navigate(`/flat/${notification.flat_id}`);
+        }
+        break;
+      default:
+        break;
+    }
+  };
 
   return (
     <header className="sticky top-0 left-0 right-0 w-full bg-white border-b border-gray-200 z-30">
+      <ToastContainer position="top-right" autoClose={3000} />
       <div className="flex flex-col lg:flex-row">
         <div className="flex items-center justify-between w-full gap-2 px-4 py-3 border-b border-gray-200 sm:gap-4 lg:justify-normal lg:border-b-0 lg:px-6 lg:py-4">
           <button
@@ -169,39 +440,257 @@ const AppHeader = () => {
         >
           <div className="flex items-center gap-2 2xsm:gap-3">
             {/* <NotificationDropdown /> */}
-            {/* Notification Menu Area */}
-            {isUserModuleRole && (
-              <button className="relative flex items-center justify-center w-10 h-10 rounded-lg hover:bg-gray-100 transition">
-                <MdOutlineNotificationsActive size={25} />
 
-                {/* red dot */}
-                <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
-              </button>
+            {isUserModuleRole && (
+              <div className="relative" ref={notificationButtonRef}>
+                <button
+                  onClick={() => {
+                    setIsNotificationOpen(!isNotificationOpen);
+                    fetchNotifications();
+                  }}
+                  className="relative flex items-center justify-center w-10 h-10 rounded-lg hover:bg-gray-100 transition"
+                >
+                  <MdOutlineNotificationsActive size={25} />
+
+                  {/* Show red dot only if unread exists */}
+                  {notifications.some((n) => !n.is_read) && (
+                    <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
+                  )}
+                </button>
+
+                {/* Notification Dropdown - Responsive */}
+                {isNotificationOpen && (
+                  <div
+                    ref={notificationDropdownRef}
+                    className="fixed sm:absolute top-auto left-0 right-0 sm:left-auto md:left-[-90px] sm:right-0 mt-3 mx-4 sm:mx-0 w-auto sm:w-80 bg-white rounded-xl shadow-lg border border-gray-200 z-50 max-h-[80vh] sm:max-h-96 overflow-y-auto"
+                    style={{
+                      top: "40px",
+                      maxHeight: "calc(60vh - 80px)",
+                    }}
+                  >
+                    <div className="p-4 border-b font-semibold text-gray-700 sticky top-0 bg-white z-10">
+                      Notifications
+                    </div>
+
+                    <div className="overflow-y-auto">
+                      {loadingNotifications ? (
+                        <div className="p-4 text-center text-gray-500">
+                          Loading...
+                        </div>
+                      ) : notifications.length === 0 ? (
+                        <div className="p-4 text-center text-gray-500">
+                          No Notifications
+                        </div>
+                      ) : (
+                        notifications.map((notification) => (
+                          <div
+                            key={notification.id}
+                            onClick={() =>
+                              handleNotificationClick(notification)
+                            }
+                            className={`p-4 border-b cursor-pointer hover:bg-gray-100 transition-colors ${
+                              !notification.is_read
+                                ? "bg-blue-50 hover:bg-blue-100"
+                                : "hover:bg-gray-50"
+                            }`}
+                          >
+                            <p className="text-sm font-semibold text-gray-800">
+                              {notification.title}
+                              {!notification.is_read && (
+                                <span className="ml-2 inline-block w-2 h-2 bg-blue-500 rounded-full"></span>
+                              )}
+                            </p>
+                            <p className="text-xs text-gray-600 mt-1 line-clamp-2">
+                              {notification.body || notification.message}
+                            </p>
+                            <p className="text-[10px] text-gray-400 mt-1">
+                              {new Date(
+                                notification.created_at,
+                              ).toLocaleString()}
+                            </p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
 
             {isTenant && (
               <button
-                className="group relative flex items-center gap-2 px-5 py-2
-               rounded-full bg-red-600 text-white font-semibold
-               shadow-md hover:shadow-lg hover:bg-red-700
-               transition-all duration-200 ease-in-out
-               active:scale-95"
+                className="
+              relative
+              flex items-center justify-center
+              w-11 h-11
+              rounded-full
+              bg-red-600
+              text-white
+                shadow-lg
+               hover:bg-red-700
+              hover:shadow-xl
+              active:scale-95
+              transition-all duration-200
+              "
+                onClick={() => setIsEmergencyModalOpen(true)}
               >
+                <span className="absolute inset-0 rounded-full border-2 border-red-400 opacity-60"></span>
+
                 {/* Icon */}
-                <PiSirenLight size={25} />
-
-                {/* Text */}
-                {/* <span>Emergency</span> */}
-
-                {/* Subtle Ping */}
-                {/* <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-white rounded-full opacity-80 group-hover:animate-ping" /> */}
+                <PiSirenLight size={22} className="relative z-10" />
               </button>
+            )}
+            {isEmergencyModalOpen && (
+              <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+                <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl transform transition-all animate-slideUp">
+                  {/* Header */}
+                  <div className="p-6 border-b border-red-100 bg-gradient-to-r from-red-50 to-orange-50 rounded-t-2xl">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                        <GiSiren size={28} className="text-red-600" />
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-bold text-gray-800">
+                          Emergency Alert
+                        </h2>
+                        <p className="text-sm text-gray-600">
+                          Select the type of emergency
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Emergency Type Selection - Radio Buttons */}
+                  <div className="p-6 space-y-4">
+                    {EMERGENCY_TYPES.map((type) => {
+                      const IconComponent = type.Icon;
+
+                      return (
+                        <label
+                          key={type.id}
+                          className={`
+          flex items-center p-4 rounded-xl border-2 cursor-pointer
+          transition-all duration-200
+          ${
+            selectedEmergencyType === type.value
+              ? "border-red-500 bg-red-50 shadow-md "
+              : "border-gray-200 hover:border-red-200 hover:bg-gray-50 "
+          }
+        `}
+                        >
+                          <input
+                            type="radio"
+                            name="emergencyType"
+                            value={type.value}
+                            checked={selectedEmergencyType === type.value}
+                            onChange={(e) =>
+                              setSelectedEmergencyType(e.target.value)
+                            }
+                            className="w-5 h-5 text-red-600 focus:ring-red-500 border-gray-300"
+                          />
+
+                          <div className="ml-4 flex items-center gap-3">
+                            <IconComponent
+                              className={`text-xl ${
+                                selectedEmergencyType === type.value
+                                  ? "text-red-600"
+                                  : "text-gray-500"
+                              }`}
+                            />
+
+                            <span
+                              className={`font-medium ${
+                                selectedEmergencyType === type.value
+                                  ? "text-red-700"
+                                  : "text-gray-700"
+                              }`}
+                            >
+                              {type.label}
+                            </span>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+
+                  {/* Footer */}
+                  <div className="p-6 border-t border-gray-200 bg-gray-50 rounded-b-2xl">
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => {
+                          setIsEmergencyModalOpen(false);
+                          setSelectedEmergencyType("");
+                        }}
+                        className="flex-1 px-4 py-3 rounded-xl border-2 border-gray-300 text-gray-700 font-medium hover:bg-gray-100 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSendEmergency}
+                        disabled={!selectedEmergencyType || isSendingEmergency}
+                        className={`
+    flex-1 px-4 py-3 rounded-xl font-medium text-white
+    transition-all duration-200 flex items-center justify-center gap-2
+    ${
+      selectedEmergencyType && !isSendingEmergency
+        ? "bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 shadow-lg hover:shadow-xl"
+        : "bg-gray-400 cursor-not-allowed"
+    }
+  `}
+                      >
+                        {isSendingEmergency ? (
+                          <>
+                            <svg
+                              className="animate-spin h-5 w-5 text-white"
+                              viewBox="0 0 24 24"
+                            >
+                              <circle
+                                className="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                                fill="none"
+                              />
+                              <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8v8z"
+                              />
+                            </svg>
+                            Sending...
+                          </>
+                        ) : (
+                          <>
+                            <GiSiren size={20} />
+                            Send Alert
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Warning Message */}
+                    <p className="text-xs text-center text-gray-500 mt-4">
+                      ⚠️ This will immediately notify all security personnel
+                    </p>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
           {/* User Area */}
           <UserDropdown />
         </div>
       </div>
+      {/* Notification Detail Modal */}
+      {isDetailModalOpen && selectedNotification && (
+        <NotificationDetailModal
+          notification={selectedNotification}
+          onClose={closeDetailModal}
+          onNavigate={navigateToNotificationSource}
+        />
+      )}
     </header>
   );
 };
