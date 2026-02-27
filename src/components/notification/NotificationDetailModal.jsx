@@ -19,7 +19,6 @@ const NotificationDetailModal = ({ notification, onClose, onNavigate }) => {
   const { societyName, buildingName, flatName, loading } =
     useNotificationDetails(notification);
 
-  // Prevent body scroll when modal is open
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => {
